@@ -100,7 +100,7 @@ $CM/cmake -S . -B build -G Ninja && $CM/cmake --build build && $CM/ctest --test-
 ## Оточення
 - Fedora, CLion (cmake у PATH відсутній — використовується вбудований у CLion).
 - Qt6 6.11: встановлені Gui/Quick/Qml/SerialPort/Sql/Test (+ драйвер QSQLITE). `sqlite-devel` не встановлено.
-- Git: гілка `main`, remote `origin` = https://github.com/IsNazarii/Berry-WMS-Terminal.git (push через GitHub-акаунт у CLion; у терміналі HTTPS-облікових даних немає, SSH-ключ не доданий на GitHub).
+- Git: гілка `main`, remote `origin` = git@github.com:IsNazarii/Berry-WMS-Terminal.git (SSH-ключ `~/.ssh/id_ed25519` працює — push можна робити з термінала).
 - GoogleTest у системі не встановлено — тягнеться FetchContent (потрібна мережа при першій конфігурації).
 
 ## Стан ядра і наступні кроки (оновлено 24.09.2026)

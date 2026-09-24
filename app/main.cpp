@@ -14,38 +14,53 @@ int main() {
     const Supplier supplier{42, "Шевченко Тарас", "A"};
     std::cout << "Постачальник: " << supplier.fullName() << " (категорія " << supplier.priceCategory() << ")\n";
 
-    // The scale swings while boxes are being placed, then settles.
-    SimulatedScaleDriver scale{{grams(3'000), grams(21'400), grams(24'950), grams(25'010), grams(25'000),
-                                grams(24'990)}};
     StabilityDetector detector{3, grams(20)};
 
-    scale.open();
-    std::optional<Weight> gross;
-    while (!gross) {
-        const auto reading = scale.read();
-        if (!reading) break;
-        detector.push(*reading);
-        std::cout << "  ваги: " << formatWeight(*reading) << (detector.isStable() ? "  [стабільно]" : "") << '\n';
-        gross = detector.stableWeight();
-    }
-    scale.close();
+    // The scale swings while a pallet is being placed, then settles.
+    auto weighStable = [&detector](std::vector<Weight> script) -> std::optional<Weight> {
+        SimulatedScaleDriver scale{std::move(script)};
+        detector.reset();
+        scale.open();
+        std::optional<Weight> stable;
+        for (int i = 0; i < 20 && !stable; ++i) {
+            const auto reading = scale.read();
+            if (!reading) break;
+            detector.push(*reading);
+            std::cout << "  ваги: " << formatWeight(*reading) << (detector.isStable() ? "  [стабільно]" : "") << '\n';
+            stable = detector.stableWeight();
+        }
+        return stable;
+    };
 
-    if (!gross) {
+    const auto palletGross = weighStable({kilograms(40), kilograms(198), grams(224'990), grams(225'010), kilograms(225)});
+    const auto blueberryGross = weighStable({kilograms(5), grams(20'020), grams(20'040), grams(20'030)});
+    if (!palletGross || !blueberryGross) {
         std::cerr << "Вага не стабілізувалась\n";
         return 1;
     }
 
     std::vector<std::unique_ptr<Transaction>> journal;
-    journal.push_back(std::make_unique<Receipt>(Receipt::create({
-        .supplierId = supplier.id(),
-        .cropCode = "raspberry",
-        .gross = *gross,
-        .boxCount = 10,
-        .tarePerBox = grams(350),
-        .pricePerKg = hryvnias(85),
-        .priceListVersion = 1,
+    journal.push_back(std::make_unique<Receipt>(Receipt::create(supplier.id(), {
+        {
+            .cropCode = "raspberry",
+            .gross = *palletGross,
+            .boxCount = 80,
+            .tarePerBox = grams(350),
+            .palletTare = kilograms(25),
+            .pricePerKg = hryvnias(85),
+            .priceListVersion = 1,
+        },
+        {
+            .cropCode = "blueberry",
+            .gross = *blueberryGross,
+            .boxCount = 10,
+            .tarePerBox = grams(300),
+            .palletTare = {}, // weighed without a pallet
+            .pricePerKg = hryvnias(120) + kopecks(50),
+            .priceListVersion = 1,
+        },
     })));
-    journal.push_back(std::make_unique<Payment>(Payment::create(supplier.id(), hryvnias(1'500), PaymentMethod::Cash)));
+    journal.push_back(std::make_unique<Payment>(Payment::create(supplier.id(), hryvnias(10'000), PaymentMethod::Cash)));
 
     Money balance;
     for (const auto& transaction : journal) {

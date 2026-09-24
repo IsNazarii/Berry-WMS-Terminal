@@ -1,6 +1,6 @@
 #pragma once
 
-#include "wms/quantity.h"
+#include "wms/cargo.h"
 
 #include <cstdint>
 #include <string>
@@ -10,20 +10,6 @@ namespace wms {
 using TruckId = std::int64_t;
 
 enum class TruckStatus { Loading, Departed };
-
-// Amount of berries measured both ways a truck can be limited by.
-struct Cargo {
-    int boxes = 0;
-    Weight weight;
-
-    Cargo& operator+=(const Cargo& other) noexcept {
-        boxes += other.boxes;
-        weight += other.weight;
-        return *this;
-    }
-
-    bool operator==(const Cargo&) const noexcept = default;
-};
 
 // A truck taking berries from the collection point. The current load is not
 // stored here: it is derived from allocation records, like the supplier balance,

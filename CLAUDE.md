@@ -73,7 +73,7 @@ $CM/cmake -S . -B build -G Ninja && $CM/cmake --build build && $CM/ctest --test-
 - Ієрархія B: `IScaleDriver` → `SimulatedScaleDriver` ✅, `SerialScaleDriver` ⏳ (infra, Qt)
 - Ієрархія C (опц.): `PricingStrategy` → …
 - Статичний поліморфізм: `Quantity<Tag>` (`Money`, `Weight`) ✅; `Repository<T>` ⏳
-- Інші класи: `Uuid`, `Supplier`, `StabilityDetector`, `ReceiptInput` ✅
+- Інші класи: `Uuid`, `Supplier`, `StabilityDetector`, `ReceiptInput`, `Truck`, `Cargo` ✅
 - Стан на 24.09: ~10 класів, 2 ієрархії, 3 поліморфізми — мінімум лаби 1 формально закритий,
   але варто додати `CrossDockAllocation`, `Truck`, ціноутворення для запасу.
 
@@ -100,4 +100,4 @@ $CM/cmake -S . -B build -G Ninja && $CM/cmake --build build && $CM/ctest --test-
 ## Відкриті питання
 - Модель принтера (термо ESC/POS чи звичайний, PDF)?
 - Модель ваг і їх протокол по COM-порту?
-- Обмеження фури: ящики чи кг (чи обидва)?
+- Обмеження фури: ящики чи кг? (`Truck` підтримує обидва, 0 = без ліміту — залишається підтвердити на практиці)

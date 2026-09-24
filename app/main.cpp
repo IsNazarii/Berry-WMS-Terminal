@@ -1,8 +1,10 @@
 // Console demo of the domain core. Will be replaced by the Qt/QML terminal UI.
+#include "wms/allocation.h"
 #include "wms/payment.h"
 #include "wms/receipt.h"
 #include "wms/scale.h"
 #include "wms/supplier.h"
+#include "wms/truck.h"
 
 #include <iostream>
 #include <memory>
@@ -39,8 +41,9 @@ int main() {
         return 1;
     }
 
-    std::vector<std::unique_ptr<Transaction>> journal;
-    journal.push_back(std::make_unique<Receipt>(Receipt::create(supplier.id(), {
+    const Truck truck{7, "BI1234AA", {.boxes = 1'200, .weight = kilograms(2'000)}};
+
+    const Receipt receipt = Receipt::create(supplier.id(), {
         {
             .cropCode = "raspberry",
             .gross = *palletGross,
@@ -59,7 +62,12 @@ int main() {
             .pricePerKg = hryvnias(120) + kopecks(50),
             .priceListVersion = 1,
         },
-    })));
+    });
+
+    std::vector<std::unique_ptr<Transaction>> journal;
+    journal.push_back(std::make_unique<Receipt>(receipt));
+    journal.push_back(std::make_unique<CrossDockAllocation>(CrossDockAllocation::wholeWeighing(receipt, 0, truck.id())));
+    journal.push_back(std::make_unique<CrossDockAllocation>(CrossDockAllocation::boxesOf(receipt, "blueberry", 4, truck.id())));
     journal.push_back(std::make_unique<Payment>(Payment::create(supplier.id(), hryvnias(10'000), PaymentMethod::Cash)));
 
     Money balance;

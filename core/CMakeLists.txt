@@ -9,6 +9,7 @@ add_library(wms_core
     src/payment.cpp
     src/scale.cpp
     src/truck.cpp
+    src/allocation.cpp
 )
 
 target_include_directories(wms_core PUBLIC include)

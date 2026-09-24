@@ -43,7 +43,7 @@ int main() {
 
     const Truck truck{7, "BI1234AA", {.boxes = 1'200, .weight = kilograms(2'000)}};
 
-    const Receipt receipt = Receipt::create(supplier.id(), {
+    const Receipt receipt = Receipt::create(supplier.id(), Settlement::OnSite, {
         {
             .cropCode = "raspberry",
             .gross = *palletGross,
@@ -68,6 +68,19 @@ int main() {
     journal.push_back(std::make_unique<Receipt>(receipt));
     journal.push_back(std::make_unique<CrossDockAllocation>(CrossDockAllocation::wholeWeighing(receipt, 0, truck.id())));
     journal.push_back(std::make_unique<CrossDockAllocation>(CrossDockAllocation::boxesOf(receipt, "blueberry", 4, truck.id())));
+    // A wholesale supplier: the terminal only weighs, a responsible person settles later.
+    journal.push_back(std::make_unique<Receipt>(Receipt::create(77, Settlement::HandedOver, {
+        {
+            .cropCode = "raspberry",
+            .gross = kilograms(210),
+            .boxCount = 80,
+            .tarePerBox = grams(350),
+            .palletTare = kilograms(25),
+            .pricePerKg = {}, // agreed later, outside the terminal
+            .priceListVersion = 0,
+            .weightSource = WeightSource::Manual,
+        },
+    })));
     journal.push_back(std::make_unique<Payment>(Payment::create(supplier.id(), hryvnias(10'000), PaymentMethod::Cash)));
 
     Money balance;

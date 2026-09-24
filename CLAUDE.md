@@ -81,7 +81,7 @@ $CM/cmake -S . -B build -G Ninja && $CM/cmake --build build && $CM/ctest --test-
 - Ієрархія C (опц.): `PricingStrategy` → …
 - Статичний поліморфізм: `Quantity<Tag>` (`Money`, `Weight`) ✅; `Repository<T>` ⏳
 - Інші класи: `Uuid`, `Supplier`, `StabilityDetector`, `Weighing`, `Truck`, `Cargo` ✅
-- Стан на 24.09: 13 класів, 2 ієрархії (A — 4 класи), 3 поліморфізми — лаба 1 закрита із запасом.
+- Стан на 24.09: 13 класів, 2 ієрархії (A — 4 класи), 3 поліморфізми, 62 тести — лаба 1 закрита із запасом.
 
 Лаба 2: ≥4 екрани (Ідентифікація, Зважування, Розподіл, Каса, + Sync/Довідники),
 ≥20 контролів, ≥1 контейнер (ListView), ≥10 обробників, логіка відділена.
@@ -102,6 +102,20 @@ $CM/cmake -S . -B build -G Ninja && $CM/cmake --build build && $CM/ctest --test-
 - Qt6 6.11: встановлені Gui/Quick/Qml/SerialPort/Sql/Test (+ драйвер QSQLITE). `sqlite-devel` не встановлено.
 - Git: гілка `main`, remote `origin` = https://github.com/IsNazarii/Berry-WMS-Terminal.git (push через GitHub-акаунт у CLion; у терміналі HTTPS-облікових даних немає, SSH-ключ не доданий на GitHub).
 - GoogleTest у системі не встановлено — тягнеться FetchContent (потрібна мережа при першій конфігурації).
+
+## Стан ядра і наступні кроки (оновлено 24.09.2026)
+Зроблено в `core/`: `Receipt` = постачальник + `Settlement` (`OnSite`/`HandedOver`) + `vector<Weighing>`
+(тара ящиків + палета); `Payment`; `CrossDockAllocation` (`wholeWeighing` / `boxesOf`);
+`Truck` + `Cargo` (ліміти ящики/кг, `fillPercent`, `isOverloaded`); симулятор ваг + `StabilityDetector`.
+`app/main.cpp` — консольне демо всього цього.
+
+Наступні кроки (по черзі, кожен — окремий коміт):
+1. Агрегатор журналу (core): баланс постачальника, завантаження фури (`Cargo` по `truckId`),
+   нерозподілений залишок чека по культурах; валідація «не більше, ніж лишилось»;
+   останній `boxesOf` культури забирає рівно залишок ваги (прибрати похибку округлення).
+2. Каркас QML-UI (лаба 2, альфа до 23.10): 4 екрани на in-memory даних.
+   Чернетка чека (список зважувань до закриття) живе в UI-адаптері; `Receipt` створюється при закритті.
+3. infra: SQLite (WAL, outbox `sync_status`), потім sync-заглушка, потім друк чека (лаба 3).
 
 ## Відкриті питання
 - Модель принтера (термо ESC/POS чи звичайний, PDF)?

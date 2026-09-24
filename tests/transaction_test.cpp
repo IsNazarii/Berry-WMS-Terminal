@@ -61,14 +61,17 @@ TEST(Weighing, RejectsNegativePalletTare) {
     EXPECT_FALSE(w.validate().empty());
 }
 
-TEST(Weighing, ReportsEveryProblem) { EXPECT_GE(Weighing{}.validate().size(), 5U); }
+TEST(Weighing, ReportsEveryWeightProblem) {
+    // Price is not checked here: whether it is required depends on the receipt's settlement.
+    EXPECT_GE(Weighing{}.validate().size(), 4U);
+}
 
 TEST(Receipt, SumsSeveralPalletsAndCrops) {
     // Two full pallets and a partial one of raspberries, plus loose blueberries.
     auto partial = raspberryPallet();
     partial.boxCount = 33;
     partial.gross = grams(90'000);
-    const Receipt r = Receipt::create(42, {raspberryPallet(), raspberryPallet(), partial, blueberryBoxes()});
+    const Receipt r = Receipt::create(42, Settlement::OnSite, {raspberryPallet(), raspberryPallet(), partial, blueberryBoxes()});
 
     EXPECT_EQ(r.supplierId(), 42);
     EXPECT_EQ(r.weighings().size(), 4U);
@@ -82,38 +85,99 @@ TEST(Receipt, SumsSeveralPalletsAndCrops) {
 }
 
 TEST(Receipt, CargoOfOneCrop) {
-    const Receipt r = Receipt::create(42, {raspberryPallet(), blueberryBoxes(), raspberryPallet()});
+    const Receipt r = Receipt::create(42, Settlement::OnSite, {raspberryPallet(), blueberryBoxes(), raspberryPallet()});
     EXPECT_EQ(r.cargoOf("raspberry"), (Cargo{.boxes = 160, .weight = kilograms(344)}));
     EXPECT_EQ(r.cargoOf("strawberry"), Cargo{});
 }
 
 TEST(Receipt, NewReceiptIsPendingSync) {
-    Receipt r = Receipt::create(42, {raspberryPallet()});
+    Receipt r = Receipt::create(42, Settlement::OnSite, {raspberryPallet()});
     EXPECT_EQ(r.syncStatus(), SyncStatus::Pending);
     EXPECT_EQ(r.id().version(), 7);
     r.markSynced();
     EXPECT_EQ(r.syncStatus(), SyncStatus::Synced);
 }
 
-TEST(Receipt, ValidReceiptHasNoErrors) { EXPECT_TRUE(Receipt::create(42, {raspberryPallet()}).isValid()); }
+TEST(Receipt, ValidReceiptHasNoErrors) { EXPECT_TRUE(Receipt::create(42, Settlement::OnSite, {raspberryPallet()}).isValid()); }
 
 TEST(Receipt, RequiresSupplierAndWeighings) {
-    const auto errors = Receipt::create(0, {}).validate();
+    const auto errors = Receipt::create(0, Settlement::OnSite, {}).validate();
     EXPECT_EQ(errors.size(), 2U);
 }
 
 TEST(Receipt, ErrorsNameTheWeighing) {
     auto bad = raspberryPallet();
     bad.pricePerKg = Money{};
-    const auto errors = Receipt::create(42, {raspberryPallet(), bad}).validate();
+    const auto errors = Receipt::create(42, Settlement::OnSite, {raspberryPallet(), bad}).validate();
     ASSERT_EQ(errors.size(), 1U);
     EXPECT_NE(errors[0].find("Зважування 2"), std::string::npos);
+}
+
+TEST(Receipt, OnSiteRequiresPrice) {
+    auto w = raspberryPallet();
+    w.pricePerKg = Money{};
+    EXPECT_FALSE(Receipt::create(42, Settlement::OnSite, {w}).isValid());
+}
+
+namespace {
+
+// Wholesale: the price is agreed later by a responsible person, the terminal only weighs.
+Weighing wholesalePallet() {
+    auto w = raspberryPallet();
+    w.pricePerKg = Money{};
+    w.priceListVersion = 0;
+    return w;
+}
+
+} // namespace
+
+TEST(Receipt, HandedOverRecordsWeightOnly) {
+    const Receipt r = Receipt::create(42, Settlement::HandedOver, {wholesalePallet(), wholesalePallet()});
+    EXPECT_EQ(r.settlement(), Settlement::HandedOver);
+    EXPECT_TRUE(r.isValid());
+    EXPECT_EQ(r.total(), (Cargo{.boxes = 160, .weight = kilograms(344)}));
+    EXPECT_TRUE(r.amount().isZero());
+    // Settled outside the terminal, so the operator's supplier balance is unchanged.
+    EXPECT_TRUE(r.balanceEffect().isZero());
+}
+
+TEST(Receipt, HandedOverRejectsPrice) {
+    // A price on a wholesale receipt would print an amount nobody agreed to.
+    const auto errors = Receipt::create(42, Settlement::HandedOver, {wholesalePallet(), raspberryPallet()}).validate();
+    ASSERT_EQ(errors.size(), 1U);
+    EXPECT_NE(errors[0].find("Зважування 2"), std::string::npos);
+}
+
+TEST(Receipt, HandedOverStillValidatesWeight) {
+    auto w = wholesalePallet();
+    w.boxCount = 0;
+    EXPECT_FALSE(Receipt::create(42, Settlement::HandedOver, {w}).isValid());
+}
+
+TEST(Receipt, DescribeHandedOverShowsNoMoney) {
+    const auto text = Receipt::create(42, Settlement::HandedOver, {wholesalePallet()}).describe();
+    EXPECT_NE(text.find("до розрахунку"), std::string::npos);
+    EXPECT_EQ(text.find("грн"), std::string::npos);
+}
+
+TEST(Receipt, RetailDebtStaysUntilPaidInParts) {
+    // No cash on the day of reception: the debt waits in the journal and is paid later in parts.
+    std::vector<std::unique_ptr<Transaction>> journal;
+    journal.push_back(std::make_unique<Receipt>(Receipt::create(42, Settlement::OnSite, {raspberryPallet()})));
+    Money balance = journal[0]->balanceEffect();
+    EXPECT_EQ(balance, hryvnias(14'620));
+
+    journal.push_back(std::make_unique<Payment>(Payment::create(42, hryvnias(10'000), PaymentMethod::Cash)));
+    journal.push_back(std::make_unique<Payment>(Payment::create(42, hryvnias(4'620), PaymentMethod::BankTransfer)));
+    balance = Money{};
+    for (const auto& t : journal) balance += t->balanceEffect();
+    EXPECT_TRUE(balance.isZero());
 }
 
 TEST(Receipt, DescribeMarksManualWeight) {
     auto w = raspberryPallet();
     w.weightSource = WeightSource::Manual;
-    EXPECT_NE(Receipt::create(42, {w}).describe().find("ручне"), std::string::npos);
+    EXPECT_NE(Receipt::create(42, Settlement::OnSite, {w}).describe().find("ручне"), std::string::npos);
 }
 
 TEST(Transaction, RejectsNilId) {
@@ -129,7 +193,7 @@ TEST(Payment, ReducesBalance) {
 
 TEST(Transaction, BalanceIsSumOfPolymorphicEffects) {
     std::vector<std::unique_ptr<Transaction>> journal;
-    journal.push_back(std::make_unique<Receipt>(Receipt::create(42, {raspberryPallet()})));
+    journal.push_back(std::make_unique<Receipt>(Receipt::create(42, Settlement::OnSite, {raspberryPallet()})));
     journal.push_back(std::make_unique<Payment>(Payment::create(42, hryvnias(1'000), PaymentMethod::Cash)));
 
     Money balance;

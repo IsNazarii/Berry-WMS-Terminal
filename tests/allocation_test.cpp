@@ -23,7 +23,7 @@ Weighing pallet(std::string crop, int boxes, Weight net) {
 
 // Two raspberry pallets (80 + 33 boxes) and one blueberry pallet.
 Receipt sampleReceipt() {
-    return Receipt::create(42, {pallet("raspberry", 80, kilograms(160)), pallet("raspberry", 33, grams(66'000)),
+    return Receipt::create(42, Settlement::OnSite, {pallet("raspberry", 80, kilograms(160)), pallet("raspberry", 33, grams(66'000)),
                                 pallet("blueberry", 40, kilograms(70))});
 }
 
@@ -54,7 +54,7 @@ TEST(CrossDockAllocation, BoxesOfCropGetProportionalWeight) {
 
 TEST(CrossDockAllocation, ProportionalWeightIsRoundedToGrams) {
     // 100 g over 3 boxes -> 33.3 g per box.
-    const Receipt receipt = Receipt::create(42, {pallet("strawberry", 3, grams(100))});
+    const Receipt receipt = Receipt::create(42, Settlement::OnSite, {pallet("strawberry", 3, grams(100))});
     EXPECT_EQ(CrossDockAllocation::boxesOf(receipt, "strawberry", 1, 7).cargo().weight, grams(33));
     EXPECT_EQ(CrossDockAllocation::boxesOf(receipt, "strawberry", 2, 7).cargo().weight, grams(67));
 }

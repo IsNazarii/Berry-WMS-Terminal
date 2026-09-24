@@ -1,0 +1,15 @@
+# Build output
+build/
+cmake-build-*/
+
+# IDE (CLion keeps machine-specific state here)
+.idea/
+
+# Claude Code / MCP local settings (contain machine-specific ports/paths)
+.claude/settings.local.json
+.mcp.json
+
+# Local runtime data
+*.sqlite
+*.sqlite-wal
+*.sqlite-shm

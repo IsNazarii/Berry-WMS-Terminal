@@ -93,8 +93,7 @@ $CM/cmake -S . -B build -G Ninja && $CM/cmake --build build && $CM/ctest --test-
 
 ## Оточення
 - Fedora, CLion (cmake у PATH відсутній — використовується вбудований у CLion).
-- Qt6: встановлені лише базові модулі (Gui). ❗ Потрібно доставити Quick/Qml/SerialPort/Sql/Test
-  (`sudo dnf install qt6-qtdeclarative-devel qt6-qtserialport-devel ...`).
+- Qt6 6.11: встановлені Gui/Quick/Qml/SerialPort/Sql/Test (+ драйвер QSQLITE). `sqlite-devel` не встановлено.
 - Git: гілка `main`, remote `origin` = https://github.com/IsNazarii/Berry-WMS-Terminal.git (push через GitHub-акаунт у CLion; у терміналі HTTPS-облікових даних немає, SSH-ключ не доданий на GitHub).
 - GoogleTest у системі не встановлено — тягнеться FetchContent (потрібна мережа при першій конфігурації).
 

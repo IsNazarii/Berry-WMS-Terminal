@@ -1,5 +1,6 @@
 #pragma once
 
+#include "wms/open_receipt.h"
 #include "wms/operator.h"
 #include "wms/pricing.h"
 #include "wms/truck.h"
@@ -60,6 +61,25 @@ public:
     void departTruck(const TruckId& id);
     void carryOverTruck(const TruckId& id);
 
+    // Receipts being weighed right now, several at once. They belong to the
+    // session: it cannot be closed while any of them is open.
+    [[nodiscard]] const std::vector<OpenReceipt>& openReceipts() const noexcept { return openReceipts_; }
+    [[nodiscard]] const OpenReceipt* findReceipt(const Uuid& id) const noexcept;
+
+    // The supplier's open receipt, or a new one: a supplier never has two.
+    // The reference is valid until the next change of open receipts.
+    // Throws std::logic_error once the session is closed.
+    const OpenReceipt& openReceipt(SupplierId supplierId);
+    // A weighing at the day price takes the price in effect at `at`; a manual
+    // price is kept. Without a day price the line stays unpriced: fine for
+    // wholesale, a retail receipt will not close. Returns the line index.
+    // All of these throw std::invalid_argument for a receipt that is not open.
+    std::size_t addWeighing(const Uuid& receiptId, Weighing weighing, TimePoint at);
+    void cancelWeighing(const Uuid& receiptId, std::size_t index);
+    // The receipt leaves the open list; the caller puts it into the journal.
+    // Throws std::logic_error when OpenReceipt::validateClose() is not empty.
+    [[nodiscard]] Receipt closeReceipt(const Uuid& receiptId, Settlement settlement);
+
     // Operator-facing: why the session cannot be closed yet; empty when it can.
     [[nodiscard]] std::vector<std::string> validateClose() const;
     // Throws std::logic_error when validateClose() is not empty or already closed.
@@ -82,6 +102,7 @@ private:
     template <class Change>
     void amend(const Amendment& amendment, std::string description, Change change);
     [[nodiscard]] Truck& truck(const TruckId& id);
+    [[nodiscard]] std::vector<OpenReceipt>::iterator receipt(const Uuid& id);
 
     std::chrono::year_month_day date_;
     TimePoint openedAt_;
@@ -91,6 +112,7 @@ private:
     DayPrices prices_;
     std::vector<Truck> trucks_;
     std::vector<AmendmentRecord> amendments_;
+    std::vector<OpenReceipt> openReceipts_;
 };
 
 } // namespace wms

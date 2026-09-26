@@ -56,8 +56,40 @@ void WorkDay::carryOverTruck(const TruckId& id) {
     truck(id).carryOver();
 }
 
+const OpenReceipt* WorkDay::findReceipt(const Uuid& id) const noexcept {
+    const auto found = std::ranges::find(openReceipts_, id, &OpenReceipt::id);
+    return found != openReceipts_.end() ? &*found : nullptr;
+}
+
+const OpenReceipt& WorkDay::openReceipt(SupplierId supplierId) {
+    requireOpen();
+    const auto found = std::ranges::find(openReceipts_, supplierId, &OpenReceipt::supplierId);
+    if (found != openReceipts_.end()) return *found;
+    return openReceipts_.emplace_back(OpenReceipt::open(supplierId));
+}
+
+std::size_t WorkDay::addWeighing(const Uuid& receiptId, Weighing weighing, TimePoint at) {
+    const auto target = receipt(receiptId);
+    if (weighing.priceSource == PriceSource::DayPrice) {
+        weighing.pricePerKg = prices_.priceAt(weighing.cropCode, at).value_or(Money{});
+    }
+    return target->add(std::move(weighing));
+}
+
+void WorkDay::cancelWeighing(const Uuid& receiptId, std::size_t index) { receipt(receiptId)->cancel(index); }
+
+Receipt WorkDay::closeReceipt(const Uuid& receiptId, Settlement settlement) {
+    const auto target = receipt(receiptId);
+    Receipt closed = target->close(settlement);
+    openReceipts_.erase(target);
+    return closed;
+}
+
 std::vector<std::string> WorkDay::validateClose() const {
     std::vector<std::string> errors;
+    for (const OpenReceipt& r : openReceipts_) {
+        errors.push_back(std::format("Відкритий чек постачальника #{}: закрийте його", r.supplierId()));
+    }
     for (const Truck& t : trucks_) {
         if (t.status() == TruckStatus::Loading) {
             errors.push_back(std::format("Фура {} ще завантажується: закрийте її або перенесіть у наступну сесію",
@@ -70,7 +102,7 @@ std::vector<std::string> WorkDay::validateClose() const {
 void WorkDay::close(TimePoint at, OperatorId by) {
     requireOpen();
     if (by <= 0) throw std::invalid_argument("Work day must be closed by an operator");
-    if (!validateClose().empty()) throw std::logic_error("Every loading truck needs a decision before closing");
+    if (!validateClose().empty()) throw std::logic_error("Session cannot be closed yet: see validateClose()");
     closedAt_ = at;
     closedBy_ = by;
 }
@@ -112,6 +144,12 @@ std::vector<Truck> WorkDay::trucksForNextSession() const {
     std::ranges::copy_if(trucks_, std::back_inserter(result),
                          [](const Truck& t) { return t.status() == TruckStatus::CarriedOver; });
     return result;
+}
+
+std::vector<OpenReceipt>::iterator WorkDay::receipt(const Uuid& id) {
+    const auto found = std::ranges::find(openReceipts_, id, &OpenReceipt::id);
+    if (found == openReceipts_.end()) throw std::invalid_argument("Receipt is not open in this session");
+    return found;
 }
 
 void WorkDay::requireOpen() const {

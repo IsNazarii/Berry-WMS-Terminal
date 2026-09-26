@@ -147,3 +147,110 @@ TEST(WorkDay, FailedAmendmentIsNotLogged) {
     EXPECT_THROW(day.departTruck(stranger.id(), fix), std::invalid_argument);
     EXPECT_TRUE(day.amendments().empty());
 }
+
+namespace {
+
+Weighing raspberryPallet() {
+    return {
+        .cropCode = "raspberry",
+        .gross = kilograms(185),
+        .boxCount = 80,
+        .tarePerBox = grams(300),
+        .palletTare = kilograms(1),
+    };
+}
+
+WorkDay dayWithRaspberryPrice() {
+    WorkDay day = openAtNoon();
+    day.setPrice("raspberry", hryvnias(85), kMidnight + 12h);
+    return day;
+}
+
+} // namespace
+
+TEST(WorkDay, OneOpenReceiptPerSupplier) {
+    // The supplier came back with more pallets: continue the same receipt.
+    WorkDay day = dayWithRaspberryPrice();
+    const Uuid first = day.openReceipt(42).id();
+    EXPECT_EQ(day.openReceipt(42).id(), first);
+    EXPECT_NE(day.openReceipt(43).id(), first);
+    EXPECT_EQ(day.openReceipts().size(), 2U);
+}
+
+TEST(WorkDay, WeighingTakesTheDayPriceOfThatMoment) {
+    WorkDay day = dayWithRaspberryPrice();
+    day.setPrice("raspberry", hryvnias(95), kMidnight + 15h);
+    const Uuid id = day.openReceipt(42).id();
+
+    day.addWeighing(id, raspberryPallet(), kMidnight + 14h);
+    day.addWeighing(id, raspberryPallet(), kMidnight + 16h);
+
+    const auto& lines = day.findReceipt(id)->weighings();
+    EXPECT_EQ(lines[0].pricePerKg, hryvnias(85));
+    EXPECT_EQ(lines[1].pricePerKg, hryvnias(95));
+}
+
+TEST(WorkDay, ManualPriceIsKept) {
+    WorkDay day = dayWithRaspberryPrice();
+    const Uuid id = day.openReceipt(42).id();
+    auto raised = raspberryPallet();
+    raised.pricePerKg = hryvnias(90);
+    raised.priceSource = PriceSource::Manual;
+
+    day.addWeighing(id, raised, kMidnight + 13h);
+    EXPECT_EQ(day.findReceipt(id)->weighings()[0].pricePerKg, hryvnias(90));
+}
+
+TEST(WorkDay, WeighingWithoutDayPriceHasNoPrice) {
+    // Allowed: a wholesale receipt needs no price; a retail one will not close.
+    WorkDay day = openAtNoon();
+    const Uuid id = day.openReceipt(42).id();
+    day.addWeighing(id, raspberryPallet(), kMidnight + 13h);
+    EXPECT_TRUE(day.findReceipt(id)->weighings()[0].pricePerKg.isZero());
+}
+
+TEST(WorkDay, CancelWeighingKeepsTheLine) {
+    WorkDay day = dayWithRaspberryPrice();
+    const Uuid id = day.openReceipt(42).id();
+    day.addWeighing(id, raspberryPallet(), kMidnight + 13h);
+    day.cancelWeighing(id, 0);
+    EXPECT_TRUE(day.findReceipt(id)->weighings()[0].cancelled);
+}
+
+TEST(WorkDay, ClosedReceiptLeavesTheOpenList) {
+    WorkDay day = dayWithRaspberryPrice();
+    const Uuid id = day.openReceipt(42).id();
+    day.addWeighing(id, raspberryPallet(), kMidnight + 13h);
+
+    const Receipt receipt = day.closeReceipt(id, Settlement::OnSite);
+    EXPECT_EQ(receipt.id(), id);
+    EXPECT_EQ(receipt.amount(), hryvnias(85 * 160));
+    EXPECT_EQ(day.findReceipt(id), nullptr);
+    EXPECT_NE(day.openReceipt(42).id(), id); // the next visit is a new receipt
+}
+
+TEST(WorkDay, ReceiptThatCannotCloseStaysOpen) {
+    WorkDay day = dayWithRaspberryPrice();
+    const Uuid id = day.openReceipt(42).id();
+    EXPECT_THROW((void)day.closeReceipt(id, Settlement::OnSite), std::logic_error);
+    EXPECT_NE(day.findReceipt(id), nullptr);
+}
+
+TEST(WorkDay, UnknownReceiptIsProgrammerError) {
+    WorkDay day = dayWithRaspberryPrice();
+    EXPECT_THROW(day.addWeighing(Uuid::generateV7(), raspberryPallet(), kMidnight + 13h), std::invalid_argument);
+}
+
+TEST(WorkDay, CannotCloseWithOpenReceipts) {
+    WorkDay day = dayWithRaspberryPrice();
+    (void)day.openReceipt(42);
+    const auto errors = day.validateClose();
+    ASSERT_EQ(errors.size(), 1U);
+    EXPECT_NE(errors[0].find("#42"), std::string::npos);
+}
+
+TEST(WorkDay, ClosedSessionOpensNoReceipts) {
+    WorkDay day = openAtNoon();
+    day.close(kMidnight + 20h, kOksana);
+    EXPECT_THROW((void)day.openReceipt(42), std::logic_error);
+}

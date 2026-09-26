@@ -42,8 +42,13 @@ void addDemoHistory(Journal& journal) {
 
 } // namespace
 
-Terminal::Terminal(QObject* parent) : QObject{parent}, suppliers_{demoSuppliers()}, trucks_{demoTrucks()} {
+Terminal::Terminal(QObject* parent)
+    : QObject{parent},
+      suppliers_{demoSuppliers()},
+      trucks_{demoTrucks()},
+      supplierModel_{suppliers_, journal_} {
     addDemoHistory(journal_);
+    connect(this, &Terminal::journalChanged, &supplierModel_, &SupplierListModel::refreshBalances);
 }
 
 int Terminal::journalSize() const noexcept { return static_cast<int>(journal_.size()); }

@@ -41,7 +41,9 @@ ApplicationWindow {
         anchors.fill: parent
         currentIndex: tabs.currentIndex
 
-        IdentificationScreen {}
+        IdentificationScreen {
+            onProceed: tabs.currentIndex = 1
+        }
         WeighingScreen {}
         AllocationScreen {}
         CashScreen {}

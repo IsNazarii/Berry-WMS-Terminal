@@ -5,6 +5,8 @@ qt_add_qml_module(wms_ui
     SOURCES
         src/terminal.h
         src/terminal.cpp
+        src/supplier_list_model.h
+        src/supplier_list_model.cpp
     QML_FILES
         qml/Main.qml
         qml/screens/IdentificationScreen.qml

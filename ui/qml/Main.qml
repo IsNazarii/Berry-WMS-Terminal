@@ -11,10 +11,11 @@ ApplicationWindow {
     visible: true
     title: qsTr("Berry WMS — термінал приймальника")
 
-    // Operator workflow goes left to right: who brought it, weigh, load, pay.
+    // Operator workflow goes left to right: open the day, who brought it, weigh, load, pay.
     header: TabBar {
         id: tabs
         visible: Terminal.loggedIn
+        TabButton { text: qsTr("Сесія") }
         TabButton { text: qsTr("Постачальник") }
         TabButton { text: qsTr("Зважування") }
         TabButton { text: qsTr("Розподіл") }
@@ -35,6 +36,10 @@ ApplicationWindow {
                       ? qsTr("Постачальник: %1 · борг: %2").arg(Terminal.supplierName).arg(Terminal.supplierBalance)
                       : qsTr("Постачальника не обрано")
                 Layout.fillWidth: true
+            }
+            Label {
+                text: Terminal.sessionOpen ? Terminal.sessionTitle : qsTr("Сесію не відкрито")
+                color: Terminal.sessionOpen ? palette.windowText : "#c62828"
             }
             Label { text: qsTr("Записів у журналі: %1").arg(Terminal.journalSize) }
             Label { text: qsTr("Оператор: %1").arg(Terminal.operatorName) }
@@ -61,8 +66,9 @@ ApplicationWindow {
         visible: Terminal.loggedIn
         currentIndex: tabs.currentIndex
 
+        SessionScreen {}
         IdentificationScreen {
-            onProceed: tabs.currentIndex = 1
+            onProceed: tabs.currentIndex = 2
         }
         WeighingScreen {}
         AllocationScreen {}

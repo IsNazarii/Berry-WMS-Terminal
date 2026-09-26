@@ -7,10 +7,13 @@
 #include "wms/scale.h"
 #include "wms/supplier.h"
 #include "wms/truck.h"
+#include "wms/workday.h"
 
 #include <QObject>
 #include <QString>
+#include <QStringList>
 #include <QVariantList>
+#include <QVariantMap>
 #include <QtQml/qqmlregistration.h>
 
 #include <optional>
@@ -39,6 +42,22 @@ class Terminal : public QObject {
     Q_PROPERTY(bool loggedIn READ loggedIn NOTIFY operatorChanged)
     Q_PROPERTY(QString operatorName READ operatorName NOTIFY operatorChanged)
 
+    Q_PROPERTY(bool sessionOpen READ sessionOpen NOTIFY sessionChanged)
+    // "Сесія 26.09.2026", empty without an open session.
+    Q_PROPERTY(QString sessionTitle READ sessionTitle NOTIFY sessionChanged)
+    Q_PROPERTY(QString sessionOpenedBy READ sessionOpenedBy NOTIFY sessionChanged)
+    // [{cropCode, name}]. Kept apart from the prices: a Repeater over a list that
+    // changes rebuilds its rows and would wipe what the operator is typing.
+    Q_PROPERTY(QVariantList crops READ cropList CONSTANT)
+    // {cropCode: formatted price}; a crop without a price is missing.
+    Q_PROPERTY(QVariantMap prices READ priceMap NOTIFY pricesChanged)
+    // [{truckId, plate, make, note, capacity, load, fillPercent, overloaded, status, loading}] of the session.
+    Q_PROPERTY(QVariantList trucks READ truckList NOTIFY trucksChanged)
+    // [{index, plate, make, note, capacity}] of the previous session, for "repeat the truck from yesterday".
+    Q_PROPERTY(QVariantList previousTrucks READ previousTruckList NOTIFY sessionChanged)
+    // Why the session cannot be closed yet, straight from WorkDay::validateClose().
+    Q_PROPERTY(QStringList closeBlockers READ closeBlockers NOTIFY trucksChanged)
+
 public:
     explicit Terminal(QObject* parent = nullptr);
 
@@ -56,6 +75,15 @@ public:
     [[nodiscard]] bool loggedIn() const noexcept { return currentOperatorId_.has_value(); }
     [[nodiscard]] QString operatorName() const;
 
+    [[nodiscard]] bool sessionOpen() const noexcept { return workDay_.has_value(); }
+    [[nodiscard]] QString sessionTitle() const;
+    [[nodiscard]] QString sessionOpenedBy() const;
+    [[nodiscard]] QVariantList cropList() const;
+    [[nodiscard]] QVariantMap priceMap() const;
+    [[nodiscard]] QVariantList truckList() const;
+    [[nodiscard]] QVariantList previousTruckList() const;
+    [[nodiscard]] QStringList closeBlockers() const;
+
     // Returns false for an unknown operator or a wrong PIN.
     Q_INVOKABLE bool login(qint64 operatorId, const QString& pin);
     // Also forgets the supplier: the next operator starts from a clean screen.
@@ -65,13 +93,28 @@ public:
     Q_INVOKABLE bool selectSupplier(qint64 id);
     Q_INVOKABLE void clearSupplier();
 
+    // Opened by the logged-in operator, named by today's date. Trucks carried
+    // over from the previous session join it with their load. Does nothing
+    // without an operator or when a session is already open.
+    Q_INVOKABLE void openSession();
+    // Session editing: each returns an operator-facing error, empty on success.
+    Q_INVOKABLE QString setPrice(const QString& cropCode, const QString& price);
+    // Limits as typed; an empty field means no limit in that dimension.
+    // Make and note are optional.
+    Q_INVOKABLE QString addTruck(const QString& plate, const QString& make, const QString& note,
+                                 const QString& boxes, const QString& kilograms);
+    Q_INVOKABLE QString repeatTruck(int previousIndex);
+    Q_INVOKABLE void departTruck(const QString& truckId);
+    Q_INVOKABLE void carryOverTruck(const QString& truckId);
+    // Does nothing while closeBlockers is not empty.
+    Q_INVOKABLE void closeSession();
+
     // Scale simulator controls, until real scales are connected.
     Q_INVOKABLE void simulatePallet();
     Q_INVOKABLE void simulateEmptyScale();
 
     // Read access for the C++ list models; QML goes through properties.
     [[nodiscard]] const std::vector<Supplier>& suppliers() const noexcept { return suppliers_; }
-    [[nodiscard]] const std::vector<Truck>& trucks() const noexcept { return trucks_; }
     [[nodiscard]] const Journal& journal() const noexcept { return journal_; }
 
 signals:
@@ -80,14 +123,23 @@ signals:
     void currentSupplierChanged();
     // The balance depends on both the supplier and the journal.
     void balanceChanged();
+    // Opened or closed.
+    void sessionChanged();
+    void pricesChanged();
+    // Truck loads depend on both the session and the journal.
+    void trucksChanged();
 
 private:
     [[nodiscard]] const Supplier* currentSupplier() const noexcept;
     [[nodiscard]] const Operator* findOperator(OperatorId id) const noexcept;
+    [[nodiscard]] QString operatorNameOf(OperatorId id) const;
+    [[nodiscard]] QVariantMap truckInfo(const Truck& truck) const;
 
     std::vector<Operator> operators_;
     std::vector<Supplier> suppliers_;
-    std::vector<Truck> trucks_;
+    // Kept while there is no open session: repeat and carry-over read them.
+    std::vector<Truck> previousTrucks_;
+    std::optional<WorkDay> workDay_;
     Journal journal_;
     // Declared after the data it reads, so it is constructed after it.
     SupplierListModel supplierModel_;

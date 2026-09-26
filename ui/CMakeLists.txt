@@ -12,6 +12,7 @@ qt_add_qml_module(wms_ui
     QML_FILES
         qml/Main.qml
         qml/screens/LoginScreen.qml
+        qml/screens/SessionScreen.qml
         qml/screens/IdentificationScreen.qml
         qml/screens/WeighingScreen.qml
         qml/screens/AllocationScreen.qml

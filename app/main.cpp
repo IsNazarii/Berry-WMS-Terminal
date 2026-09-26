@@ -1,13 +1,11 @@
 // Console demo of the domain core. Will be replaced by the Qt/QML terminal UI.
-#include "wms/allocation.h"
-#include "wms/payment.h"
-#include "wms/receipt.h"
+#include "wms/journal.h"
 #include "wms/scale.h"
 #include "wms/supplier.h"
 #include "wms/truck.h"
 
 #include <iostream>
-#include <memory>
+#include <string>
 #include <vector>
 
 int main() {
@@ -64,12 +62,39 @@ int main() {
         },
     });
 
-    std::vector<std::unique_ptr<Transaction>> journal;
-    journal.push_back(std::make_unique<Receipt>(receipt));
-    journal.push_back(std::make_unique<CrossDockAllocation>(CrossDockAllocation::wholeWeighing(receipt, 0, truck.id())));
-    journal.push_back(std::make_unique<CrossDockAllocation>(CrossDockAllocation::boxesOf(receipt, "blueberry", 4, truck.id())));
+    Journal journal;
+
+    // describe() is virtual: one printer serves every record type.
+    auto print = [](const Transaction& t) { std::cout << t.describe() << "  [" << t.id().toString() << "]\n"; };
+    // Generic lambda: journal.add(t) picks the overload for the concrete type at compile time.
+    auto record = [&journal, &print](const auto& t) {
+        if (const auto errors = t.validate(); !errors.empty()) {
+            for (const auto& error : errors) std::cerr << "Помилка: " << error << '\n';
+            return false;
+        }
+        journal.add(t);
+        print(t);
+        return true;
+    };
+    // Allocations need the rest of the journal to be checked.
+    auto allocate = [&journal, &print](const CrossDockAllocation& a) {
+        if (const auto errors = journal.validateAllocation(a); !errors.empty()) {
+            for (const auto& error : errors) std::cout << "  відхилено: " << error << '\n';
+            return;
+        }
+        journal.add(a);
+        print(a);
+    };
+
+    if (!record(receipt)) return 1;
+    allocate(CrossDockAllocation::wholeWeighing(receipt, 0, truck.id()));
+    allocate(journal.boxesOf(receipt.id(), "blueberry", 3, truck.id()));
+    allocate(journal.boxesOf(receipt.id(), "blueberry", 8, truck.id()));    // only 7 left
+    allocate(CrossDockAllocation::wholeWeighing(receipt, 0, truck.id()));  // the same pallet again
+    allocate(journal.boxesOf(receipt.id(), "blueberry", 7, truck.id()));    // last boxes: exactly the rest
+
     // A wholesale supplier: the terminal only weighs, a responsible person settles later.
-    journal.push_back(std::make_unique<Receipt>(Receipt::create(77, Settlement::HandedOver, {
+    const bool recorded = record(Receipt::create(77, Settlement::HandedOver, {
         {
             .cropCode = "raspberry",
             .gross = kilograms(210),
@@ -80,18 +105,16 @@ int main() {
             .priceListVersion = 0,
             .weightSource = WeightSource::Manual,
         },
-    })));
-    journal.push_back(std::make_unique<Payment>(Payment::create(supplier.id(), hryvnias(10'000), PaymentMethod::Cash)));
+    }));
+    if (!recorded || !record(Payment::create(supplier.id(), hryvnias(10'000), PaymentMethod::Cash))) return 1;
 
-    Money balance;
-    for (const auto& transaction : journal) {
-        if (const auto errors = transaction->validate(); !errors.empty()) {
-            for (const auto& error : errors) std::cerr << "Помилка: " << error << '\n';
-            return 1;
-        }
-        std::cout << transaction->describe() << "  [" << transaction->id().toString() << "]\n";
-        balance += transaction->balanceEffect();
-    }
-    std::cout << "Борг перед постачальником: " << formatMoney(balance) << '\n';
+    const Cargo load = journal.loadOf(truck.id());
+    const Cargo blueberryLeft = journal.unallocatedOf(receipt.id(), "blueberry");
+    std::cout << "\nЗаписів у журналі: " << journal.size() << '\n'
+              << "Борг перед постачальником: " << formatMoney(journal.balanceOf(supplier.id())) << '\n'
+              << "Фура " << truck.plate() << ": " << load.boxes << " ящ., " << formatWeight(load.weight) << " ("
+              << truck.fillPercent(load) << "%)\n"
+              << "Лохина не розподілена: " << blueberryLeft.boxes << " ящ., " << formatWeight(blueberryLeft.weight)
+              << '\n';
     return 0;
 }

@@ -112,7 +112,7 @@ $CM/cmake -S . -B build -G Ninja && $CM/cmake --build build && $CM/ctest --test-
 `balanceOf(supplier)`, `loadOf(truck)`, `unallocatedOf(receipt, crop)`, `validateAllocation()`
 (для оператора; `add()` приймає будь-які факти — офлайн-конфлікт дає від'ємний залишок),
 `Journal::boxesOf()` ділить вагу пропорційно залишку (останні ящики = рівно залишок ваги).
-`app/main.cpp` — консольне демо (ще без `Journal`).
+`app/main.cpp` — консольне демо через `Journal` (відхилені розподіли, баланс, завантаження фури).
 
 Наступні кроки (по черзі, кожен — окремий коміт):
 1. Каркас QML-UI (лаба 2, альфа до 23.10): 4 екрани на in-memory даних.

@@ -23,8 +23,8 @@ std::vector<Supplier> demoSuppliers() {
 
 std::vector<Truck> demoTrucks() {
     return {
-        {7, "BI1234AA", {.boxes = 1'200, .weight = kilograms(2'000)}},
-        {8, "BI5678BB", {.boxes = 0, .weight = kilograms(5'000)}},
+        Truck::create("BI1234AA", {.boxes = 1'200, .weight = kilograms(2'000)}),
+        Truck::create("BI5678BB", {.boxes = 0, .weight = kilograms(5'000)}),
     };
 }
 

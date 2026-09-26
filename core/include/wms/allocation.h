@@ -39,7 +39,7 @@ public:
                                                      TruckId truckId, const Cargo& available);
 
     [[nodiscard]] const Uuid& receiptId() const noexcept { return receiptId_; }
-    [[nodiscard]] TruckId truckId() const noexcept { return truckId_; }
+    [[nodiscard]] const TruckId& truckId() const noexcept { return truckId_; }
     [[nodiscard]] const std::string& cropCode() const noexcept { return cropCode_; }
     [[nodiscard]] const Cargo& cargo() const noexcept { return cargo_; }
     // Set only when a whole weighing was allocated.

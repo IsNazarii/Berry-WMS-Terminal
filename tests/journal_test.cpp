@@ -12,6 +12,10 @@ using namespace wms;
 
 namespace {
 
+// Fixed truck ids, so a failing test prints the same values every run.
+const TruckId kTruck = Uuid::generateV7(TimePoint{}, 1, 7);
+const TruckId kOtherTruck = Uuid::generateV7(TimePoint{}, 1, 8);
+
 Weighing pallet(std::string crop, int boxes, Weight net, Money pricePerKg = hryvnias(85)) {
     return {
         .cropCode = std::move(crop),
@@ -66,7 +70,7 @@ TEST(Journal, SameRecordIsAddedOnlyOnce) {
 
 TEST(Journal, EmptyTruckHasNoLoad) {
     const Journal journal;
-    EXPECT_EQ(journal.loadOf(7), Cargo{});
+    EXPECT_EQ(journal.loadOf(kTruck), Cargo{});
 }
 
 TEST(Journal, TruckLoadSumsItsAllocations) {
@@ -75,12 +79,12 @@ TEST(Journal, TruckLoadSumsItsAllocations) {
         42, Settlement::OnSite, {pallet("raspberry", 80, kilograms(160)), pallet("blueberry", 40, kilograms(70))});
     journal.add(receipt);
     // Blueberry: 40 boxes, 70 kg -> 1.75 kg per box.
-    journal.add(CrossDockAllocation::wholeWeighing(receipt, 0, 7));
-    journal.add(CrossDockAllocation::boxesOf(receipt, "blueberry", 10, 7));
-    journal.add(CrossDockAllocation::boxesOf(receipt, "blueberry", 30, 8)); // another truck
+    journal.add(CrossDockAllocation::wholeWeighing(receipt, 0, kTruck));
+    journal.add(CrossDockAllocation::boxesOf(receipt, "blueberry", 10, kTruck));
+    journal.add(CrossDockAllocation::boxesOf(receipt, "blueberry", 30, kOtherTruck)); // another truck
 
-    EXPECT_EQ(journal.loadOf(7), (Cargo{.boxes = 90, .weight = grams(177'500)}));
-    EXPECT_EQ(journal.loadOf(8), (Cargo{.boxes = 30, .weight = grams(52'500)}));
+    EXPECT_EQ(journal.loadOf(kTruck), (Cargo{.boxes = 90, .weight = grams(177'500)}));
+    EXPECT_EQ(journal.loadOf(kOtherTruck), (Cargo{.boxes = 30, .weight = grams(52'500)}));
 }
 
 namespace {
@@ -114,9 +118,9 @@ TEST(Journal, UnallocatedSubtractsOnlyThatReceiptAndCrop) {
     const Receipt other = mixedReceipt();
     journal.add(receipt);
     journal.add(other);
-    journal.add(CrossDockAllocation::wholeWeighing(receipt, 0, 7));         // 80 raspberry boxes
-    journal.add(CrossDockAllocation::boxesOf(receipt, "blueberry", 10, 7)); // other crop
-    journal.add(CrossDockAllocation::boxesOf(other, "raspberry", 5, 7));    // other receipt
+    journal.add(CrossDockAllocation::wholeWeighing(receipt, 0, kTruck));         // 80 raspberry boxes
+    journal.add(CrossDockAllocation::boxesOf(receipt, "blueberry", 10, kTruck)); // other crop
+    journal.add(CrossDockAllocation::boxesOf(other, "raspberry", 5, kTruck));    // other receipt
 
     EXPECT_EQ(journal.unallocatedOf(receipt.id(), "raspberry"), (Cargo{.boxes = 20, .weight = kilograms(40)}));
 }
@@ -130,18 +134,18 @@ TEST(Journal, AllocationWithinWhatIsLeftIsValid) {
     Journal journal;
     const Receipt receipt = mixedReceipt();
     journal.add(receipt);
-    journal.add(CrossDockAllocation::wholeWeighing(receipt, 0, 7));
+    journal.add(CrossDockAllocation::wholeWeighing(receipt, 0, kTruck));
 
-    EXPECT_TRUE(journal.validateAllocation(CrossDockAllocation::boxesOf(receipt, "raspberry", 20, 8)).empty());
+    EXPECT_TRUE(journal.validateAllocation(CrossDockAllocation::boxesOf(receipt, "raspberry", 20, kOtherTruck)).empty());
 }
 
 TEST(Journal, RejectsMoreBoxesThanLeft) {
     Journal journal;
     const Receipt receipt = mixedReceipt();
     journal.add(receipt);
-    journal.add(CrossDockAllocation::wholeWeighing(receipt, 0, 7));
+    journal.add(CrossDockAllocation::wholeWeighing(receipt, 0, kTruck));
 
-    const auto errors = journal.validateAllocation(CrossDockAllocation::boxesOf(receipt, "raspberry", 21, 8));
+    const auto errors = journal.validateAllocation(CrossDockAllocation::boxesOf(receipt, "raspberry", 21, kOtherTruck));
     EXPECT_TRUE(mentions(errors, "Залишилось лише 20 ящ."));
 }
 
@@ -149,15 +153,15 @@ TEST(Journal, RejectsSameWeighingTwice) {
     Journal journal;
     const Receipt receipt = mixedReceipt();
     journal.add(receipt);
-    journal.add(CrossDockAllocation::wholeWeighing(receipt, 1, 7));
+    journal.add(CrossDockAllocation::wholeWeighing(receipt, 1, kTruck));
 
-    const auto errors = journal.validateAllocation(CrossDockAllocation::wholeWeighing(receipt, 1, 8));
+    const auto errors = journal.validateAllocation(CrossDockAllocation::wholeWeighing(receipt, 1, kOtherTruck));
     EXPECT_TRUE(mentions(errors, "Зважування 2 вже розподілено"));
 }
 
 TEST(Journal, RejectsAllocationOfUnknownReceipt) {
     const Journal journal;
-    const auto errors = journal.validateAllocation(CrossDockAllocation::wholeWeighing(mixedReceipt(), 0, 7));
+    const auto errors = journal.validateAllocation(CrossDockAllocation::wholeWeighing(mixedReceipt(), 0, kTruck));
     EXPECT_TRUE(mentions(errors, "Чек не знайдено"));
 }
 
@@ -166,7 +170,7 @@ TEST(Journal, KeepsAllocationOwnErrors) {
     const Receipt receipt = mixedReceipt();
     journal.add(receipt);
 
-    const auto errors = journal.validateAllocation(CrossDockAllocation::boxesOf(receipt, "raspberry", 10, 0));
+    const auto errors = journal.validateAllocation(CrossDockAllocation::boxesOf(receipt, "raspberry", 10, TruckId{}));
     EXPECT_TRUE(mentions(errors, "Не обрано фуру"));
 }
 
@@ -175,13 +179,13 @@ TEST(Journal, LastBoxesTakeExactlyTheRemainingWeight) {
     Journal journal;
     const Receipt receipt = Receipt::create(42, Settlement::OnSite, {pallet("strawberry", 3, grams(100))});
     journal.add(receipt);
-    for (int i = 0; i < 3; ++i) journal.add(journal.boxesOf(receipt.id(), "strawberry", 1, 7));
+    for (int i = 0; i < 3; ++i) journal.add(journal.boxesOf(receipt.id(), "strawberry", 1, kTruck));
 
-    EXPECT_EQ(journal.loadOf(7), (Cargo{.boxes = 3, .weight = grams(100)}));
+    EXPECT_EQ(journal.loadOf(kTruck), (Cargo{.boxes = 3, .weight = grams(100)}));
     EXPECT_EQ(journal.unallocatedOf(receipt.id(), "strawberry"), Cargo{});
 }
 
 TEST(Journal, BoxesOfUnknownReceiptIsProgrammerError) {
     const Journal journal;
-    EXPECT_THROW((void)journal.boxesOf(mixedReceipt().id(), "raspberry", 1, 7), std::invalid_argument);
+    EXPECT_THROW((void)journal.boxesOf(mixedReceipt().id(), "raspberry", 1, kTruck), std::invalid_argument);
 }

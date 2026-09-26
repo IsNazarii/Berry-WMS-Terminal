@@ -1,13 +1,15 @@
 #pragma once
 
 #include "wms/cargo.h"
+#include "wms/uuid.h"
 
-#include <cstdint>
 #include <string>
 
 namespace wms {
 
-using TruckId = std::int64_t;
+// Trucks are created by the operator on any terminal, offline too, so their ids
+// are UUIDs like the records: two terminals never hand out the same id.
+using TruckId = Uuid;
 
 enum class TruckStatus { Loading, Departed };
 
@@ -20,7 +22,10 @@ public:
     // at least one limit must be set.
     Truck(TruckId id, std::string plate, Cargo capacity);
 
-    [[nodiscard]] TruckId id() const noexcept { return id_; }
+    // New truck with a fresh UUIDv7.
+    [[nodiscard]] static Truck create(std::string plate, Cargo capacity);
+
+    [[nodiscard]] const TruckId& id() const noexcept { return id_; }
     [[nodiscard]] const std::string& plate() const noexcept { return plate_; }
     [[nodiscard]] const Cargo& capacity() const noexcept { return capacity_; }
     [[nodiscard]] TruckStatus status() const noexcept { return status_; }

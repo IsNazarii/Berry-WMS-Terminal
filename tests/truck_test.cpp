@@ -8,9 +8,17 @@ using namespace wms;
 
 namespace {
 
-Truck truckFor(int maxBoxes, Weight maxWeight) { return Truck{7, "AA1234BB", {.boxes = maxBoxes, .weight = maxWeight}}; }
+Truck truckFor(int maxBoxes, Weight maxWeight) { return Truck::create("AA1234BB", {.boxes = maxBoxes, .weight = maxWeight}); }
 
 } // namespace
+
+TEST(Truck, CreateGivesEveryTruckItsOwnId) {
+    // Trucks are created offline on each terminal, so ids must not clash.
+    const Truck a = Truck::create("AA1234BB", {.boxes = 10});
+    const Truck b = Truck::create("AA1234BB", {.boxes = 10});
+    EXPECT_EQ(a.id().version(), 7);
+    EXPECT_NE(a.id(), b.id());
+}
 
 TEST(Cargo, AddsUp) {
     Cargo total{.boxes = 10, .weight = kilograms(20)};
@@ -19,10 +27,10 @@ TEST(Cargo, AddsUp) {
 }
 
 TEST(Truck, RejectsInvalidConstruction) {
-    EXPECT_THROW((Truck{0, "AA1234BB", {.boxes = 10}}), std::invalid_argument);
-    EXPECT_THROW((Truck{1, "", {.boxes = 10}}), std::invalid_argument);
-    EXPECT_THROW((Truck{1, "AA1234BB", {}}), std::invalid_argument); // no limit at all
-    EXPECT_THROW((Truck{1, "AA1234BB", {.boxes = -1, .weight = kilograms(1)}}), std::invalid_argument);
+    EXPECT_THROW((Truck{TruckId{}, "AA1234BB", {.boxes = 10}}), std::invalid_argument); // nil id
+    EXPECT_THROW((void)(Truck::create("", {.boxes = 10})), std::invalid_argument);
+    EXPECT_THROW((void)(Truck::create("AA1234BB", {})), std::invalid_argument); // no limit at all
+    EXPECT_THROW((void)(Truck::create("AA1234BB", {.boxes = -1, .weight = kilograms(1)})), std::invalid_argument);
 }
 
 TEST(Truck, RemainingCapacity) {

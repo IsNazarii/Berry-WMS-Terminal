@@ -37,7 +37,7 @@ CrossDockAllocation CrossDockAllocation::boxesOf(const Receipt& receipt, std::st
 std::vector<std::string> CrossDockAllocation::validate() const {
     std::vector<std::string> errors;
     if (receiptId_.isNil()) errors.emplace_back("Не обрано чек");
-    if (truckId_ <= 0) errors.emplace_back("Не обрано фуру");
+    if (truckId_.isNil()) errors.emplace_back("Не обрано фуру");
     if (cropCode_.empty()) errors.emplace_back("Не обрано культуру");
     if (cargo_.boxes <= 0) errors.emplace_back("Кількість ящиків має бути більшою за нуль");
     if (!cargo_.weight.isPositive()) errors.emplace_back("Вага має бути більшою за нуль");
@@ -46,7 +46,7 @@ std::vector<std::string> CrossDockAllocation::validate() const {
 
 std::string CrossDockAllocation::describe() const {
     return std::format("Розподіл {}: {} ящ., {} → фура {}{}", cropCode_, cargo_.boxes, formatWeight(cargo_.weight),
-                       truckId_, weighingIndex_ ? std::format(" (зважування {})", *weighingIndex_ + 1) : "");
+                       truckId_.toString(), weighingIndex_ ? std::format(" (зважування {})", *weighingIndex_ + 1) : "");
 }
 
 } // namespace wms

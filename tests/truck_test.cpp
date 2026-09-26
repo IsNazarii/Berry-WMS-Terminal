@@ -69,3 +69,12 @@ TEST(Truck, DepartsOnlyOnce) {
     EXPECT_FALSE(truck.acceptsCargo());
     EXPECT_THROW(truck.depart(), std::logic_error);
 }
+
+TEST(Truck, CarriedOverTruckTakesNoMoreCargoInThisSession) {
+    Truck truck = truckFor(100, kilograms(500));
+    truck.carryOver();
+    EXPECT_EQ(truck.status(), TruckStatus::CarriedOver);
+    EXPECT_FALSE(truck.acceptsCargo());
+    EXPECT_THROW(truck.depart(), std::logic_error);
+    EXPECT_THROW(truck.carryOver(), std::logic_error);
+}

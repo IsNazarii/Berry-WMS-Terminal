@@ -21,8 +21,13 @@ Truck Truck::create(std::string plate, Cargo capacity) {
 }
 
 void Truck::depart() {
-    if (status_ == TruckStatus::Departed) throw std::logic_error("Truck has already departed");
+    if (status_ != TruckStatus::Loading) throw std::logic_error("Only a loading truck can depart");
     status_ = TruckStatus::Departed;
+}
+
+void Truck::carryOver() {
+    if (status_ != TruckStatus::Loading) throw std::logic_error("Only a loading truck can be carried over");
+    status_ = TruckStatus::CarriedOver;
 }
 
 Cargo Truck::remaining(const Cargo& loaded) const noexcept {

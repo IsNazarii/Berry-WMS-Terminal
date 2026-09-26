@@ -12,6 +12,7 @@ add_library(wms_core
     src/allocation.cpp
     src/journal.cpp
     src/pricing.cpp
+    src/workday.cpp
 )
 
 target_include_directories(wms_core PUBLIC include)

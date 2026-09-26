@@ -11,7 +11,9 @@ namespace wms {
 // are UUIDs like the records: two terminals never hand out the same id.
 using TruckId = Uuid;
 
-enum class TruckStatus { Loading, Departed };
+// CarriedOver: the session closed before the truck left; it goes on loading
+// in the next session under the same id.
+enum class TruckStatus { Loading, Departed, CarriedOver };
 
 // A truck taking berries from the collection point. The current load is not
 // stored here: it is derived from allocation records, like the supplier balance,
@@ -31,7 +33,9 @@ public:
     [[nodiscard]] TruckStatus status() const noexcept { return status_; }
 
     [[nodiscard]] bool acceptsCargo() const noexcept { return status_ == TruckStatus::Loading; }
+    // Both throw std::logic_error unless the truck is still loading.
     void depart();
+    void carryOver();
 
     // Negative values mean the truck is overloaded in that dimension.
     [[nodiscard]] Cargo remaining(const Cargo& loaded) const noexcept;

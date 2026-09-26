@@ -57,7 +57,6 @@ Page {
                 id: row
                 required property var supplierId
                 required property string name
-                required property string category
                 required property string phone
                 required property string balance
 
@@ -73,7 +72,6 @@ Page {
                     spacing: 16
                     Label { text: "#" + row.supplierId; Layout.preferredWidth: 48 }
                     Label { text: row.name; font.bold: true; Layout.fillWidth: true; elide: Text.ElideRight }
-                    Label { text: row.category; Layout.preferredWidth: 48 }
                     Label { text: row.phone; Layout.preferredWidth: 140 }
                     Label { text: row.balance; Layout.preferredWidth: 120; horizontalAlignment: Text.AlignRight }
                 }

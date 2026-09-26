@@ -14,14 +14,14 @@ TEST(FoldCase, LowercasesUkrainianAndAscii) {
 }
 
 TEST(Supplier, MatchesByExactId) {
-    const Supplier s{42, "Шевченко Тарас", "A"};
+    const Supplier s{42, "Шевченко Тарас"};
     EXPECT_TRUE(s.matches("42"));
     EXPECT_FALSE(s.matches("4"));
     EXPECT_FALSE(s.matches("420"));
 }
 
 TEST(Supplier, MatchesByNameIgnoringCase) {
-    const Supplier s{42, "Шевченко Тарас", "A"};
+    const Supplier s{42, "Шевченко Тарас"};
     EXPECT_TRUE(s.matches("шевч"));
     EXPECT_TRUE(s.matches("ТАРАС"));
     EXPECT_FALSE(s.matches("Франко"));
@@ -29,6 +29,6 @@ TEST(Supplier, MatchesByNameIgnoringCase) {
 }
 
 TEST(Supplier, RejectsInvalidData) {
-    EXPECT_THROW((Supplier{0, "Ім'я", "A"}), std::invalid_argument);
-    EXPECT_THROW((Supplier{1, "", "A"}), std::invalid_argument);
+    EXPECT_THROW((Supplier{0, "Ім'я"}), std::invalid_argument);
+    EXPECT_THROW((Supplier{1, ""}), std::invalid_argument);
 }

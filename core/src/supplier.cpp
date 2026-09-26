@@ -8,8 +8,8 @@
 
 namespace wms {
 
-Supplier::Supplier(SupplierId id, std::string fullName, std::string priceCategory, std::string phone)
-    : id_{id}, fullName_{std::move(fullName)}, priceCategory_{std::move(priceCategory)}, phone_{std::move(phone)} {
+Supplier::Supplier(SupplierId id, std::string fullName, std::string phone)
+    : id_{id}, fullName_{std::move(fullName)}, phone_{std::move(phone)} {
     if (id_ <= 0) throw std::invalid_argument("Supplier id must be positive");
     if (fullName_.empty()) throw std::invalid_argument("Supplier name must not be empty");
 }

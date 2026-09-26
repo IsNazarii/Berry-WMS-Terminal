@@ -22,7 +22,7 @@ class SupplierListModel : public QAbstractListModel {
     Q_PROPERTY(int count READ rowCount NOTIFY countChanged)
 
 public:
-    enum Role { IdRole = Qt::UserRole + 1, NameRole, CategoryRole, PhoneRole, BalanceRole };
+    enum Role { IdRole = Qt::UserRole + 1, NameRole, PhoneRole, BalanceRole };
 
     SupplierListModel(const std::vector<Supplier>& suppliers, const Journal& journal, QObject* parent = nullptr);
 

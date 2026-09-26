@@ -19,7 +19,6 @@ QVariant SupplierListModel::data(const QModelIndex& index, int role) const {
     switch (role) {
     case IdRole: return QVariant::fromValue<qint64>(supplier.id());
     case NameRole: return QString::fromStdString(supplier.fullName());
-    case CategoryRole: return QString::fromStdString(supplier.priceCategory());
     case PhoneRole: return QString::fromStdString(supplier.phone());
     case BalanceRole: return QString::fromStdString(formatMoney(journal_.balanceOf(supplier.id())));
     default: return {};
@@ -28,8 +27,7 @@ QVariant SupplierListModel::data(const QModelIndex& index, int role) const {
 
 QHash<int, QByteArray> SupplierListModel::roleNames() const {
     return {
-        {IdRole, "supplierId"}, {NameRole, "name"}, {CategoryRole, "category"},
-        {PhoneRole, "phone"},   {BalanceRole, "balance"},
+        {IdRole, "supplierId"}, {NameRole, "name"}, {PhoneRole, "phone"}, {BalanceRole, "balance"},
     };
 }
 

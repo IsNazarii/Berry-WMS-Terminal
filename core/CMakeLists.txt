@@ -7,6 +7,7 @@ add_library(wms_core
     src/operator.cpp
     src/transaction.cpp
     src/receipt.cpp
+    src/open_receipt.cpp
     src/payment.cpp
     src/scale.cpp
     src/truck.cpp

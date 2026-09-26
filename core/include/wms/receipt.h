@@ -4,6 +4,7 @@
 #include "wms/supplier.h"
 #include "wms/transaction.h"
 
+#include <concepts>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -77,6 +78,15 @@ private:
     SupplierId supplierId_;
     Settlement settlement_;
     std::vector<Weighing> weighings_;
+};
+
+// Weighed berries with a final id: a closed Receipt or one still open.
+// Allocations work on both, since pallets go into trucks while unloading goes on.
+template <class R>
+concept WeighedReceipt = requires(const R& receipt, std::string_view cropCode) {
+    { receipt.id() } -> std::convertible_to<const Uuid&>;
+    { receipt.weighings() } -> std::convertible_to<const std::vector<Weighing>&>;
+    { receipt.cargoOf(cropCode) } -> std::same_as<Cargo>;
 };
 
 } // namespace wms

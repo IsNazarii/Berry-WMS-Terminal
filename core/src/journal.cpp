@@ -76,12 +76,23 @@ const Receipt* Journal::findReceipt(const Uuid& id) const noexcept {
 Cargo Journal::unallocatedOf(const Uuid& receiptId, std::string_view cropCode) const {
     const Receipt* receipt = findReceipt(receiptId);
     if (receipt == nullptr) throw std::invalid_argument("Receipt is not in the journal");
-
     Cargo left = receipt->cargoOf(cropCode);
-    for (const auto& a : allocations_) {
-        if (a.receiptId() == receiptId && a.cropCode() == cropCode) left -= a.cargo();
-    }
+    left -= allocatedOf(receiptId, cropCode);
     return left;
+}
+
+Cargo Journal::unallocatedOf(const OpenReceipt& receipt, std::string_view cropCode) const noexcept {
+    Cargo left = receipt.cargoOf(cropCode);
+    left -= allocatedOf(receipt.id(), cropCode);
+    return left;
+}
+
+Cargo Journal::allocatedOf(const Uuid& receiptId, std::string_view cropCode) const noexcept {
+    Cargo taken;
+    for (const auto& a : allocations_) {
+        if (a.receiptId() == receiptId && a.cropCode() == cropCode) taken += a.cargo();
+    }
+    return taken;
 }
 
 Allocation Journal::boxesOf(const Uuid& receiptId, std::string_view cropCode, int boxes,
@@ -91,16 +102,33 @@ Allocation Journal::boxesOf(const Uuid& receiptId, std::string_view cropCode, in
     return Allocation::boxesOf(*receipt, cropCode, boxes, destination, unallocatedOf(receiptId, cropCode));
 }
 
+Allocation Journal::boxesOf(const OpenReceipt& receipt, std::string_view cropCode, int boxes,
+                            Destination destination) const {
+    return Allocation::boxesOf(receipt, cropCode, boxes, destination, unallocatedOf(receipt, cropCode));
+}
+
 std::vector<std::string> Journal::validateAllocation(const Allocation& allocation) const {
-    std::vector<std::string> errors = allocation.validate();
     const Receipt* receipt = findReceipt(allocation.receiptId());
     if (receipt == nullptr) {
+        std::vector<std::string> errors = allocation.validate();
         errors.emplace_back("Чек не знайдено в журналі");
         return errors;
     }
+    return checkAllocation(allocation, *receipt);
+}
 
+std::vector<std::string> Journal::validateAllocation(const Allocation& allocation,
+                                                     const OpenReceipt& receipt) const {
+    if (allocation.receiptId() != receipt.id()) throw std::invalid_argument("Allocation is from another receipt");
+    return checkAllocation(allocation, receipt);
+}
+
+// Defined here and only used here, so the header does not need it.
+template <WeighedReceipt R>
+std::vector<std::string> Journal::checkAllocation(const Allocation& allocation, const R& receipt) const {
+    std::vector<std::string> errors = allocation.validate();
     if (const auto index = allocation.weighingIndex()) {
-        if (receipt->weighings().at(*index).cancelled) {
+        if (receipt.weighings().at(*index).cancelled) {
             errors.push_back(std::format("Зважування {} анульовано", *index + 1));
         }
         for (const auto& a : allocations_) {
@@ -113,7 +141,8 @@ std::vector<std::string> Journal::validateAllocation(const Allocation& allocatio
 
     // Boxes are what the operator counts; the weight follows from them, so a
     // separate weight check would only report rounding noise.
-    const Cargo left = unallocatedOf(allocation.receiptId(), allocation.cropCode());
+    Cargo left = receipt.cargoOf(allocation.cropCode());
+    left -= allocatedOf(allocation.receiptId(), allocation.cropCode());
     if (allocation.cargo().boxes > left.boxes) {
         errors.push_back(std::format("Залишилось лише {} ящ. культури {}", left.boxes, allocation.cropCode()));
     }

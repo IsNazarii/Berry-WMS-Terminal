@@ -23,6 +23,14 @@ Cargo OpenReceipt::total() const noexcept {
     return sum;
 }
 
+Cargo OpenReceipt::cargoOf(std::string_view cropCode) const noexcept {
+    Cargo sum;
+    for (const auto& w : weighings_) {
+        if (!w.cancelled && w.cropCode == cropCode) sum += w.cargo();
+    }
+    return sum;
+}
+
 std::size_t OpenReceipt::add(Weighing weighing) {
     if (!weighing.validate().empty()) throw std::invalid_argument("Weighing is not valid");
     weighings_.push_back(std::move(weighing));

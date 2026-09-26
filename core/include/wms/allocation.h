@@ -7,6 +7,7 @@
 
 #include <cstddef>
 #include <optional>
+#include <stdexcept>
 #include <string>
 #include <string_view>
 #include <variant>
@@ -33,20 +34,25 @@ public:
                Cargo cargo, std::optional<std::size_t> weighingIndex,
                SyncStatus syncStatus = SyncStatus::Pending);
 
+    // The factories take a closed Receipt or an OpenReceipt alike.
+
     // A whole weighing (usually a pallet) goes to the destination unchanged.
     // Throws std::out_of_range for an index outside the receipt.
-    [[nodiscard]] static Allocation wholeWeighing(const Receipt& receipt, std::size_t weighingIndex,
+    template <WeighedReceipt R>
+    [[nodiscard]] static Allocation wholeWeighing(const R& receipt, std::size_t weighingIndex,
                                                   Destination destination);
     // `boxes` boxes of a crop from anywhere in the receipt; their weight is the
     // crop's net weight split proportionally by boxes.
     // Throws std::invalid_argument when the receipt has no such crop.
-    [[nodiscard]] static Allocation boxesOf(const Receipt& receipt, std::string_view cropCode, int boxes,
+    template <WeighedReceipt R>
+    [[nodiscard]] static Allocation boxesOf(const R& receipt, std::string_view cropCode, int boxes,
                                             Destination destination);
     // Same, but the weight is split from what is still `available` of the crop
     // (see Journal::unallocatedOf), so taking the last boxes takes exactly the
     // remaining weight and rounding never loses or invents grams.
     // With nothing available the weight is zero and validate() reports it.
-    [[nodiscard]] static Allocation boxesOf(const Receipt& receipt, std::string_view cropCode, int boxes,
+    template <WeighedReceipt R>
+    [[nodiscard]] static Allocation boxesOf(const R& receipt, std::string_view cropCode, int boxes,
                                             Destination destination, const Cargo& available);
 
     [[nodiscard]] const Uuid& receiptId() const noexcept { return receiptId_; }
@@ -69,5 +75,30 @@ private:
     Cargo cargo_;
     std::optional<std::size_t> weighingIndex_;
 };
+
+// Templates live in the header: they are instantiated for each receipt type.
+
+template <WeighedReceipt R>
+Allocation Allocation::wholeWeighing(const R& receipt, std::size_t weighingIndex, Destination destination) {
+    const Weighing& weighing = receipt.weighings().at(weighingIndex);
+    return Allocation{Uuid::generateV7(), Clock::now(), receipt.id(), destination,
+                      weighing.cropCode,  weighing.cargo(), weighingIndex};
+}
+
+template <WeighedReceipt R>
+Allocation Allocation::boxesOf(const R& receipt, std::string_view cropCode, int boxes, Destination destination) {
+    return boxesOf(receipt, cropCode, boxes, destination, receipt.cargoOf(cropCode));
+}
+
+template <WeighedReceipt R>
+Allocation Allocation::boxesOf(const R& receipt, std::string_view cropCode, int boxes, Destination destination,
+                               const Cargo& available) {
+    if (receipt.cargoOf(cropCode).boxes <= 0) throw std::invalid_argument("Receipt has no boxes of the requested crop");
+
+    const Weight weight =
+        available.boxes > 0 ? grams(divideRounded(available.weight.raw() * boxes, available.boxes)) : Weight{};
+    return Allocation{Uuid::generateV7(), Clock::now(), receipt.id(), destination, std::string{cropCode},
+                      {.boxes = boxes, .weight = weight}, std::nullopt};
+}
 
 } // namespace wms

@@ -1,4 +1,5 @@
 #include "wms/journal.h"
+#include "wms/open_receipt.h"
 
 #include <gtest/gtest.h>
 
@@ -293,4 +294,74 @@ TEST(Journal, OfflineOvershipmentIsKeptAsNegativeStock) {
     journal.add(journal.shipmentOf("raspberry", 80, kTruck));
     journal.add(StockShipment::create("raspberry", {.boxes = 80, .weight = kilograms(160)}, kTruck));
     EXPECT_EQ(journal.stockOf("raspberry").boxes, -60);
+}
+
+namespace {
+
+// A big supplier still unloading: two raspberry pallets on the scale so far.
+OpenReceipt unloading() {
+    OpenReceipt r = OpenReceipt::open(42);
+    r.add(pallet("raspberry", 80, kilograms(160)));
+    r.add(pallet("raspberry", 20, kilograms(40)));
+    return r;
+}
+
+} // namespace
+
+TEST(Journal, PalletOfOpenReceiptGoesIntoTruck) {
+    Journal journal;
+    const OpenReceipt open = unloading();
+    const Allocation a = Allocation::wholeWeighing(open, 0, kTruck);
+
+    EXPECT_TRUE(journal.validateAllocation(a, open).empty());
+    journal.add(a);
+    EXPECT_EQ(journal.loadOf(kTruck), (Cargo{.boxes = 80, .weight = kilograms(160)}));
+    EXPECT_EQ(journal.unallocatedOf(open, "raspberry"), (Cargo{.boxes = 20, .weight = kilograms(40)}));
+}
+
+TEST(Journal, PalletOfOpenReceiptCannotGoTwice) {
+    Journal journal;
+    const OpenReceipt open = unloading();
+    journal.add(Allocation::wholeWeighing(open, 1, kTruck));
+
+    const auto errors = journal.validateAllocation(Allocation::wholeWeighing(open, 1, kOtherTruck), open);
+    EXPECT_TRUE(mentions(errors, "Зважування 2 вже розподілено"));
+}
+
+TEST(Journal, CancelledPalletOfOpenReceiptStaysPut) {
+    Journal journal;
+    OpenReceipt open = unloading();
+    open.cancel(0);
+
+    const auto errors = journal.validateAllocation(Allocation::wholeWeighing(open, 0, kTruck), open);
+    EXPECT_TRUE(mentions(errors, "Зважування 1 анульовано"));
+}
+
+TEST(Journal, BoxesOfOpenReceiptAreSplitFromWhatIsLeft) {
+    Journal journal;
+    const OpenReceipt open = unloading();
+    journal.add(Allocation::wholeWeighing(open, 0, kTruck));
+
+    const Allocation rest = journal.boxesOf(open, "raspberry", 20, ToWarehouse{});
+    EXPECT_EQ(rest.cargo(), (Cargo{.boxes = 20, .weight = kilograms(40)}));
+    EXPECT_TRUE(journal.validateAllocation(rest, open).empty());
+}
+
+TEST(Journal, AllocationMadeWhileOpenCountsAfterClosing) {
+    // Same id and indices after closing, so the pallet already in the truck is not offered again.
+    Journal journal;
+    const OpenReceipt open = unloading();
+    journal.add(Allocation::wholeWeighing(open, 0, kTruck));
+
+    const Receipt closed = open.close(Settlement::OnSite);
+    journal.add(closed);
+    EXPECT_EQ(journal.unallocatedOf(closed.id(), "raspberry"), (Cargo{.boxes = 20, .weight = kilograms(40)}));
+    const auto errors = journal.validateAllocation(Allocation::wholeWeighing(closed, 0, kOtherTruck));
+    EXPECT_TRUE(mentions(errors, "Зважування 1 вже розподілено"));
+}
+
+TEST(Journal, AllocationOfAnotherOpenReceiptIsProgrammerError) {
+    const Journal journal;
+    const Allocation a = Allocation::wholeWeighing(unloading(), 0, kTruck);
+    EXPECT_THROW((void)journal.validateAllocation(a, unloading()), std::invalid_argument);
 }

@@ -1,6 +1,7 @@
 #pragma once
 
 #include "wms/allocation.h"
+#include "wms/open_receipt.h"
 #include "wms/payment.h"
 #include "wms/receipt.h"
 #include "wms/shipment.h"
@@ -42,17 +43,26 @@ public:
     // Part of the crop in the receipt that no truck has taken yet.
     // Throws std::invalid_argument when the receipt is not in the journal.
     [[nodiscard]] Cargo unallocatedOf(const Uuid& receiptId, std::string_view cropCode) const;
+    // Same for a receipt still being weighed: it is not in the journal yet,
+    // but its pallets may already be in a truck.
+    [[nodiscard]] Cargo unallocatedOf(const OpenReceipt& receipt, std::string_view cropCode) const noexcept;
 
     // Preferred way to allocate boxes: the weight is split from what is left,
     // not from the whole crop. Still check it with validateAllocation().
     // Throws std::invalid_argument when the receipt is not in the journal.
     [[nodiscard]] Allocation boxesOf(const Uuid& receiptId, std::string_view cropCode, int boxes,
                                      Destination destination) const;
+    [[nodiscard]] Allocation boxesOf(const OpenReceipt& receipt, std::string_view cropCode, int boxes,
+                                     Destination destination) const;
 
     // Operator-facing check before an allocation is added: its own errors plus
     // the rules that need the rest of the journal. add() does not call this on
     // purpose: facts synced from another terminal are accepted as they are.
     [[nodiscard]] std::vector<std::string> validateAllocation(const Allocation& allocation) const;
+    // Same for an allocation from a receipt still open. Throws
+    // std::invalid_argument when the allocation is from another receipt.
+    [[nodiscard]] std::vector<std::string> validateAllocation(const Allocation& allocation,
+                                                              const OpenReceipt& receipt) const;
 
     // Preferred way to ship from the warehouse: the weight is split from the
     // stock, so shipping the last boxes takes exactly the remaining weight.
@@ -64,6 +74,11 @@ private:
     // Remembers the id; false when it was already there.
     bool registerId(const Uuid& id);
     [[nodiscard]] const Receipt* findReceipt(const Uuid& id) const noexcept;
+    // What allocations have already taken of the crop from the receipt.
+    [[nodiscard]] Cargo allocatedOf(const Uuid& receiptId, std::string_view cropCode) const noexcept;
+    // The checks shared by closed and open receipts.
+    template <WeighedReceipt R>
+    [[nodiscard]] std::vector<std::string> checkAllocation(const Allocation& allocation, const R& receipt) const;
 
     std::set<Uuid> ids_;
     std::vector<Receipt> receipts_;

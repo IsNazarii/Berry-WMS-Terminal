@@ -8,6 +8,7 @@
 
 #include <cstddef>
 #include <string>
+#include <string_view>
 #include <vector>
 
 namespace wms {
@@ -31,6 +32,7 @@ public:
     [[nodiscard]] const std::vector<Weighing>& weighings() const noexcept { return weighings_; }
     // Without cancelled lines.
     [[nodiscard]] Cargo total() const noexcept;
+    [[nodiscard]] Cargo cargoOf(std::string_view cropCode) const noexcept;
 
     // Returns the index of the new line. Throws std::invalid_argument when
     // Weighing::validate() is not empty: the UI shows those errors first.

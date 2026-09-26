@@ -80,8 +80,9 @@ $CM/cmake -S . -B build -G Ninja && $CM/cmake --build build && $CM/ctest --test-
 - Ієрархія B: `IScaleDriver` → `SimulatedScaleDriver` ✅, `SerialScaleDriver` ⏳ (infra, Qt)
 - Ієрархія C (опц.): `PricingStrategy` → …
 - Статичний поліморфізм: `Quantity<Tag>` (`Money`, `Weight`) ✅; `Repository<T>` ⏳
-- Інші класи: `Uuid`, `Supplier`, `StabilityDetector`, `Weighing`, `Truck`, `Cargo` ✅
-- Стан на 24.09: 13 класів, 2 ієрархії (A — 4 класи), 3 поліморфізми, 62 тести — лаба 1 закрита із запасом.
+- Статичний поліморфізм (перевантаження): `Journal::add(Receipt|Payment|CrossDockAllocation)` ✅
+- Інші класи: `Uuid`, `Supplier`, `StabilityDetector`, `Weighing`, `Truck`, `Cargo`, `Journal` ✅
+- Стан на 26.09: 14 класів, 2 ієрархії (A — 4 класи), 3+ поліморфізми, 81 тест — лаба 1 закрита із запасом.
 
 Лаба 2: ≥4 екрани (Ідентифікація, Зважування, Розподіл, Каса, + Sync/Довідники),
 ≥20 контролів, ≥1 контейнер (ListView), ≥10 обробників, логіка відділена.
@@ -103,19 +104,20 @@ $CM/cmake -S . -B build -G Ninja && $CM/cmake --build build && $CM/ctest --test-
 - Git: гілка `main`, remote `origin` = git@github.com:IsNazarii/Berry-WMS-Terminal.git (SSH-ключ `~/.ssh/id_ed25519` працює — push можна робити з термінала).
 - GoogleTest у системі не встановлено — тягнеться FetchContent (потрібна мережа при першій конфігурації).
 
-## Стан ядра і наступні кроки (оновлено 24.09.2026)
+## Стан ядра і наступні кроки (оновлено 26.09.2026)
 Зроблено в `core/`: `Receipt` = постачальник + `Settlement` (`OnSite`/`HandedOver`) + `vector<Weighing>`
 (тара ящиків + палета); `Payment`; `CrossDockAllocation` (`wholeWeighing` / `boxesOf`);
 `Truck` + `Cargo` (ліміти ящики/кг, `fillPercent`, `isOverloaded`); симулятор ваг + `StabilityDetector`.
-`app/main.cpp` — консольне демо всього цього.
+`Journal` — append-only журнал (окреме сховище на кожен тип, дедуплікація за UUID):
+`balanceOf(supplier)`, `loadOf(truck)`, `unallocatedOf(receipt, crop)`, `validateAllocation()`
+(для оператора; `add()` приймає будь-які факти — офлайн-конфлікт дає від'ємний залишок),
+`Journal::boxesOf()` ділить вагу пропорційно залишку (останні ящики = рівно залишок ваги).
+`app/main.cpp` — консольне демо (ще без `Journal`).
 
 Наступні кроки (по черзі, кожен — окремий коміт):
-1. Агрегатор журналу (core): баланс постачальника, завантаження фури (`Cargo` по `truckId`),
-   нерозподілений залишок чека по культурах; валідація «не більше, ніж лишилось»;
-   останній `boxesOf` культури забирає рівно залишок ваги (прибрати похибку округлення).
-2. Каркас QML-UI (лаба 2, альфа до 23.10): 4 екрани на in-memory даних.
+1. Каркас QML-UI (лаба 2, альфа до 23.10): 4 екрани на in-memory даних.
    Чернетка чека (список зважувань до закриття) живе в UI-адаптері; `Receipt` створюється при закритті.
-3. infra: SQLite (WAL, outbox `sync_status`), потім sync-заглушка, потім друк чека (лаба 3).
+2. infra: SQLite (WAL, outbox `sync_status`), потім sync-заглушка, потім друк чека (лаба 3).
 
 ## Відкриті питання
 - Модель принтера (термо ESC/POS чи звичайний, PDF)?

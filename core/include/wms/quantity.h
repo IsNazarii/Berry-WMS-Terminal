@@ -2,7 +2,9 @@
 
 #include <compare>
 #include <cstdint>
+#include <optional>
 #include <string>
+#include <string_view>
 
 namespace wms {
 
@@ -73,5 +75,9 @@ using Weight = Quantity<WeightTag>; // grams
 
 [[nodiscard]] std::string formatMoney(Money money);    // "1234.50 грн"
 [[nodiscard]] std::string formatWeight(Weight weight); // "12.345 кг"
+
+// Amount typed by the operator: "85", "85.5" or "85,50" (both separators, since
+// the Ukrainian keyboard gives a comma). Empty for anything else, negatives included.
+[[nodiscard]] std::optional<Money> parseMoney(std::string_view text);
 
 } // namespace wms

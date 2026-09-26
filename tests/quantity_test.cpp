@@ -43,3 +43,22 @@ TEST(Quantity, Formatting) {
     EXPECT_EQ(formatWeight(grams(12'345)), "12.345 кг");
     EXPECT_EQ(formatWeight(grams(7)), "0.007 кг");
 }
+
+TEST(Quantity, ParseMoneyAcceptsCommaOrDot) {
+    EXPECT_EQ(parseMoney("85"), hryvnias(85));
+    EXPECT_EQ(parseMoney("85.5"), kopecks(8'550));
+    EXPECT_EQ(parseMoney("85,05"), kopecks(8'505));
+    EXPECT_EQ(parseMoney(" 0.99 "), kopecks(99));
+}
+
+TEST(Quantity, ParseMoneyRejectsWhatIsNotAnAmount) {
+    EXPECT_FALSE(parseMoney(""));
+    EXPECT_FALSE(parseMoney("  "));
+    EXPECT_FALSE(parseMoney("-5"));
+    EXPECT_FALSE(parseMoney("85.555")); // no fractions of a kopeck
+    EXPECT_FALSE(parseMoney("85."));
+    EXPECT_FALSE(parseMoney(".5"));
+    EXPECT_FALSE(parseMoney("8a5"));
+    EXPECT_FALSE(parseMoney("1.2.3"));
+    EXPECT_FALSE(parseMoney("99999999999999999999")); // would overflow int64
+}

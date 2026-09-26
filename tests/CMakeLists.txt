@@ -18,6 +18,7 @@ add_executable(wms_core_tests
     pricing_test.cpp
     workday_test.cpp
     shipment_test.cpp
+    operator_test.cpp
 )
 target_link_libraries(wms_core_tests PRIVATE wms_core GTest::gtest_main)
 

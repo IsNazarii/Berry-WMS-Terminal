@@ -44,6 +44,10 @@
 - **Склад:** як фура, але не зникає між сесіями. З чека — на склад; зі складу — лише у фуру
   поточної сесії. Залишок за культурами обчислюється з журналу. Рідкісний продаж на місці —
   окрема «фура» з відповідною назвою. Склад поки один; згодом можливі морозильні камери.
+- **Оператори:** вибір зі списку + PIN (4–6 цифр) — підтвердження «хто», не захист (тому без хешу).
+  PIN перевіряє UI; ядро отримує вже підтверджений `OperatorId`.
+- **Закрита сесія** змінюється лише поправкою `Amendment {by, at, reason}` (пояснення обов'язкове);
+  у журнал поправок пишеться й сама зміна.
 - ID транзакцій — UUIDv7 (генерує клієнт), ідемпотентність на сервері за UUID.
 - Sync: outbox (`sync_status`), батчі, сервер повертає прийняті UUID, retry з backoff;
   pull довідників (постачальники, прайси, фури) за курсором `updated_since`.
@@ -95,8 +99,8 @@ $CM/cmake -S . -B build -G Ninja && $CM/cmake --build build && $CM/ctest --test-
 - Статичний поліморфізм: `Quantity<Tag>` (`Money`, `Weight`) ✅; `Destination` = `std::variant` + `std::visit` ✅;
   `Repository<T>` ⏳
 - Статичний поліморфізм (перевантаження): `Journal::add(Receipt|Payment|Allocation|StockShipment)` ✅
-- Інші класи: `Uuid`, `Supplier`, `StabilityDetector`, `Weighing`, `Truck`, `Cargo`, `Journal`, `DayPrices`, `WorkDay` ✅
-- Стан на 26.09: 17 класів ядра, 2 ієрархії (A — 5 класів), 4+ поліморфізми, 112 тестів — лаба 1 закрита із запасом.
+- Інші класи: `Uuid`, `Supplier`, `StabilityDetector`, `Weighing`, `Truck`, `Cargo`, `Journal`, `DayPrices`, `WorkDay`, `Operator` ✅
+- Стан на 26.09: 18 класів ядра, 2 ієрархії (A — 5 класів), 4+ поліморфізми, 118 тестів — лаба 1 закрита із запасом.
 
 Лаба 2: ≥4 екрани (Ідентифікація, Зважування, Розподіл, Каса, + Sync/Довідники),
 ≥20 контролів, ≥1 контейнер (ListView), ≥10 обробників, логіка відділена.
@@ -123,7 +127,9 @@ $CM/cmake -S . -B build -G Ninja && $CM/cmake --build build && $CM/ctest --test-
 (`priceSource`: `DayPrice`/`Manual`); `Payment`; `Allocation` (чек → `Destination` = фура | `ToWarehouse`;
 `wholeWeighing` / `boxesOf`); `StockShipment` (склад → фура); `Truck` (id = UUID, статуси
 `Loading`/`Departed`/`CarriedOver`) + `Cargo`; `DayPrices` (історія змін, `priceAt(crop, t)`);
-`WorkDay` (сесія: дата відкриття, ціни, фури, `validateClose`/`close`, `repeatTruck`/`adoptTruck`);
+`WorkDay` (сесія: дата відкриття, хто відкрив/закрив, ціни, фури, `validateClose`/`close`,
+`repeatTruck`/`adoptTruck`; поправки в закритій сесії — перевантаження з `Amendment`, журнал `amendments()`);
+`Operator` (id, ім'я, PIN 4–6 цифр, лише `checkPin`);
 симулятор ваг + `StabilityDetector`; `Journal` — append-only: `balanceOf`, `loadOf` (з чеків і складу),
 `stockOf`, `unallocatedOf`, `boxesOf`/`shipmentOf`, `validateAllocation`/`validateShipment`.
 
@@ -134,8 +140,8 @@ UI (`ui/`, модуль `BerryWms.Ui`, статична бібліотека + `
 Перевірка QML: ціль `wms_ui_qmllint` (запускати на кожному кроці).
 
 Наступні кроки (кожен — окремий коміт, ядро тест-першим):
-- D5. Зміни в закритій сесії дозволені, але з записом «хто, коли, чому» (пояснення обов'язкове).
-  ❓ Хто = оператор: як він ідентифікується (вибір імені при відкритті сесії? PIN?) — уточнити.
+- Пізні записи журналу (забутий чек у закритій сесії): прив'язати записи до сесії + позначка поправки
+  — разом з UI сесії.
 - UI: `Terminal` на `WorkDay`; Зважування (чернетка чека, денна/ручна ціна, підтвердження
   нестабільної ваги клавішею, закриття чека); Сесія (відкриття/закриття, ціни, фури); Розподіл
   (фура | склад); Склад (залишки, відвантаження); Каса.

@@ -2,8 +2,11 @@
 
 #include <gtest/gtest.h>
 
+#include <stdexcept>
 #include <string>
+#include <string_view>
 #include <utility>
+#include <vector>
 
 using namespace wms;
 
@@ -79,4 +82,91 @@ TEST(Journal, TruckLoadSumsItsAllocations) {
 
     EXPECT_EQ(journal.loadOf(7), (Cargo{.boxes = 90, .weight = grams(177'500)}));
     EXPECT_EQ(journal.loadOf(8), (Cargo{.boxes = 30, .weight = grams(52'500)}));
+}
+
+namespace {
+
+// Raspberry: two pallets, 80 + 20 boxes, 2 kg per box. Blueberry: one pallet of 40 boxes.
+Receipt mixedReceipt() {
+    return Receipt::create(42, Settlement::OnSite,
+                           {pallet("raspberry", 80, kilograms(160)), pallet("raspberry", 20, kilograms(40)),
+                            pallet("blueberry", 40, kilograms(70))});
+}
+
+bool mentions(const std::vector<std::string>& errors, std::string_view fragment) {
+    for (const auto& e : errors) {
+        if (e.find(fragment) != std::string::npos) return true;
+    }
+    return false;
+}
+
+} // namespace
+
+TEST(Journal, NothingAllocatedYetLeavesWholeCrop) {
+    Journal journal;
+    const Receipt receipt = mixedReceipt();
+    journal.add(receipt);
+    EXPECT_EQ(journal.unallocatedOf(receipt.id(), "raspberry"), (Cargo{.boxes = 100, .weight = kilograms(200)}));
+}
+
+TEST(Journal, UnallocatedSubtractsOnlyThatReceiptAndCrop) {
+    Journal journal;
+    const Receipt receipt = mixedReceipt();
+    const Receipt other = mixedReceipt();
+    journal.add(receipt);
+    journal.add(other);
+    journal.add(CrossDockAllocation::wholeWeighing(receipt, 0, 7));         // 80 raspberry boxes
+    journal.add(CrossDockAllocation::boxesOf(receipt, "blueberry", 10, 7)); // other crop
+    journal.add(CrossDockAllocation::boxesOf(other, "raspberry", 5, 7));    // other receipt
+
+    EXPECT_EQ(journal.unallocatedOf(receipt.id(), "raspberry"), (Cargo{.boxes = 20, .weight = kilograms(40)}));
+}
+
+TEST(Journal, UnallocatedOfUnknownReceiptIsProgrammerError) {
+    const Journal journal;
+    EXPECT_THROW((void)journal.unallocatedOf(mixedReceipt().id(), "raspberry"), std::invalid_argument);
+}
+
+TEST(Journal, AllocationWithinWhatIsLeftIsValid) {
+    Journal journal;
+    const Receipt receipt = mixedReceipt();
+    journal.add(receipt);
+    journal.add(CrossDockAllocation::wholeWeighing(receipt, 0, 7));
+
+    EXPECT_TRUE(journal.validateAllocation(CrossDockAllocation::boxesOf(receipt, "raspberry", 20, 8)).empty());
+}
+
+TEST(Journal, RejectsMoreBoxesThanLeft) {
+    Journal journal;
+    const Receipt receipt = mixedReceipt();
+    journal.add(receipt);
+    journal.add(CrossDockAllocation::wholeWeighing(receipt, 0, 7));
+
+    const auto errors = journal.validateAllocation(CrossDockAllocation::boxesOf(receipt, "raspberry", 21, 8));
+    EXPECT_TRUE(mentions(errors, "Залишилось лише 20 ящ."));
+}
+
+TEST(Journal, RejectsSameWeighingTwice) {
+    Journal journal;
+    const Receipt receipt = mixedReceipt();
+    journal.add(receipt);
+    journal.add(CrossDockAllocation::wholeWeighing(receipt, 1, 7));
+
+    const auto errors = journal.validateAllocation(CrossDockAllocation::wholeWeighing(receipt, 1, 8));
+    EXPECT_TRUE(mentions(errors, "Зважування 2 вже розподілено"));
+}
+
+TEST(Journal, RejectsAllocationOfUnknownReceipt) {
+    const Journal journal;
+    const auto errors = journal.validateAllocation(CrossDockAllocation::wholeWeighing(mixedReceipt(), 0, 7));
+    EXPECT_TRUE(mentions(errors, "Чек не знайдено"));
+}
+
+TEST(Journal, KeepsAllocationOwnErrors) {
+    Journal journal;
+    const Receipt receipt = mixedReceipt();
+    journal.add(receipt);
+
+    const auto errors = journal.validateAllocation(CrossDockAllocation::boxesOf(receipt, "raspberry", 10, 0));
+    EXPECT_TRUE(mentions(errors, "Не обрано фуру"));
 }

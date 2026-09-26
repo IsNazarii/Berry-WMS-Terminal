@@ -7,6 +7,8 @@
 
 #include <cstddef>
 #include <set>
+#include <string>
+#include <string_view>
 #include <vector>
 
 namespace wms {
@@ -31,9 +33,19 @@ public:
     // Everything allocated to the truck; compare with Truck::capacity() to spot overload.
     [[nodiscard]] Cargo loadOf(TruckId truckId) const noexcept;
 
+    // Part of the crop in the receipt that no truck has taken yet.
+    // Throws std::invalid_argument when the receipt is not in the journal.
+    [[nodiscard]] Cargo unallocatedOf(const Uuid& receiptId, std::string_view cropCode) const;
+
+    // Operator-facing check before an allocation is added: its own errors plus
+    // the rules that need the rest of the journal. add() does not call this on
+    // purpose: facts synced from another terminal are accepted as they are.
+    [[nodiscard]] std::vector<std::string> validateAllocation(const CrossDockAllocation& allocation) const;
+
 private:
     // Remembers the id; false when it was already there.
     bool registerId(const Uuid& id);
+    [[nodiscard]] const Receipt* findReceipt(const Uuid& id) const noexcept;
 
     std::set<Uuid> ids_;
     std::vector<Receipt> receipts_;

@@ -31,7 +31,9 @@ public:
     // What we owe the supplier: positive = we owe them, negative = they were overpaid.
     [[nodiscard]] Money balanceOf(SupplierId supplierId) const noexcept;
     // Everything allocated to the truck; compare with Truck::capacity() to spot overload.
-    [[nodiscard]] Cargo loadOf(TruckId truckId) const noexcept;
+    [[nodiscard]] Cargo loadOf(const TruckId& truckId) const noexcept;
+    // What the warehouse holds of the crop, from all receipts of all sessions.
+    [[nodiscard]] Cargo stockOf(std::string_view cropCode) const noexcept;
 
     // Part of the crop in the receipt that no truck has taken yet.
     // Throws std::invalid_argument when the receipt is not in the journal.
@@ -41,7 +43,7 @@ public:
     // not from the whole crop. Still check it with validateAllocation().
     // Throws std::invalid_argument when the receipt is not in the journal.
     [[nodiscard]] Allocation boxesOf(const Uuid& receiptId, std::string_view cropCode, int boxes,
-                                     TruckId truckId) const;
+                                     Destination destination) const;
 
     // Operator-facing check before an allocation is added: its own errors plus
     // the rules that need the rest of the journal. add() does not call this on

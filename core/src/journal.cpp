@@ -38,12 +38,20 @@ Money Journal::balanceOf(SupplierId supplierId) const noexcept {
     return balance;
 }
 
-Cargo Journal::loadOf(TruckId truckId) const noexcept {
+Cargo Journal::loadOf(const TruckId& truckId) const noexcept {
     Cargo load;
     for (const auto& a : allocations_) {
-        if (a.truckId() == truckId) load += a.cargo();
+        if (a.destination() == Destination{truckId}) load += a.cargo();
     }
     return load;
+}
+
+Cargo Journal::stockOf(std::string_view cropCode) const noexcept {
+    Cargo stock;
+    for (const auto& a : allocations_) {
+        if (std::holds_alternative<ToWarehouse>(a.destination()) && a.cropCode() == cropCode) stock += a.cargo();
+    }
+    return stock;
 }
 
 const Receipt* Journal::findReceipt(const Uuid& id) const noexcept {
@@ -68,10 +76,10 @@ Cargo Journal::unallocatedOf(const Uuid& receiptId, std::string_view cropCode) c
 }
 
 Allocation Journal::boxesOf(const Uuid& receiptId, std::string_view cropCode, int boxes,
-                            TruckId truckId) const {
+                            Destination destination) const {
     const Receipt* receipt = findReceipt(receiptId);
     if (receipt == nullptr) throw std::invalid_argument("Receipt is not in the journal");
-    return Allocation::boxesOf(*receipt, cropCode, boxes, truckId, unallocatedOf(receiptId, cropCode));
+    return Allocation::boxesOf(*receipt, cropCode, boxes, destination, unallocatedOf(receiptId, cropCode));
 }
 
 std::vector<std::string> Journal::validateAllocation(const Allocation& allocation) const {

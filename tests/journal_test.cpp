@@ -189,3 +189,39 @@ TEST(Journal, BoxesOfUnknownReceiptIsProgrammerError) {
     const Journal journal;
     EXPECT_THROW((void)journal.boxesOf(mixedReceipt().id(), "raspberry", 1, kTruck), std::invalid_argument);
 }
+
+TEST(Journal, WarehouseStockSumsAllocationsToIt) {
+    Journal journal;
+    const Receipt receipt = Receipt::create(
+        42, Settlement::OnSite, {pallet("raspberry", 80, kilograms(160)), pallet("blueberry", 40, kilograms(70))});
+    journal.add(receipt);
+    journal.add(Allocation::wholeWeighing(receipt, 0, ToWarehouse{}));
+    journal.add(Allocation::boxesOf(receipt, "blueberry", 10, ToWarehouse{}));
+    journal.add(Allocation::boxesOf(receipt, "blueberry", 30, kTruck));
+
+    EXPECT_EQ(journal.stockOf("raspberry"), (Cargo{.boxes = 80, .weight = kilograms(160)}));
+    EXPECT_EQ(journal.stockOf("blueberry"), (Cargo{.boxes = 10, .weight = grams(17'500)}));
+    EXPECT_EQ(journal.stockOf("strawberry"), Cargo{});
+    // The warehouse is not a truck: its berries are no truck's load.
+    EXPECT_EQ(journal.loadOf(kTruck), (Cargo{.boxes = 30, .weight = grams(52'500)}));
+}
+
+TEST(Journal, StockSpansReceiptsOfAllSuppliers) {
+    Journal journal;
+    const Receipt first = Receipt::create(42, Settlement::OnSite, {pallet("raspberry", 10, kilograms(20))});
+    const Receipt second = Receipt::create(43, Settlement::OnSite, {pallet("raspberry", 5, kilograms(10))});
+    journal.add(first);
+    journal.add(second);
+    journal.add(Allocation::wholeWeighing(first, 0, ToWarehouse{}));
+    journal.add(Allocation::wholeWeighing(second, 0, ToWarehouse{}));
+    EXPECT_EQ(journal.stockOf("raspberry"), (Cargo{.boxes = 15, .weight = kilograms(30)}));
+}
+
+TEST(Journal, PalletPutInTheWarehouseCannotAlsoGoIntoATruck) {
+    Journal journal;
+    const Receipt receipt = Receipt::create(42, Settlement::OnSite, {pallet("raspberry", 80, kilograms(160))});
+    journal.add(receipt);
+    journal.add(Allocation::wholeWeighing(receipt, 0, ToWarehouse{}));
+    EXPECT_FALSE(journal.validateAllocation(Allocation::wholeWeighing(receipt, 0, kTruck)).empty());
+    EXPECT_EQ(journal.unallocatedOf(receipt.id(), "raspberry"), Cargo{});
+}

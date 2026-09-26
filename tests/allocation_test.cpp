@@ -37,7 +37,7 @@ TEST(Allocation, WholeWeighingTakesExactCargo) {
     const auto a = Allocation::wholeWeighing(receipt, 1, kTruck);
 
     EXPECT_EQ(a.receiptId(), receipt.id());
-    EXPECT_EQ(a.truckId(), kTruck);
+    EXPECT_EQ(a.destination(), Destination{kTruck});
     EXPECT_EQ(a.cropCode(), "raspberry");
     EXPECT_EQ(a.cargo(), (Cargo{.boxes = 33, .weight = grams(66'000)}));
     EXPECT_EQ(a.weighingIndex(), 1U);
@@ -96,4 +96,16 @@ TEST(Allocation, DescribeMentionsTruckAndCargo) {
     EXPECT_NE(text.find("blueberry"), std::string::npos);
     EXPECT_NE(text.find("40 ящ."), std::string::npos);
     EXPECT_NE(text.find("фура " + kTruck.toString()), std::string::npos);
+}
+
+TEST(Allocation, CanGoToTheWarehouse) {
+    const auto a = Allocation::wholeWeighing(sampleReceipt(), 2, ToWarehouse{});
+    EXPECT_TRUE(a.isValid());
+    EXPECT_TRUE(std::holds_alternative<ToWarehouse>(a.destination()));
+    EXPECT_NE(a.describe().find("склад"), std::string::npos);
+}
+
+TEST(Allocation, TruckDestinationKeepsTheTruck) {
+    const auto a = Allocation::boxesOf(sampleReceipt(), "raspberry", 10, kTruck);
+    EXPECT_EQ(a.destination(), Destination{kTruck});
 }

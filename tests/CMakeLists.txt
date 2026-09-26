@@ -15,6 +15,7 @@ add_executable(wms_core_tests
     truck_test.cpp
     allocation_test.cpp
     journal_test.cpp
+    pricing_test.cpp
 )
 target_link_libraries(wms_core_tests PRIVATE wms_core GTest::gtest_main)
 

@@ -11,6 +11,7 @@ add_library(wms_core
     src/truck.cpp
     src/allocation.cpp
     src/journal.cpp
+    src/pricing.cpp
 )
 
 target_include_directories(wms_core PUBLIC include)

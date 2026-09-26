@@ -62,3 +62,20 @@ TEST(Quantity, ParseMoneyRejectsWhatIsNotAnAmount) {
     EXPECT_FALSE(parseMoney("1.2.3"));
     EXPECT_FALSE(parseMoney("99999999999999999999")); // would overflow int64
 }
+
+TEST(Quantity, ParseWeightReadsKilograms) {
+    EXPECT_EQ(parseWeight("25"), kilograms(25));
+    EXPECT_EQ(parseWeight("185,4"), grams(185'400));
+    EXPECT_EQ(parseWeight("0.35"), grams(350));
+    EXPECT_EQ(parseWeight(" 1.005 "), grams(1'005));
+    EXPECT_EQ(parseWeight("0"), grams(0)); // weighed without a pallet
+}
+
+TEST(Quantity, ParseWeightRejectsWhatIsNotAWeight) {
+    EXPECT_FALSE(parseWeight(""));
+    EXPECT_FALSE(parseWeight("-1"));
+    EXPECT_FALSE(parseWeight("1.0005")); // no fractions of a gram
+    EXPECT_FALSE(parseWeight("1,"));
+    EXPECT_FALSE(parseWeight("1a"));
+    EXPECT_FALSE(parseWeight("99999999999999999999"));
+}

@@ -31,20 +31,36 @@ std::optional<std::int64_t> parseDigits(std::string_view digits) {
     return value;
 }
 
-} // namespace
+// A decimal typed by the operator, in units of 10^-fractionDigits: "85,5" with
+// 2 digits is 8550. Either separator, since the Ukrainian keyboard gives a comma.
+std::optional<std::int64_t> parseFixed(std::string_view text, int fractionDigits) {
+    std::int64_t scale = 1;
+    for (int i = 0; i < fractionDigits; ++i) scale *= 10;
 
-std::optional<Money> parseMoney(std::string_view text) {
     text = trim(text);
     const auto separator = text.find_first_of(".,");
     const auto whole = parseDigits(text.substr(0, separator));
-    if (!whole || *whole > INT64_MAX / 100) return std::nullopt;
-    if (separator == std::string_view::npos) return hryvnias(*whole);
+    if (!whole || *whole > INT64_MAX / scale) return std::nullopt;
+    if (separator == std::string_view::npos) return *whole * scale;
 
     const auto fractionText = text.substr(separator + 1);
-    const auto fraction = parseDigits(fractionText);
-    if (!fraction || fractionText.size() > 2) return std::nullopt;
-    // "85.5" means 50 kopecks, not 5.
-    return hryvnias(*whole) + kopecks(fractionText.size() == 1 ? *fraction * 10 : *fraction);
+    auto fraction = parseDigits(fractionText);
+    if (!fraction || fractionText.size() > static_cast<std::size_t>(fractionDigits)) return std::nullopt;
+    // "85.5" means 50 kopecks, not 5: pad the fraction to full length.
+    for (auto i = fractionText.size(); i < static_cast<std::size_t>(fractionDigits); ++i) *fraction *= 10;
+    return *whole * scale + *fraction;
+}
+
+} // namespace
+
+std::optional<Money> parseMoney(std::string_view text) {
+    const auto raw = parseFixed(text, 2);
+    return raw ? std::optional{kopecks(*raw)} : std::nullopt;
+}
+
+std::optional<Weight> parseWeight(std::string_view text) {
+    const auto raw = parseFixed(text, 3);
+    return raw ? std::optional{grams(*raw)} : std::nullopt;
 }
 
 std::string formatMoney(Money money) { return formatFixed(money.raw(), 100, 2, " грн"); }

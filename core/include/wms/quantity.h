@@ -79,5 +79,7 @@ using Weight = Quantity<WeightTag>; // grams
 // Amount typed by the operator: "85", "85.5" or "85,50" (both separators, since
 // the Ukrainian keyboard gives a comma). Empty for anything else, negatives included.
 [[nodiscard]] std::optional<Money> parseMoney(std::string_view text);
+// Weight typed by the operator in kilograms, up to grams: "25", "185,4", "0.35".
+[[nodiscard]] std::optional<Weight> parseWeight(std::string_view text);
 
 } // namespace wms

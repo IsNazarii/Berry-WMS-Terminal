@@ -225,3 +225,61 @@ TEST(Journal, PalletPutInTheWarehouseCannotAlsoGoIntoATruck) {
     EXPECT_FALSE(journal.validateAllocation(Allocation::wholeWeighing(receipt, 0, kTruck)).empty());
     EXPECT_EQ(journal.unallocatedOf(receipt.id(), "raspberry"), Cargo{});
 }
+
+namespace {
+
+// 100 raspberry boxes of 2 kg in the warehouse.
+Journal journalWithStock() {
+    Journal journal;
+    const Receipt receipt = Receipt::create(42, Settlement::OnSite, {pallet("raspberry", 100, kilograms(200))});
+    journal.add(receipt);
+    journal.add(Allocation::wholeWeighing(receipt, 0, ToWarehouse{}));
+    return journal;
+}
+
+} // namespace
+
+TEST(Journal, ShipmentMovesStockIntoTheTruck) {
+    Journal journal = journalWithStock();
+    journal.add(journal.shipmentOf("raspberry", 30, kTruck));
+
+    EXPECT_EQ(journal.stockOf("raspberry"), (Cargo{.boxes = 70, .weight = kilograms(140)}));
+    EXPECT_EQ(journal.loadOf(kTruck), (Cargo{.boxes = 30, .weight = kilograms(60)}));
+}
+
+TEST(Journal, TruckLoadCountsReceiptsAndWarehouseAlike) {
+    Journal journal = journalWithStock();
+    const Receipt fresh = Receipt::create(43, Settlement::OnSite, {pallet("raspberry", 10, kilograms(20))});
+    journal.add(fresh);
+    journal.add(Allocation::wholeWeighing(fresh, 0, kTruck));
+    journal.add(journal.shipmentOf("raspberry", 5, kTruck));
+    EXPECT_EQ(journal.loadOf(kTruck), (Cargo{.boxes = 15, .weight = kilograms(30)}));
+}
+
+TEST(Journal, ShippingTheLastBoxesEmptiesTheStockExactly) {
+    Journal journal;
+    // 3 boxes weighing 100 g: 33.3 g per box does not divide evenly.
+    const Receipt receipt = Receipt::create(42, Settlement::OnSite, {pallet("strawberry", 3, grams(100))});
+    journal.add(receipt);
+    journal.add(Allocation::wholeWeighing(receipt, 0, ToWarehouse{}));
+    journal.add(journal.shipmentOf("strawberry", 1, kTruck));
+    journal.add(journal.shipmentOf("strawberry", 2, kTruck));
+    EXPECT_EQ(journal.stockOf("strawberry"), Cargo{});
+}
+
+TEST(Journal, CannotShipMoreThanIsInStock) {
+    const Journal journal = journalWithStock();
+    const auto errors = journal.validateShipment(journal.shipmentOf("raspberry", 101, kTruck));
+    ASSERT_EQ(errors.size(), 1u);
+    EXPECT_NE(errors[0].find("100"), std::string::npos);
+    EXPECT_TRUE(journal.validateShipment(journal.shipmentOf("raspberry", 100, kTruck)).empty());
+}
+
+TEST(Journal, OfflineOvershipmentIsKeptAsNegativeStock) {
+    // Two terminals shipped the same stock while offline: both facts stay,
+    // the negative stock tells the logistician to sort it out.
+    Journal journal = journalWithStock();
+    journal.add(journal.shipmentOf("raspberry", 80, kTruck));
+    journal.add(StockShipment::create("raspberry", {.boxes = 80, .weight = kilograms(160)}, kTruck));
+    EXPECT_EQ(journal.stockOf("raspberry").boxes, -60);
+}

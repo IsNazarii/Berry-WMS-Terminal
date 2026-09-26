@@ -15,6 +15,12 @@ struct Cargo {
         return *this;
     }
 
+    Cargo& operator-=(const Cargo& other) noexcept {
+        boxes -= other.boxes;
+        weight -= other.weight;
+        return *this;
+    }
+
     bool operator==(const Cargo&) const noexcept = default;
 };
 

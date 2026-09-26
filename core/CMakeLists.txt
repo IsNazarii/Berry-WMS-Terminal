@@ -10,6 +10,7 @@ add_library(wms_core
     src/scale.cpp
     src/truck.cpp
     src/allocation.cpp
+    src/shipment.cpp
     src/journal.cpp
     src/pricing.cpp
     src/workday.cpp

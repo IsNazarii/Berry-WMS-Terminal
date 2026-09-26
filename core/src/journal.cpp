@@ -26,6 +26,12 @@ bool Journal::add(Allocation allocation) {
     return true;
 }
 
+bool Journal::add(StockShipment shipment) {
+    if (!registerId(shipment.id())) return false;
+    shipments_.push_back(std::move(shipment));
+    return true;
+}
+
 Money Journal::balanceOf(SupplierId supplierId) const noexcept {
     // balanceEffect() is virtual: each record type knows its own sign.
     Money balance;
@@ -43,6 +49,9 @@ Cargo Journal::loadOf(const TruckId& truckId) const noexcept {
     for (const auto& a : allocations_) {
         if (a.destination() == Destination{truckId}) load += a.cargo();
     }
+    for (const auto& s : shipments_) {
+        if (s.truckId() == truckId) load += s.cargo();
+    }
     return load;
 }
 
@@ -50,6 +59,9 @@ Cargo Journal::stockOf(std::string_view cropCode) const noexcept {
     Cargo stock;
     for (const auto& a : allocations_) {
         if (std::holds_alternative<ToWarehouse>(a.destination()) && a.cropCode() == cropCode) stock += a.cargo();
+    }
+    for (const auto& s : shipments_) {
+        if (s.cropCode() == cropCode) stock -= s.cargo();
     }
     return stock;
 }
@@ -67,10 +79,7 @@ Cargo Journal::unallocatedOf(const Uuid& receiptId, std::string_view cropCode) c
 
     Cargo left = receipt->cargoOf(cropCode);
     for (const auto& a : allocations_) {
-        if (a.receiptId() == receiptId && a.cropCode() == cropCode) {
-            left.boxes -= a.cargo().boxes;
-            left.weight -= a.cargo().weight;
-        }
+        if (a.receiptId() == receiptId && a.cropCode() == cropCode) left -= a.cargo();
     }
     return left;
 }
@@ -103,6 +112,21 @@ std::vector<std::string> Journal::validateAllocation(const Allocation& allocatio
     const Cargo left = unallocatedOf(allocation.receiptId(), allocation.cropCode());
     if (allocation.cargo().boxes > left.boxes) {
         errors.push_back(std::format("Залишилось лише {} ящ. культури {}", left.boxes, allocation.cropCode()));
+    }
+    return errors;
+}
+
+StockShipment Journal::shipmentOf(std::string_view cropCode, int boxes, const TruckId& truckId) const {
+    const Cargo stock = stockOf(cropCode);
+    const Weight weight = stock.boxes > 0 ? grams(divideRounded(stock.weight.raw() * boxes, stock.boxes)) : Weight{};
+    return StockShipment::create(std::string{cropCode}, {.boxes = boxes, .weight = weight}, truckId);
+}
+
+std::vector<std::string> Journal::validateShipment(const StockShipment& shipment) const {
+    std::vector<std::string> errors = shipment.validate();
+    const Cargo stock = stockOf(shipment.cropCode());
+    if (shipment.cargo().boxes > stock.boxes) {
+        errors.push_back(std::format("На складі лише {} ящ. культури {}", stock.boxes, shipment.cropCode()));
     }
     return errors;
 }

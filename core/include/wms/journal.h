@@ -3,6 +3,7 @@
 #include "wms/allocation.h"
 #include "wms/payment.h"
 #include "wms/receipt.h"
+#include "wms/shipment.h"
 #include "wms/supplier.h"
 
 #include <cstddef>
@@ -25,14 +26,17 @@ public:
     bool add(Receipt receipt);
     bool add(Payment payment);
     bool add(Allocation allocation);
+    bool add(StockShipment shipment);
 
     [[nodiscard]] std::size_t size() const noexcept { return ids_.size(); }
 
     // What we owe the supplier: positive = we owe them, negative = they were overpaid.
     [[nodiscard]] Money balanceOf(SupplierId supplierId) const noexcept;
-    // Everything allocated to the truck; compare with Truck::capacity() to spot overload.
+    // Everything put into the truck, from receipts and from the warehouse;
+    // compare with Truck::capacity() to spot overload.
     [[nodiscard]] Cargo loadOf(const TruckId& truckId) const noexcept;
-    // What the warehouse holds of the crop, from all receipts of all sessions.
+    // What the warehouse holds of the crop across all sessions: put in minus shipped out.
+    // Negative after an offline conflict (two terminals shipped the same boxes).
     [[nodiscard]] Cargo stockOf(std::string_view cropCode) const noexcept;
 
     // Part of the crop in the receipt that no truck has taken yet.
@@ -50,6 +54,12 @@ public:
     // purpose: facts synced from another terminal are accepted as they are.
     [[nodiscard]] std::vector<std::string> validateAllocation(const Allocation& allocation) const;
 
+    // Preferred way to ship from the warehouse: the weight is split from the
+    // stock, so shipping the last boxes takes exactly the remaining weight.
+    [[nodiscard]] StockShipment shipmentOf(std::string_view cropCode, int boxes, const TruckId& truckId) const;
+    // Operator-facing check, like validateAllocation(): not more than is in stock.
+    [[nodiscard]] std::vector<std::string> validateShipment(const StockShipment& shipment) const;
+
 private:
     // Remembers the id; false when it was already there.
     bool registerId(const Uuid& id);
@@ -59,6 +69,7 @@ private:
     std::vector<Receipt> receipts_;
     std::vector<Payment> payments_;
     std::vector<Allocation> allocations_;
+    std::vector<StockShipment> shipments_;
 };
 
 } // namespace wms

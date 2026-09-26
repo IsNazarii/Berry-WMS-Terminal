@@ -1,5 +1,6 @@
 #pragma once
 
+#include "wms/operator.h"
 #include "wms/pricing.h"
 #include "wms/truck.h"
 
@@ -10,6 +11,18 @@
 
 namespace wms {
 
+// A change to a closed session: allowed, but it must say who made it, when and why.
+struct Amendment {
+    OperatorId by = 0;
+    TimePoint at;
+    std::string reason;
+};
+
+struct AmendmentRecord {
+    Amendment amendment;
+    std::string change; // what was changed, written by WorkDay itself
+};
+
 // One working session of the collection point. It opens around noon, may run
 // until the next morning and is named by the date it opened. Suppliers and
 // their debts live in the journal and span all sessions; prices and trucks
@@ -18,12 +31,14 @@ class WorkDay {
 public:
     // The date is passed in rather than derived from `openedAt`: the core does
     // not know the local time zone, the UI does.
-    WorkDay(std::chrono::year_month_day date, TimePoint openedAt);
+    WorkDay(std::chrono::year_month_day date, TimePoint openedAt, OperatorId openedBy);
 
     [[nodiscard]] std::chrono::year_month_day date() const noexcept { return date_; }
     [[nodiscard]] TimePoint openedAt() const noexcept { return openedAt_; }
     [[nodiscard]] std::optional<TimePoint> closedAt() const noexcept { return closedAt_; }
     [[nodiscard]] bool isOpen() const noexcept { return !closedAt_.has_value(); }
+    [[nodiscard]] OperatorId openedBy() const noexcept { return openedBy_; }
+    [[nodiscard]] std::optional<OperatorId> closedBy() const noexcept { return closedBy_; }
 
     [[nodiscard]] const DayPrices& prices() const noexcept { return prices_; }
     // Changes of an open session only; throws std::logic_error once it is closed.
@@ -48,19 +63,34 @@ public:
     // Operator-facing: why the session cannot be closed yet; empty when it can.
     [[nodiscard]] std::vector<std::string> validateClose() const;
     // Throws std::logic_error when validateClose() is not empty or already closed.
-    void close(TimePoint at);
+    void close(TimePoint at, OperatorId by);
+
+    // The same changes as an amendment: allowed in a closed session too, and
+    // logged with what was changed. Throw std::invalid_argument without an
+    // operator or a reason; a change that fails is not logged.
+    void setPrice(std::string cropCode, Money pricePerKg, TimePoint at, const Amendment& amendment);
+    const Truck& addTruck(std::string plate, Cargo capacity, const Amendment& amendment);
+    void departTruck(const TruckId& id, const Amendment& amendment);
+    void carryOverTruck(const TruckId& id, const Amendment& amendment);
+    [[nodiscard]] const std::vector<AmendmentRecord>& amendments() const noexcept { return amendments_; }
 
     [[nodiscard]] std::vector<Truck> trucksForNextSession() const;
 
 private:
     void requireOpen() const;
+    // Checks the amendment, applies `change` and logs it with `description`.
+    template <class Change>
+    void amend(const Amendment& amendment, std::string description, Change change);
     [[nodiscard]] Truck& truck(const TruckId& id);
 
     std::chrono::year_month_day date_;
     TimePoint openedAt_;
+    OperatorId openedBy_;
     std::optional<TimePoint> closedAt_;
+    std::optional<OperatorId> closedBy_;
     DayPrices prices_;
     std::vector<Truck> trucks_;
+    std::vector<AmendmentRecord> amendments_;
 };
 
 } // namespace wms

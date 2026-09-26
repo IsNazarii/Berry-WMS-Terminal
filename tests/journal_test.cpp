@@ -79,9 +79,9 @@ TEST(Journal, TruckLoadSumsItsAllocations) {
         42, Settlement::OnSite, {pallet("raspberry", 80, kilograms(160)), pallet("blueberry", 40, kilograms(70))});
     journal.add(receipt);
     // Blueberry: 40 boxes, 70 kg -> 1.75 kg per box.
-    journal.add(CrossDockAllocation::wholeWeighing(receipt, 0, kTruck));
-    journal.add(CrossDockAllocation::boxesOf(receipt, "blueberry", 10, kTruck));
-    journal.add(CrossDockAllocation::boxesOf(receipt, "blueberry", 30, kOtherTruck)); // another truck
+    journal.add(Allocation::wholeWeighing(receipt, 0, kTruck));
+    journal.add(Allocation::boxesOf(receipt, "blueberry", 10, kTruck));
+    journal.add(Allocation::boxesOf(receipt, "blueberry", 30, kOtherTruck)); // another truck
 
     EXPECT_EQ(journal.loadOf(kTruck), (Cargo{.boxes = 90, .weight = grams(177'500)}));
     EXPECT_EQ(journal.loadOf(kOtherTruck), (Cargo{.boxes = 30, .weight = grams(52'500)}));
@@ -118,9 +118,9 @@ TEST(Journal, UnallocatedSubtractsOnlyThatReceiptAndCrop) {
     const Receipt other = mixedReceipt();
     journal.add(receipt);
     journal.add(other);
-    journal.add(CrossDockAllocation::wholeWeighing(receipt, 0, kTruck));         // 80 raspberry boxes
-    journal.add(CrossDockAllocation::boxesOf(receipt, "blueberry", 10, kTruck)); // other crop
-    journal.add(CrossDockAllocation::boxesOf(other, "raspberry", 5, kTruck));    // other receipt
+    journal.add(Allocation::wholeWeighing(receipt, 0, kTruck));         // 80 raspberry boxes
+    journal.add(Allocation::boxesOf(receipt, "blueberry", 10, kTruck)); // other crop
+    journal.add(Allocation::boxesOf(other, "raspberry", 5, kTruck));    // other receipt
 
     EXPECT_EQ(journal.unallocatedOf(receipt.id(), "raspberry"), (Cargo{.boxes = 20, .weight = kilograms(40)}));
 }
@@ -134,18 +134,18 @@ TEST(Journal, AllocationWithinWhatIsLeftIsValid) {
     Journal journal;
     const Receipt receipt = mixedReceipt();
     journal.add(receipt);
-    journal.add(CrossDockAllocation::wholeWeighing(receipt, 0, kTruck));
+    journal.add(Allocation::wholeWeighing(receipt, 0, kTruck));
 
-    EXPECT_TRUE(journal.validateAllocation(CrossDockAllocation::boxesOf(receipt, "raspberry", 20, kOtherTruck)).empty());
+    EXPECT_TRUE(journal.validateAllocation(Allocation::boxesOf(receipt, "raspberry", 20, kOtherTruck)).empty());
 }
 
 TEST(Journal, RejectsMoreBoxesThanLeft) {
     Journal journal;
     const Receipt receipt = mixedReceipt();
     journal.add(receipt);
-    journal.add(CrossDockAllocation::wholeWeighing(receipt, 0, kTruck));
+    journal.add(Allocation::wholeWeighing(receipt, 0, kTruck));
 
-    const auto errors = journal.validateAllocation(CrossDockAllocation::boxesOf(receipt, "raspberry", 21, kOtherTruck));
+    const auto errors = journal.validateAllocation(Allocation::boxesOf(receipt, "raspberry", 21, kOtherTruck));
     EXPECT_TRUE(mentions(errors, "Залишилось лише 20 ящ."));
 }
 
@@ -153,15 +153,15 @@ TEST(Journal, RejectsSameWeighingTwice) {
     Journal journal;
     const Receipt receipt = mixedReceipt();
     journal.add(receipt);
-    journal.add(CrossDockAllocation::wholeWeighing(receipt, 1, kTruck));
+    journal.add(Allocation::wholeWeighing(receipt, 1, kTruck));
 
-    const auto errors = journal.validateAllocation(CrossDockAllocation::wholeWeighing(receipt, 1, kOtherTruck));
+    const auto errors = journal.validateAllocation(Allocation::wholeWeighing(receipt, 1, kOtherTruck));
     EXPECT_TRUE(mentions(errors, "Зважування 2 вже розподілено"));
 }
 
 TEST(Journal, RejectsAllocationOfUnknownReceipt) {
     const Journal journal;
-    const auto errors = journal.validateAllocation(CrossDockAllocation::wholeWeighing(mixedReceipt(), 0, kTruck));
+    const auto errors = journal.validateAllocation(Allocation::wholeWeighing(mixedReceipt(), 0, kTruck));
     EXPECT_TRUE(mentions(errors, "Чек не знайдено"));
 }
 
@@ -170,7 +170,7 @@ TEST(Journal, KeepsAllocationOwnErrors) {
     const Receipt receipt = mixedReceipt();
     journal.add(receipt);
 
-    const auto errors = journal.validateAllocation(CrossDockAllocation::boxesOf(receipt, "raspberry", 10, TruckId{}));
+    const auto errors = journal.validateAllocation(Allocation::boxesOf(receipt, "raspberry", 10, TruckId{}));
     EXPECT_TRUE(mentions(errors, "Не обрано фуру"));
 }
 

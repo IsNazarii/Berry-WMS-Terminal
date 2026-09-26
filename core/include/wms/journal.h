@@ -24,7 +24,7 @@ public:
     // sync may deliver a record twice, and the UUID makes that harmless.
     bool add(Receipt receipt);
     bool add(Payment payment);
-    bool add(CrossDockAllocation allocation);
+    bool add(Allocation allocation);
 
     [[nodiscard]] std::size_t size() const noexcept { return ids_.size(); }
 
@@ -40,13 +40,13 @@ public:
     // Preferred way to allocate boxes: the weight is split from what is left,
     // not from the whole crop. Still check it with validateAllocation().
     // Throws std::invalid_argument when the receipt is not in the journal.
-    [[nodiscard]] CrossDockAllocation boxesOf(const Uuid& receiptId, std::string_view cropCode, int boxes,
-                                              TruckId truckId) const;
+    [[nodiscard]] Allocation boxesOf(const Uuid& receiptId, std::string_view cropCode, int boxes,
+                                     TruckId truckId) const;
 
     // Operator-facing check before an allocation is added: its own errors plus
     // the rules that need the rest of the journal. add() does not call this on
     // purpose: facts synced from another terminal are accepted as they are.
-    [[nodiscard]] std::vector<std::string> validateAllocation(const CrossDockAllocation& allocation) const;
+    [[nodiscard]] std::vector<std::string> validateAllocation(const Allocation& allocation) const;
 
 private:
     // Remembers the id; false when it was already there.
@@ -56,7 +56,7 @@ private:
     std::set<Uuid> ids_;
     std::vector<Receipt> receipts_;
     std::vector<Payment> payments_;
-    std::vector<CrossDockAllocation> allocations_;
+    std::vector<Allocation> allocations_;
 };
 
 } // namespace wms

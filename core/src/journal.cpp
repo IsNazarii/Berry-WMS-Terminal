@@ -20,7 +20,7 @@ bool Journal::add(Payment payment) {
     return true;
 }
 
-bool Journal::add(CrossDockAllocation allocation) {
+bool Journal::add(Allocation allocation) {
     if (!registerId(allocation.id())) return false;
     allocations_.push_back(std::move(allocation));
     return true;
@@ -67,14 +67,14 @@ Cargo Journal::unallocatedOf(const Uuid& receiptId, std::string_view cropCode) c
     return left;
 }
 
-CrossDockAllocation Journal::boxesOf(const Uuid& receiptId, std::string_view cropCode, int boxes,
-                                     TruckId truckId) const {
+Allocation Journal::boxesOf(const Uuid& receiptId, std::string_view cropCode, int boxes,
+                            TruckId truckId) const {
     const Receipt* receipt = findReceipt(receiptId);
     if (receipt == nullptr) throw std::invalid_argument("Receipt is not in the journal");
-    return CrossDockAllocation::boxesOf(*receipt, cropCode, boxes, truckId, unallocatedOf(receiptId, cropCode));
+    return Allocation::boxesOf(*receipt, cropCode, boxes, truckId, unallocatedOf(receiptId, cropCode));
 }
 
-std::vector<std::string> Journal::validateAllocation(const CrossDockAllocation& allocation) const {
+std::vector<std::string> Journal::validateAllocation(const Allocation& allocation) const {
     std::vector<std::string> errors = allocation.validate();
     if (findReceipt(allocation.receiptId()) == nullptr) {
         errors.emplace_back("Чек не знайдено в журналі");

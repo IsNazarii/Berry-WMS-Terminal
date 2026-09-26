@@ -87,11 +87,11 @@ $CM/cmake -S . -B build -G Ninja && $CM/cmake --build build && $CM/ctest --test-
 ## Мапа вимог курсу → код (оновлювати по ходу)
 Лаба 1: ≥9 класів, ≥15 полів, ≥25 нетривіальних методів, ≥2 ієрархії (одна ≥3 класи),
 ≥3 поліморфізми (≥1 статичний, ≥1 динамічний), інкапсуляція.
-- Ієрархія A: `Transaction` → `Receipt` ✅, `Payment` ✅, `CrossDockAllocation` ✅
+- Ієрархія A: `Transaction` → `Receipt` ✅, `Payment` ✅, `Allocation` ✅
 - Ієрархія B: `IScaleDriver` → `SimulatedScaleDriver` ✅, `SerialScaleDriver` ⏳ (infra, Qt)
 - Ієрархія C (опц.): `PricingStrategy` → …
 - Статичний поліморфізм: `Quantity<Tag>` (`Money`, `Weight`) ✅; `Repository<T>` ⏳
-- Статичний поліморфізм (перевантаження): `Journal::add(Receipt|Payment|CrossDockAllocation)` ✅
+- Статичний поліморфізм (перевантаження): `Journal::add(Receipt|Payment|Allocation)` ✅
 - Інші класи: `Uuid`, `Supplier`, `StabilityDetector`, `Weighing`, `Truck`, `Cargo`, `Journal` ✅
 - Стан на 26.09: 14 класів, 2 ієрархії (A — 4 класи), 3+ поліморфізми, 81 тест — лаба 1 закрита із запасом.
 
@@ -117,7 +117,7 @@ $CM/cmake -S . -B build -G Ninja && $CM/cmake --build build && $CM/ctest --test-
 
 ## Стан і наступні кроки (оновлено 26.09.2026)
 Ядро (`core/`): `Receipt` = постачальник + `Settlement` (`OnSite`/`HandedOver`) + `vector<Weighing>`;
-`Payment`; `CrossDockAllocation` (`wholeWeighing` / `boxesOf`); `Truck` + `Cargo`; симулятор ваг +
+`Payment`; `Allocation` (`wholeWeighing` / `boxesOf`); `Truck` + `Cargo`; симулятор ваг +
 `StabilityDetector`; `Journal` — append-only, `balanceOf`, `loadOf`, `unallocatedOf`, `validateAllocation`.
 
 UI (`ui/`, модуль `BerryWms.Ui`, статична бібліотека + `Q_IMPORT_QML_PLUGIN` у `app/main.cpp`):

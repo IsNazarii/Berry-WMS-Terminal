@@ -11,6 +11,9 @@
 namespace wms {
 
 enum class WeightSource { Scale, Manual };
+// Manual = the operator changed the day price for this weighing (a one-off raise).
+// Kept for reconciliation only; the printed receipt looks the same either way.
+enum class PriceSource { DayPrice, Manual };
 
 // Chosen by the operator when closing a receipt.
 enum class Settlement {
@@ -25,9 +28,9 @@ struct Weighing {
     Weight gross;
     int boxCount = 0;
     Weight tarePerBox;
-    Weight palletTare;        // entered by the operator; zero when weighed without a pallet
-    Money pricePerKg;         // snapshot of the price at reception; zero for Settlement::HandedOver
-    int priceListVersion = 0; // which price list the snapshot came from
+    Weight palletTare; // entered by the operator; zero when weighed without a pallet
+    Money pricePerKg; // snapshot of the price at reception; zero for Settlement::HandedOver
+    PriceSource priceSource = PriceSource::DayPrice;
     WeightSource weightSource = WeightSource::Scale;
 
     [[nodiscard]] Weight tare() const noexcept;

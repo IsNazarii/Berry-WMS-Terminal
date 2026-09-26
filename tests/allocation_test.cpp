@@ -17,7 +17,6 @@ Weighing pallet(std::string crop, int boxes, Weight net) {
         .tarePerBox = grams(300),
         .palletTare = kilograms(25),
         .pricePerKg = hryvnias(85),
-        .priceListVersion = 1,
     };
 }
 

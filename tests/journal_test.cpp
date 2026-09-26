@@ -19,7 +19,6 @@ Weighing pallet(std::string crop, int boxes, Weight net, Money pricePerKg = hryv
         .boxCount = boxes,
         .tarePerBox = grams(300),
         .pricePerKg = pricePerKg,
-        .priceListVersion = 1,
     };
 }
 

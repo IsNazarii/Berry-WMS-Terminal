@@ -37,7 +37,6 @@ void addDemoHistory(Journal& journal) {
         .tarePerBox = grams(350),
         .palletTare = kilograms(25),
         .pricePerKg = hryvnias(85),
-        .priceListVersion = 1,
     }}));
     journal.add(Payment::create(42, hryvnias(3'000), PaymentMethod::Cash));
 }

@@ -19,7 +19,6 @@ Weighing raspberryPallet() {
         .tarePerBox = grams(350),
         .palletTare = grams(25'000),
         .pricePerKg = hryvnias(85),
-        .priceListVersion = 1,
     };
 }
 
@@ -30,7 +29,6 @@ Weighing blueberryBoxes() {
         .boxCount = 10,
         .tarePerBox = grams(300),
         .pricePerKg = hryvnias(120) + kopecks(50),
-        .priceListVersion = 1,
     };
 }
 
@@ -125,7 +123,6 @@ namespace {
 Weighing wholesalePallet() {
     auto w = raspberryPallet();
     w.pricePerKg = Money{};
-    w.priceListVersion = 0;
     return w;
 }
 
@@ -202,4 +199,27 @@ TEST(Transaction, BalanceIsSumOfPolymorphicEffects) {
     EXPECT_EQ(balance, hryvnias(13'620));
     EXPECT_EQ(journal[0]->kind(), TransactionKind::Receipt);
     EXPECT_EQ(journal[1]->kind(), TransactionKind::Payment);
+}
+
+TEST(Weighing, PriceComesFromDayPricesByDefault) {
+    EXPECT_EQ(raspberryPallet().priceSource, PriceSource::DayPrice);
+}
+
+TEST(Weighing, ManualPriceCountsLikeDayPrice) {
+    // A one-off raise for one supplier: marked internally, priced the usual way.
+    auto raised = raspberryPallet();
+    raised.pricePerKg = hryvnias(88);
+    raised.priceSource = PriceSource::Manual;
+    EXPECT_EQ(raised.amount(), costOf(raised.net(), hryvnias(88)));
+
+    auto sameAtDayPrice = raised;
+    sameAtDayPrice.priceSource = PriceSource::DayPrice;
+    const Uuid id = Uuid::generateV7();
+    const TimePoint at = Clock::now();
+    const Receipt manual{id, at, 42, Settlement::OnSite, {raised}};
+    const Receipt usual{id, at, 42, Settlement::OnSite, {sameAtDayPrice}};
+    EXPECT_TRUE(manual.isValid());
+    // The supplier must not see the difference.
+    EXPECT_EQ(manual.describe(), usual.describe());
+    EXPECT_EQ(manual.amount(), usual.amount());
 }

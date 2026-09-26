@@ -107,9 +107,13 @@ $CM/cmake -S . -B build -G Ninja && $CM/cmake --build build && $CM/ctest --test-
 - Ієрархія C (опц.): `PricingStrategy` → …
 - Статичний поліморфізм: `Quantity<Tag>` (`Money`, `Weight`) ✅; `Destination` = `std::variant` + `std::visit` ✅;
   `Repository<T>` ⏳
-- Статичний поліморфізм (перевантаження): `Journal::add(Receipt|Payment|Allocation|StockShipment)` ✅
-- Інші класи: `Uuid`, `Supplier`, `StabilityDetector`, `Weighing`, `Truck`, `Cargo`, `Journal`, `DayPrices`, `WorkDay`, `Operator` ✅
-- Стан на 26.09: 18 класів ядра, 2 ієрархії (A — 5 класів), 4+ поліморфізми, 118 тестів — лаба 1 закрита із запасом.
+- Статичний поліморфізм (перевантаження): `Journal::add(Receipt|Payment|Allocation|StockShipment)` ✅;
+  `Journal::validateAllocation`/`unallocatedOf`/`boxesOf` для `Receipt` і `OpenReceipt` ✅
+- Статичний поліморфізм (concept): `WeighedReceipt` + шаблонні `Allocation::wholeWeighing`/`boxesOf`
+  (приймають `Receipt` і `OpenReceipt`) ✅
+- Інші класи: `Uuid`, `Supplier`, `StabilityDetector`, `Weighing`, `Truck`, `Cargo`, `Journal`, `DayPrices`,
+  `WorkDay`, `Operator`, `OpenReceipt` ✅
+- Стан на 26.09: 19 класів ядра, 2 ієрархії (A — 5 класів), 6+ поліморфізмів, 158 тестів — лаба 1 закрита із запасом.
 
 Лаба 2: ≥4 екрани (Вхід, Прийом, Сесія, Розподіл, Склад, Каса, + Sync/Довідники),
 ≥20 контролів, ≥1 контейнер (ListView), ≥10 обробників, логіка відділена.
@@ -131,16 +135,23 @@ $CM/cmake -S . -B build -G Ninja && $CM/cmake --build build && $CM/ctest --test-
 - Git: гілка `main`, remote `origin` = git@github.com:IsNazarii/Berry-WMS-Terminal.git (SSH-ключ `~/.ssh/id_ed25519` працює — push можна робити з термінала).
 - GoogleTest у системі не встановлено — тягнеться FetchContent (потрібна мережа при першій конфігурації).
 
-## Стан і наступні кроки (оновлено 26.09.2026, вечір)
+## Стан і наступні кроки (оновлено 26.09.2026, ніч)
 Ядро (`core/`): `Receipt` = постачальник + `Settlement` (`OnSite`/`HandedOver`) + `vector<Weighing>`
-(`priceSource`: `DayPrice`/`Manual`); `Payment`; `Allocation` (чек → `Destination` = фура | `ToWarehouse`;
+(`priceSource`: `DayPrice`/`Manual`; `cancelled` — рядок лишається, не рахується); `Payment`;
+`OpenReceipt` (чек, що зважується: `add`/`cancel`, `validateClose`/`close(settlement)` → `Receipt` з тим самим
+UUID і часом відкриття; для опту ціни обнуляються); `Allocation` (чек → `Destination` = фура | `ToWarehouse`;
 `wholeWeighing` / `boxesOf`); `StockShipment` (склад → фура); `Truck` (id = UUID, статуси
 `Loading`/`Departed`/`CarriedOver`) + `Cargo`; `DayPrices` (історія змін, `priceAt(crop, t)`);
 `WorkDay` (сесія: дата відкриття, хто відкрив/закрив, ціни, фури, `validateClose`/`close`,
-`repeatTruck`/`adoptTruck`; поправки в закритій сесії — перевантаження з `Amendment`, журнал `amendments()`);
+`repeatTruck`/`adoptTruck`; поправки в закритій сесії — перевантаження з `Amendment`, журнал `amendments()`;
+відкриті чеки: `openReceipt(supplier)` — один на постачальника, `addWeighing(id, w, at)` сам бере денну ціну
+на момент `at` (ручну не чіпає), `cancelWeighing(id, i, journal)`, `closeReceipt` → `Receipt`;
+`validateClose` не пускає з відкритими чеками);
 `Operator` (id, ім'я, PIN 4–6 цифр, лише `checkPin`);
 симулятор ваг + `StabilityDetector`; `Journal` — append-only: `balanceOf`, `loadOf` (з чеків і складу),
-`stockOf`, `unallocatedOf`, `boxesOf`/`shipmentOf`, `validateAllocation`/`validateShipment`.
+`stockOf`, `unallocatedOf`, `boxesOf`/`shipmentOf`, `validateAllocation`/`validateShipment` (для закритого чека
+і для відкритого — палета йде у фуру ще під час розвантаження), `validateCancel` (розподілене не анулюється).
+Відновлення відкритих чеків після перезапуску — конструктор `OpenReceipt` є, метод у `WorkDay` — разом зі SQLite.
 
 UI (`ui/`, модуль `BerryWms.Ui`, статична бібліотека + `Q_IMPORT_QML_PLUGIN` у `app/main.cpp`):
 синглтон `Terminal` (демо-дані в пам'яті, міст QML → core), `SupplierListModel` (пошук),
@@ -153,13 +164,11 @@ UI (`ui/`, модуль `BerryWms.Ui`, статична бібліотека + `
 по центру табло ваг, справа зважування активного чека + «Закрити чек».
 
 Наступні кроки (кожен — окремий коміт, ядро тест-першим):
-1. core: анульовані зважування в `Receipt` (не рахуються, індекси стабільні).
-2. core: `OpenReceipt` — додати/анулювати зважування, `close(settlement)` → `Receipt` (той самий UUID).
-3. core: реєстр відкритих чеків (один на постачальника); розподіл палети з відкритого чека;
-   `WorkDay::validateClose` не пускає з відкритими чеками.
-4. UI: `Terminal` на `WorkDay` + екран Сесії (відкриття/закриття, ціни, фури); оператор → «хто відкрив/закрив».
-5. UI: екран «Прийом» (відкриті чеки, зважування з денною/ручною ціною, підтвердження нестабільної ваги).
-6. UI: Розподіл (фура | склад), Склад, Каса. Потім — прохід по UX.
+1. UI: `Terminal` на `WorkDay` + екран Сесії (відкриття/закриття, ціни, фури); поточний оператор →
+   «хто відкрив/закрив». UI тримає UUID відкритого чека, не посилання (вектор переалоковується).
+2. UI: екран «Прийом» (відкриті чеки, зважування з денною/ручною ціною, підтвердження нестабільної ваги,
+   анулювання з показом `validateCancel`, закриття чека з вибором `Settlement`).
+3. UI: Розподіл (фура | склад, у т.ч. з відкритого чека), Склад, Каса. Потім — прохід по UX.
 - Пізні записи журналу (забутий чек у закритій сесії) — прив'язати записи до сесії + позначка поправки.
 
 ## Відкриті питання

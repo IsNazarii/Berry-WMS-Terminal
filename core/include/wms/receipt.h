@@ -32,6 +32,10 @@ struct Weighing {
     Money pricePerKg; // snapshot of the price at reception; zero for Settlement::HandedOver
     PriceSource priceSource = PriceSource::DayPrice;
     WeightSource weightSource = WeightSource::Scale;
+    // A mistake (e.g. weighed into the wrong receipt). The line stays, so
+    // allocations keep pointing at the right weighing by index, but it is
+    // counted nowhere and not printed.
+    bool cancelled = false;
 
     [[nodiscard]] Weight tare() const noexcept;
     [[nodiscard]] Weight net() const noexcept;
@@ -55,6 +59,7 @@ public:
 
     [[nodiscard]] SupplierId supplierId() const noexcept { return supplierId_; }
     [[nodiscard]] Settlement settlement() const noexcept { return settlement_; }
+    // All lines, cancelled ones included; totals below skip the cancelled.
     [[nodiscard]] const std::vector<Weighing>& weighings() const noexcept { return weighings_; }
 
     [[nodiscard]] Cargo total() const noexcept;

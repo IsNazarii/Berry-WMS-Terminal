@@ -93,12 +93,16 @@ Allocation Journal::boxesOf(const Uuid& receiptId, std::string_view cropCode, in
 
 std::vector<std::string> Journal::validateAllocation(const Allocation& allocation) const {
     std::vector<std::string> errors = allocation.validate();
-    if (findReceipt(allocation.receiptId()) == nullptr) {
+    const Receipt* receipt = findReceipt(allocation.receiptId());
+    if (receipt == nullptr) {
         errors.emplace_back("Чек не знайдено в журналі");
         return errors;
     }
 
     if (const auto index = allocation.weighingIndex()) {
+        if (receipt->weighings().at(*index).cancelled) {
+            errors.push_back(std::format("Зважування {} анульовано", *index + 1));
+        }
         for (const auto& a : allocations_) {
             if (a.receiptId() == allocation.receiptId() && a.weighingIndex() == index) {
                 errors.push_back(std::format("Зважування {} вже розподілено", *index + 1));

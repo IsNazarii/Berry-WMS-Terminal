@@ -159,6 +159,17 @@ TEST(Journal, RejectsSameWeighingTwice) {
     EXPECT_TRUE(mentions(errors, "Зважування 2 вже розподілено"));
 }
 
+TEST(Journal, RejectsCancelledWeighing) {
+    Journal journal;
+    auto mistake = pallet("raspberry", 10, kilograms(20));
+    mistake.cancelled = true;
+    const Receipt receipt = Receipt::create(42, Settlement::OnSite, {pallet("raspberry", 80, kilograms(160)), mistake});
+    journal.add(receipt);
+
+    const auto errors = journal.validateAllocation(Allocation::wholeWeighing(receipt, 1, kTruck));
+    EXPECT_TRUE(mentions(errors, "Зважування 2 анульовано"));
+}
+
 TEST(Journal, RejectsAllocationOfUnknownReceipt) {
     const Journal journal;
     const auto errors = journal.validateAllocation(Allocation::wholeWeighing(mixedReceipt(), 0, kTruck));

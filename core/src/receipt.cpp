@@ -1,5 +1,6 @@
 #include "wms/receipt.h"
 
+#include <algorithm>
 #include <format>
 #include <utility>
 
@@ -33,14 +34,16 @@ Receipt Receipt::create(SupplierId supplierId, Settlement settlement, std::vecto
 
 Cargo Receipt::total() const noexcept {
     Cargo sum;
-    for (const auto& w : weighings_) sum += w.cargo();
+    for (const auto& w : weighings_) {
+        if (!w.cancelled) sum += w.cargo();
+    }
     return sum;
 }
 
 Cargo Receipt::cargoOf(std::string_view cropCode) const noexcept {
     Cargo sum;
     for (const auto& w : weighings_) {
-        if (w.cropCode == cropCode) sum += w.cargo();
+        if (!w.cancelled && w.cropCode == cropCode) sum += w.cargo();
     }
     return sum;
 }
@@ -49,15 +52,20 @@ Money Receipt::amount() const noexcept {
     if (settlement_ == Settlement::HandedOver) return Money{};
     // Sum of already rounded lines, so the total always matches the printed lines.
     Money sum;
-    for (const auto& w : weighings_) sum += w.amount();
+    for (const auto& w : weighings_) {
+        if (!w.cancelled) sum += w.amount();
+    }
     return sum;
 }
 
 std::vector<std::string> Receipt::validate() const {
     std::vector<std::string> errors;
     if (supplierId_ <= 0) errors.emplace_back("Не обрано постачальника");
-    if (weighings_.empty()) errors.emplace_back("Чек не містить жодного зважування");
+    if (std::ranges::all_of(weighings_, &Weighing::cancelled)) {
+        errors.emplace_back("Чек не містить жодного зважування");
+    }
     for (std::size_t i = 0; i < weighings_.size(); ++i) {
+        if (weighings_[i].cancelled) continue;
         auto lineErrors = weighings_[i].validate();
         const Money price = weighings_[i].pricePerKg;
         if (settlement_ == Settlement::OnSite && !price.isPositive()) {
@@ -75,13 +83,15 @@ std::vector<std::string> Receipt::validate() const {
 
 std::string Receipt::describe() const {
     const bool handedOver = settlement_ == Settlement::HandedOver;
-    std::string text = std::format("Прийом: {} зваж., {} ящ., нетто {}", weighings_.size(), total().boxes,
+    const auto counted = std::ranges::count(weighings_, false, &Weighing::cancelled);
+    std::string text = std::format("Прийом: {} зваж., {} ящ., нетто {}", counted, total().boxes,
                                    formatWeight(net()));
     text += handedOver ? " [опт, до розрахунку]" : std::format(" = {}", formatMoney(amount()));
     for (const auto& w : weighings_) {
         text += std::format("\n  {}: {} ящ., нетто {}", w.cropCode, w.boxCount, formatWeight(w.net()));
         if (!handedOver) text += std::format(" × {}/кг = {}", formatMoney(w.pricePerKg), formatMoney(w.amount()));
         if (w.weightSource == WeightSource::Manual) text += " [ручне введення ваги]";
+        if (w.cancelled) text += " [анульовано]";
     }
     return text;
 }

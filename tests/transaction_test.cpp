@@ -177,6 +177,49 @@ TEST(Receipt, DescribeMarksManualWeight) {
     EXPECT_NE(Receipt::create(42, Settlement::OnSite, {w}).describe().find("ручне"), std::string::npos);
 }
 
+namespace {
+
+// A pallet weighed into the wrong receipt by mistake.
+Weighing cancelled(Weighing w) {
+    w.cancelled = true;
+    return w;
+}
+
+} // namespace
+
+TEST(Receipt, CancelledWeighingIsNotCounted) {
+    const Receipt r = Receipt::create(42, Settlement::OnSite, {raspberryPallet(), cancelled(blueberryBoxes())});
+    EXPECT_EQ(r.total(), raspberryPallet().cargo());
+    EXPECT_EQ(r.amount(), raspberryPallet().amount());
+    EXPECT_EQ(r.cargoOf("blueberry"), Cargo{});
+}
+
+TEST(Receipt, CancelledWeighingKeepsItsPlaceAndValues) {
+    // Allocations point at weighings by index, so a cancelled line must not disappear.
+    const Receipt r = Receipt::create(42, Settlement::OnSite, {cancelled(blueberryBoxes()), raspberryPallet()});
+    ASSERT_EQ(r.weighings().size(), 2U);
+    EXPECT_TRUE(r.weighings()[0].cancelled);
+    EXPECT_EQ(r.weighings()[0].net(), blueberryBoxes().net());
+}
+
+TEST(Receipt, CancelledWeighingIsNotValidated) {
+    // A mistaken line need not be correct, it only has to stay on record.
+    auto wrong = raspberryPallet();
+    wrong.boxCount = 0;
+    EXPECT_TRUE(Receipt::create(42, Settlement::OnSite, {raspberryPallet(), cancelled(wrong)}).isValid());
+}
+
+TEST(Receipt, OnlyCancelledWeighingsAreNoReceipt) {
+    const auto errors = Receipt::create(42, Settlement::OnSite, {cancelled(raspberryPallet())}).validate();
+    ASSERT_EQ(errors.size(), 1U);
+    EXPECT_NE(errors[0].find("жодного зважування"), std::string::npos);
+}
+
+TEST(Receipt, DescribeMarksCancelledWeighing) {
+    const auto text = Receipt::create(42, Settlement::OnSite, {raspberryPallet(), cancelled(blueberryBoxes())}).describe();
+    EXPECT_NE(text.find("анульовано"), std::string::npos);
+}
+
 TEST(Transaction, RejectsNilId) {
     EXPECT_THROW((Payment{Uuid{}, Clock::now(), 1, hryvnias(1), PaymentMethod::Cash}), std::invalid_argument);
 }

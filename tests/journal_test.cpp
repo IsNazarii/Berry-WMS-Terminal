@@ -365,3 +365,43 @@ TEST(Journal, AllocationOfAnotherOpenReceiptIsProgrammerError) {
     const Allocation a = Allocation::wholeWeighing(unloading(), 0, kTruck);
     EXPECT_THROW((void)journal.validateAllocation(a, unloading()), std::invalid_argument);
 }
+
+TEST(Journal, PalletNotYetAllocatedCanBeCancelled) {
+    const Journal journal;
+    EXPECT_TRUE(journal.validateCancel(unloading(), 1).empty());
+}
+
+TEST(Journal, PalletInTruckCannotBeCancelled) {
+    Journal journal;
+    const OpenReceipt open = unloading();
+    journal.add(Allocation::wholeWeighing(open, 0, kTruck));
+
+    const auto errors = journal.validateCancel(open, 0);
+    ASSERT_EQ(errors.size(), 1U);
+    EXPECT_TRUE(mentions(errors, "Зважування 1 вже розподілено"));
+}
+
+TEST(Journal, CancelMustLeaveTheBoxesAlreadyAllocated) {
+    // 90 of 100 raspberry boxes went into a truck by count, not by pallet:
+    // without the 20-box pallet only 80 would be left to cover them.
+    Journal journal;
+    const OpenReceipt open = unloading();
+    journal.add(journal.boxesOf(open, "raspberry", 90, kTruck));
+
+    EXPECT_TRUE(mentions(journal.validateCancel(open, 1), "розподілено вже 90"));
+}
+
+TEST(Journal, CancelIsFineWhileEnoughBoxesStay) {
+    Journal journal;
+    const OpenReceipt open = unloading();
+    journal.add(journal.boxesOf(open, "raspberry", 50, kTruck));
+
+    EXPECT_TRUE(journal.validateCancel(open, 1).empty());
+}
+
+TEST(Journal, CancelledPalletCannotBeCancelledAgain) {
+    const Journal journal;
+    OpenReceipt open = unloading();
+    open.cancel(0);
+    EXPECT_TRUE(mentions(journal.validateCancel(open, 0), "вже анульовано"));
+}

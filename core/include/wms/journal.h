@@ -64,6 +64,11 @@ public:
     [[nodiscard]] std::vector<std::string> validateAllocation(const Allocation& allocation,
                                                               const OpenReceipt& receipt) const;
 
+    // Operator-facing: why a weighing of an open receipt cannot be cancelled.
+    // Berries already put into a truck or the warehouse must stay counted.
+    // Throws std::out_of_range for an index outside the receipt.
+    [[nodiscard]] std::vector<std::string> validateCancel(const OpenReceipt& receipt, std::size_t index) const;
+
     // Preferred way to ship from the warehouse: the weight is split from the
     // stock, so shipping the last boxes takes exactly the remaining weight.
     [[nodiscard]] StockShipment shipmentOf(std::string_view cropCode, int boxes, const TruckId& truckId) const;

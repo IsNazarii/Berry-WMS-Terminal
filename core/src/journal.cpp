@@ -123,6 +123,26 @@ std::vector<std::string> Journal::validateAllocation(const Allocation& allocatio
     return checkAllocation(allocation, receipt);
 }
 
+std::vector<std::string> Journal::validateCancel(const OpenReceipt& receipt, std::size_t index) const {
+    const Weighing& weighing = receipt.weighings().at(index);
+    if (weighing.cancelled) return {std::format("Зважування {} вже анульовано", index + 1)};
+
+    for (const auto& a : allocations_) {
+        if (a.receiptId() == receipt.id() && a.weighingIndex() == index) {
+            return {std::format("Зважування {} вже розподілено", index + 1)};
+        }
+    }
+    // Allocations by box count are not tied to a pallet: whatever is left of
+    // the crop after cancelling must still cover them.
+    const int left = receipt.cargoOf(weighing.cropCode).boxes - weighing.boxCount;
+    const int allocated = allocatedOf(receipt.id(), weighing.cropCode).boxes;
+    if (left < allocated) {
+        return {std::format("Без зважування {} лишиться {} ящ. культури {}, а розподілено вже {}", index + 1, left,
+                            weighing.cropCode, allocated)};
+    }
+    return {};
+}
+
 // Defined here and only used here, so the header does not need it.
 template <WeighedReceipt R>
 std::vector<std::string> Journal::checkAllocation(const Allocation& allocation, const R& receipt) const {

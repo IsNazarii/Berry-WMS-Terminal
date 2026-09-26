@@ -76,7 +76,11 @@ std::size_t WorkDay::addWeighing(const Uuid& receiptId, Weighing weighing, TimeP
     return target->add(std::move(weighing));
 }
 
-void WorkDay::cancelWeighing(const Uuid& receiptId, std::size_t index) { receipt(receiptId)->cancel(index); }
+void WorkDay::cancelWeighing(const Uuid& receiptId, std::size_t index, const Journal& journal) {
+    const auto target = receipt(receiptId);
+    if (!journal.validateCancel(*target, index).empty()) throw std::logic_error("Weighing cannot be cancelled");
+    target->cancel(index);
+}
 
 Receipt WorkDay::closeReceipt(const Uuid& receiptId, Settlement settlement) {
     const auto target = receipt(receiptId);

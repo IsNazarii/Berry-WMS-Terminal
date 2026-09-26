@@ -1,5 +1,6 @@
 #pragma once
 
+#include "wms/journal.h"
 #include "wms/open_receipt.h"
 #include "wms/operator.h"
 #include "wms/pricing.h"
@@ -75,7 +76,8 @@ public:
     // wholesale, a retail receipt will not close. Returns the line index.
     // All of these throw std::invalid_argument for a receipt that is not open.
     std::size_t addWeighing(const Uuid& receiptId, Weighing weighing, TimePoint at);
-    void cancelWeighing(const Uuid& receiptId, std::size_t index);
+    // Throws std::logic_error when Journal::validateCancel() is not empty.
+    void cancelWeighing(const Uuid& receiptId, std::size_t index, const Journal& journal);
     // The receipt leaves the open list; the caller puts it into the journal.
     // Throws std::logic_error when OpenReceipt::validateClose() is not empty.
     [[nodiscard]] Receipt closeReceipt(const Uuid& receiptId, Settlement settlement);

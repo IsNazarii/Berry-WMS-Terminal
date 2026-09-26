@@ -1,3 +1,4 @@
+#include "wms/journal.h"
 #include "wms/workday.h"
 
 #include <gtest/gtest.h>
@@ -213,8 +214,19 @@ TEST(WorkDay, CancelWeighingKeepsTheLine) {
     WorkDay day = dayWithRaspberryPrice();
     const Uuid id = day.openReceipt(42).id();
     day.addWeighing(id, raspberryPallet(), kMidnight + 13h);
-    day.cancelWeighing(id, 0);
+    day.cancelWeighing(id, 0, Journal{});
     EXPECT_TRUE(day.findReceipt(id)->weighings()[0].cancelled);
+}
+
+TEST(WorkDay, PalletInTruckCannotBeCancelled) {
+    WorkDay day = dayWithRaspberryPrice();
+    const Uuid id = day.openReceipt(42).id();
+    day.addWeighing(id, raspberryPallet(), kMidnight + 13h);
+    Journal journal;
+    journal.add(Allocation::wholeWeighing(*day.findReceipt(id), 0, Uuid::generateV7()));
+
+    EXPECT_THROW(day.cancelWeighing(id, 0, journal), std::logic_error);
+    EXPECT_FALSE(day.findReceipt(id)->weighings()[0].cancelled);
 }
 
 TEST(WorkDay, ClosedReceiptLeavesTheOpenList) {

@@ -1,7 +1,9 @@
 #pragma once
 
+#include "scale_monitor.h"
 #include "supplier_list_model.h"
 #include "wms/journal.h"
+#include "wms/scale.h"
 #include "wms/supplier.h"
 #include "wms/truck.h"
 
@@ -25,6 +27,7 @@ class Terminal : public QObject {
     Q_PROPERTY(int journalSize READ journalSize NOTIFY journalChanged)
     // Fully qualified: the QML type registrar does not resolve names inside the namespace.
     Q_PROPERTY(wms::ui::SupplierListModel* suppliers READ supplierModel CONSTANT)
+    Q_PROPERTY(wms::ui::ScaleMonitor* scales READ scaleMonitor CONSTANT)
     Q_PROPERTY(bool hasSupplier READ hasSupplier NOTIFY currentSupplierChanged)
     Q_PROPERTY(qint64 supplierId READ supplierId NOTIFY currentSupplierChanged)
     Q_PROPERTY(QString supplierName READ supplierName NOTIFY currentSupplierChanged)
@@ -35,6 +38,7 @@ public:
 
     [[nodiscard]] int journalSize() const noexcept;
     [[nodiscard]] SupplierListModel* supplierModel() noexcept { return &supplierModel_; }
+    [[nodiscard]] ScaleMonitor* scaleMonitor() noexcept { return &scaleMonitor_; }
     [[nodiscard]] bool hasSupplier() const noexcept { return currentSupplierId_.has_value(); }
     // Meaningful only when hasSupplier is true.
     [[nodiscard]] qint64 supplierId() const noexcept { return currentSupplierId_.value_or(0); }
@@ -45,6 +49,10 @@ public:
     // Returns false when there is no supplier with this id.
     Q_INVOKABLE bool selectSupplier(qint64 id);
     Q_INVOKABLE void clearSupplier();
+
+    // Scale simulator controls, until real scales are connected.
+    Q_INVOKABLE void simulatePallet();
+    Q_INVOKABLE void simulateEmptyScale();
 
     // Read access for the C++ list models; QML goes through properties.
     [[nodiscard]] const std::vector<Supplier>& suppliers() const noexcept { return suppliers_; }
@@ -65,6 +73,8 @@ private:
     Journal journal_;
     // Declared after the data it reads, so it is constructed after it.
     SupplierListModel supplierModel_;
+    SimulatedScaleDriver simulator_;
+    ScaleMonitor scaleMonitor_;
     std::optional<SupplierId> currentSupplierId_;
 };
 

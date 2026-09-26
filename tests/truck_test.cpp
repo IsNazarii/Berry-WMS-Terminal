@@ -20,6 +20,16 @@ TEST(Truck, CreateGivesEveryTruckItsOwnId) {
     EXPECT_NE(a.id(), b.id());
 }
 
+TEST(Truck, DetailsAreOptional) {
+    const Truck bare = Truck::create("AA1234BB", {.boxes = 10});
+    EXPECT_TRUE(bare.details().make.empty());
+    EXPECT_TRUE(bare.details().note.empty());
+
+    const Truck described = Truck::create("AA1234BB", {.boxes = 10}, {.make = "DAF XF", .note = "Іван, на Київ"});
+    EXPECT_EQ(described.details().make, "DAF XF");
+    EXPECT_EQ(described.details().note, "Іван, на Київ");
+}
+
 TEST(Cargo, AddsUp) {
     Cargo total{.boxes = 10, .weight = kilograms(20)};
     total += {.boxes = 5, .weight = kilograms(8)};

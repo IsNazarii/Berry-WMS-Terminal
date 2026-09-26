@@ -15,6 +15,7 @@ namespace {
 constexpr year_month_day kDate = September / 26 / 2026;
 const TimePoint kMidnight = TimePoint{sys_days{kDate}};
 const Cargo kBigTruck{.boxes = 1'200, .weight = kilograms(2'000)};
+const TruckDetails kDaf{.make = "DAF XF", .note = "Іван, на Київ"};
 constexpr OperatorId kOksana = 1;
 constexpr OperatorId kPetro = 2;
 
@@ -40,12 +41,13 @@ TEST(WorkDay, HasItsOwnPrices) {
 
 TEST(WorkDay, RepeatedTruckKeepsPlateAndLimitsButGetsANewId) {
     WorkDay yesterday{September / 25 / 2026, kMidnight - 12h, kOksana};
-    const Truck original = yesterday.addTruck("BI1234AA", kBigTruck);
+    const Truck original = yesterday.addTruck("BI1234AA", kBigTruck, kDaf);
 
     WorkDay today = openAtNoon();
     const Truck& repeated = today.repeatTruck(original);
     EXPECT_EQ(repeated.plate(), "BI1234AA");
     EXPECT_EQ(repeated.capacity(), kBigTruck);
+    EXPECT_EQ(repeated.details(), kDaf); // usually the same driver on the same route
     EXPECT_NE(repeated.id(), original.id()); // a new trip starts empty
     EXPECT_EQ(today.trucks().size(), 1u);
 }
@@ -82,6 +84,16 @@ TEST(WorkDay, CarriedOverTruckKeepsItsIdAndLoadsOnInTheNextSession) {
     // Same id, so everything already allocated to it still counts as its load.
     ASSERT_NE(next.findTruck(id), nullptr);
     EXPECT_TRUE(next.findTruck(id)->acceptsCargo());
+}
+
+TEST(WorkDay, CarriedOverTruckKeepsItsDetails) {
+    WorkDay day = openAtNoon();
+    const TruckId id = day.addTruck("BI1234AA", kBigTruck, kDaf).id();
+    day.carryOverTruck(id);
+
+    WorkDay next{September / 27 / 2026, kMidnight + 36h, kOksana};
+    next.adoptTruck(day.trucksForNextSession().front());
+    EXPECT_EQ(next.findTruck(id)->details(), kDaf);
 }
 
 TEST(WorkDay, ClosedSessionRejectsChanges) {

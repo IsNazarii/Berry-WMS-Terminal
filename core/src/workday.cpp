@@ -32,18 +32,20 @@ const Truck* WorkDay::findTruck(const TruckId& id) const noexcept {
     return found != trucks_.end() ? &*found : nullptr;
 }
 
-const Truck& WorkDay::addTruck(std::string plate, Cargo capacity) {
+const Truck& WorkDay::addTruck(std::string plate, Cargo capacity, TruckDetails details) {
     requireOpen();
-    return trucks_.emplace_back(Truck::create(std::move(plate), capacity));
+    return trucks_.emplace_back(Truck::create(std::move(plate), capacity, std::move(details)));
 }
 
-const Truck& WorkDay::repeatTruck(const Truck& earlier) { return addTruck(earlier.plate(), earlier.capacity()); }
+const Truck& WorkDay::repeatTruck(const Truck& earlier) {
+    return addTruck(earlier.plate(), earlier.capacity(), earlier.details());
+}
 
 const Truck& WorkDay::adoptTruck(const Truck& carriedOver) {
     requireOpen();
     if (findTruck(carriedOver.id())) throw std::invalid_argument("Truck is already in this session");
     // A fresh object with the same id: it is loading again in this session.
-    return trucks_.emplace_back(carriedOver.id(), carriedOver.plate(), carriedOver.capacity());
+    return trucks_.emplace_back(carriedOver.id(), carriedOver.plate(), carriedOver.capacity(), carriedOver.details());
 }
 
 void WorkDay::departTruck(const TruckId& id) {
@@ -125,11 +127,11 @@ void WorkDay::setPrice(std::string cropCode, Money pricePerKg, TimePoint at, con
     amend(amendment, std::move(description), [&] { prices_.set(std::move(cropCode), pricePerKg, at); });
 }
 
-const Truck& WorkDay::addTruck(std::string plate, Cargo capacity, const Amendment& amendment) {
+const Truck& WorkDay::addTruck(std::string plate, Cargo capacity, const Amendment& amendment, TruckDetails details) {
     auto description = std::format("Додано фуру {}", plate);
     const Truck* added = nullptr;
     amend(amendment, std::move(description),
-          [&] { added = &trucks_.emplace_back(Truck::create(std::move(plate), capacity)); });
+          [&] { added = &trucks_.emplace_back(Truck::create(std::move(plate), capacity, std::move(details))); });
     return *added;
 }
 

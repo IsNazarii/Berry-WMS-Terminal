@@ -6,8 +6,8 @@
 
 namespace wms {
 
-Truck::Truck(TruckId id, std::string plate, Cargo capacity)
-    : id_{id}, plate_{std::move(plate)}, capacity_{capacity} {
+Truck::Truck(TruckId id, std::string plate, Cargo capacity, TruckDetails details)
+    : id_{id}, plate_{std::move(plate)}, capacity_{capacity}, details_{std::move(details)} {
     if (id_.isNil()) throw std::invalid_argument("Truck id must not be nil");
     if (plate_.empty()) throw std::invalid_argument("Truck plate must not be empty");
     if (capacity_.boxes < 0 || capacity_.weight.isNegative())
@@ -16,8 +16,8 @@ Truck::Truck(TruckId id, std::string plate, Cargo capacity)
         throw std::invalid_argument("Truck must be limited by boxes, weight or both");
 }
 
-Truck Truck::create(std::string plate, Cargo capacity) {
-    return Truck{Uuid::generateV7(), std::move(plate), capacity};
+Truck Truck::create(std::string plate, Cargo capacity, TruckDetails details) {
+    return Truck{Uuid::generateV7(), std::move(plate), capacity, std::move(details)};
 }
 
 void Truck::depart() {

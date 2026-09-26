@@ -50,9 +50,9 @@ public:
     [[nodiscard]] const Truck* findTruck(const TruckId& id) const noexcept;
 
     // All of these throw std::logic_error once the session is closed.
-    const Truck& addTruck(std::string plate, Cargo capacity);
-    // Same plate and limits as a truck of an earlier session, but a new trip:
-    // new id, empty.
+    const Truck& addTruck(std::string plate, Cargo capacity, TruckDetails details = {});
+    // Same plate, limits and details as a truck of an earlier session, but a
+    // new trip: new id, empty.
     const Truck& repeatTruck(const Truck& earlier);
     // A truck carried over from the previous session: same id, so its load so far still counts.
     const Truck& adoptTruck(const Truck& carriedOver);
@@ -91,7 +91,7 @@ public:
     // logged with what was changed. Throw std::invalid_argument without an
     // operator or a reason; a change that fails is not logged.
     void setPrice(std::string cropCode, Money pricePerKg, TimePoint at, const Amendment& amendment);
-    const Truck& addTruck(std::string plate, Cargo capacity, const Amendment& amendment);
+    const Truck& addTruck(std::string plate, Cargo capacity, const Amendment& amendment, TruckDetails details = {});
     void departTruck(const TruckId& id, const Amendment& amendment);
     void carryOverTruck(const TruckId& id, const Amendment& amendment);
     [[nodiscard]] const std::vector<AmendmentRecord>& amendments() const noexcept { return amendments_; }

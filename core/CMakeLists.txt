@@ -10,6 +10,7 @@ add_library(wms_core
     src/scale.cpp
     src/truck.cpp
     src/allocation.cpp
+    src/journal.cpp
 )
 
 target_include_directories(wms_core PUBLIC include)

@@ -14,6 +14,7 @@ add_executable(wms_core_tests
     scale_test.cpp
     truck_test.cpp
     allocation_test.cpp
+    journal_test.cpp
 )
 target_link_libraries(wms_core_tests PRIVATE wms_core GTest::gtest_main)
 

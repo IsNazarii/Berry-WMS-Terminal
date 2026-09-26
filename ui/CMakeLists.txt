@@ -11,6 +11,7 @@ qt_add_qml_module(wms_ui
         src/scale_monitor.cpp
     QML_FILES
         qml/Main.qml
+        qml/screens/LoginScreen.qml
         qml/screens/IdentificationScreen.qml
         qml/screens/WeighingScreen.qml
         qml/screens/AllocationScreen.qml

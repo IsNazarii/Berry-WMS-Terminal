@@ -11,6 +11,13 @@ namespace wms::ui {
 namespace {
 
 // Reference data the server will send later; hard-coded for the alpha.
+std::vector<Operator> demoOperators() {
+    return {
+        {1, "Назарій", "1111"},
+        {2, "Оксана", "2222"},
+    };
+}
+
 std::vector<Supplier> demoSuppliers() {
     return {
         {42, "Шевченко Тарас", "+380671112233"},
@@ -59,6 +66,7 @@ std::vector<Weight> palletLanding(Weight target) {
 
 Terminal::Terminal(QObject* parent)
     : QObject{parent},
+      operators_{demoOperators()},
       suppliers_{demoSuppliers()},
       trucks_{demoTrucks()},
       supplierModel_{suppliers_, journal_},
@@ -78,6 +86,33 @@ QString Terminal::supplierName() const {
 QString Terminal::supplierBalance() const {
     if (!currentSupplierId_) return {};
     return QString::fromStdString(formatMoney(journal_.balanceOf(*currentSupplierId_)));
+}
+
+QVariantList Terminal::operatorList() const {
+    QVariantList list;
+    for (const Operator& op : operators_)
+        list.append(QVariantMap{{"operatorId", qint64{op.id()}}, {"name", QString::fromStdString(op.name())}});
+    return list;
+}
+
+QString Terminal::operatorName() const {
+    const Operator* op = currentOperatorId_ ? findOperator(*currentOperatorId_) : nullptr;
+    return op ? QString::fromStdString(op->name()) : QString{};
+}
+
+bool Terminal::login(qint64 operatorId, const QString& pin) {
+    const Operator* op = findOperator(operatorId);
+    if (!op || !op->checkPin(pin.toStdString())) return false;
+    currentOperatorId_ = op->id();
+    emit operatorChanged();
+    return true;
+}
+
+void Terminal::logout() {
+    if (!currentOperatorId_) return;
+    clearSupplier();
+    currentOperatorId_.reset();
+    emit operatorChanged();
 }
 
 bool Terminal::selectSupplier(qint64 id) {
@@ -110,6 +145,11 @@ const Supplier* Terminal::currentSupplier() const noexcept {
     if (!currentSupplierId_) return nullptr;
     const auto found = std::ranges::find(suppliers_, *currentSupplierId_, &Supplier::id);
     return found != suppliers_.end() ? &*found : nullptr;
+}
+
+const Operator* Terminal::findOperator(OperatorId id) const noexcept {
+    const auto found = std::ranges::find(operators_, id, &Operator::id);
+    return found != operators_.end() ? &*found : nullptr;
 }
 
 } // namespace wms::ui

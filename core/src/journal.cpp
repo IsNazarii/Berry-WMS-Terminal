@@ -36,4 +36,12 @@ Money Journal::balanceOf(SupplierId supplierId) const noexcept {
     return balance;
 }
 
+Cargo Journal::loadOf(TruckId truckId) const noexcept {
+    Cargo load;
+    for (const auto& a : allocations_) {
+        if (a.truckId() == truckId) load += a.cargo();
+    }
+    return load;
+}
+
 } // namespace wms

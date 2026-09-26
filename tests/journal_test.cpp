@@ -61,3 +61,22 @@ TEST(Journal, SameRecordIsAddedOnlyOnce) {
     EXPECT_EQ(journal.size(), 1U);
     EXPECT_EQ(journal.balanceOf(42), -hryvnias(100));
 }
+
+TEST(Journal, EmptyTruckHasNoLoad) {
+    const Journal journal;
+    EXPECT_EQ(journal.loadOf(7), Cargo{});
+}
+
+TEST(Journal, TruckLoadSumsItsAllocations) {
+    Journal journal;
+    const Receipt receipt = Receipt::create(
+        42, Settlement::OnSite, {pallet("raspberry", 80, kilograms(160)), pallet("blueberry", 40, kilograms(70))});
+    journal.add(receipt);
+    // Blueberry: 40 boxes, 70 kg -> 1.75 kg per box.
+    journal.add(CrossDockAllocation::wholeWeighing(receipt, 0, 7));
+    journal.add(CrossDockAllocation::boxesOf(receipt, "blueberry", 10, 7));
+    journal.add(CrossDockAllocation::boxesOf(receipt, "blueberry", 30, 8)); // another truck
+
+    EXPECT_EQ(journal.loadOf(7), (Cargo{.boxes = 90, .weight = grams(177'500)}));
+    EXPECT_EQ(journal.loadOf(8), (Cargo{.boxes = 30, .weight = grams(52'500)}));
+}

@@ -28,6 +28,8 @@ public:
 
     // What we owe the supplier: positive = we owe them, negative = they were overpaid.
     [[nodiscard]] Money balanceOf(SupplierId supplierId) const noexcept;
+    // Everything allocated to the truck; compare with Truck::capacity() to spot overload.
+    [[nodiscard]] Cargo loadOf(TruckId truckId) const noexcept;
 
 private:
     // Remembers the id; false when it was already there.

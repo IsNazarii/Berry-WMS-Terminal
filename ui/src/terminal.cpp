@@ -101,6 +101,29 @@ std::optional<std::int64_t> parseLimit(const QString& text) {
     return ok && value >= 0 ? std::optional<std::int64_t>{value} : std::nullopt;
 }
 
+QString cropName(std::string_view code) {
+    const auto found = std::ranges::find(kCrops, code, &Crop::code);
+    return found != std::end(kCrops) ? QString::fromUtf8(found->name) : QString::fromUtf8(code);
+}
+
+// Money of the lines that count; the receipt's own amount() exists only once it is closed.
+Money amountOf(const OpenReceipt& receipt) {
+    Money sum;
+    for (const Weighing& w : receipt.weighings()) {
+        if (!w.cancelled) sum += w.amount();
+    }
+    return sum;
+}
+
+QString money(Money value) { return QString::fromStdString(formatMoney(value)); }
+QString weight(Weight value) { return QString::fromStdString(formatWeight(value)); }
+
+QString joined(const std::vector<std::string>& errors) {
+    QStringList list;
+    for (const std::string& error : errors) list << QString::fromStdString(error);
+    return list.join("\n");
+}
+
 // Step of the simulated scales; real ones are set to 200 or 500 g.
 constexpr Weight kSimulatedDivision = grams(200);
 
@@ -130,6 +153,7 @@ Terminal::Terminal(QObject* parent)
     connect(this, &Terminal::journalChanged, this, &Terminal::trucksChanged);
     connect(this, &Terminal::sessionChanged, this, &Terminal::trucksChanged);
     connect(this, &Terminal::sessionChanged, this, &Terminal::pricesChanged);
+    connect(this, &Terminal::sessionChanged, this, &Terminal::receiptsChanged);
 }
 
 int Terminal::journalSize() const noexcept { return static_cast<int>(journal_.size()); }
@@ -140,8 +164,8 @@ QString Terminal::supplierName() const {
 }
 
 QString Terminal::supplierBalance() const {
-    if (!currentSupplierId_) return {};
-    return QString::fromStdString(formatMoney(journal_.balanceOf(*currentSupplierId_)));
+    const Supplier* supplier = currentSupplier();
+    return supplier ? QString::fromStdString(formatMoney(journal_.balanceOf(supplier->id()))) : QString{};
 }
 
 QString Terminal::sessionTitle() const {
@@ -204,6 +228,55 @@ QStringList Terminal::closeBlockers() const {
     return list;
 }
 
+QVariantList Terminal::openReceiptList() const {
+    QVariantList list;
+    if (!workDay_) return list;
+    for (const OpenReceipt& receipt : workDay_->openReceipts()) {
+        const auto supplier = std::ranges::find(suppliers_, receipt.supplierId(), &Supplier::id);
+        list.append(QVariantMap{
+            {"receiptId", QString::fromStdString(receipt.id().toString())},
+            {"supplierName", supplier != suppliers_.end() ? QString::fromStdString(supplier->fullName())
+                                                          : QString("#%1").arg(receipt.supplierId())},
+            {"openedAt", localTime(receipt.openedAt())},
+            {"total", describeCargo(receipt.total())},
+        });
+    }
+    return list;
+}
+
+QString Terminal::activeReceiptId() const {
+    return activeReceiptId_ ? QString::fromStdString(activeReceiptId_->toString()) : QString{};
+}
+
+QVariantList Terminal::activeLines() const {
+    QVariantList list;
+    const OpenReceipt* receipt = activeReceipt();
+    if (!receipt) return list;
+    for (std::size_t i = 0; i < receipt->weighings().size(); ++i) {
+        const Weighing& w = receipt->weighings()[i];
+        list.append(QVariantMap{
+            {"index", static_cast<int>(i)},
+            {"crop", cropName(w.cropCode)},
+            {"boxes", w.boxCount},
+            {"gross", weight(w.gross)},
+            {"tare", weight(w.tare())},
+            {"net", weight(w.net())},
+            {"price", w.pricePerKg.isZero() ? QString("—") : money(w.pricePerKg)},
+            {"amount", money(w.amount())},
+            {"manualPrice", w.priceSource == PriceSource::Manual},
+            {"manualWeight", w.weightSource == WeightSource::Manual},
+            {"cancelled", w.cancelled},
+        });
+    }
+    return list;
+}
+
+QString Terminal::activeTotal() const {
+    const OpenReceipt* receipt = activeReceipt();
+    if (!receipt) return {};
+    return QString("%1 · %2").arg(describeCargo(receipt->total()), money(amountOf(*receipt)));
+}
+
 QVariantList Terminal::operatorList() const {
     QVariantList list;
     for (const Operator& op : operators_)
@@ -225,7 +298,7 @@ bool Terminal::login(qint64 operatorId, const QString& pin) {
 
 void Terminal::logout() {
     if (!currentOperatorId_) return;
-    clearSupplier();
+    setActiveReceipt(std::nullopt);
     currentOperatorId_.reset();
     emit operatorChanged();
 }
@@ -299,21 +372,90 @@ void Terminal::closeSession() {
     emit sessionChanged();
 }
 
-bool Terminal::selectSupplier(qint64 id) {
-    const auto found = std::ranges::find(suppliers_, id, &Supplier::id);
-    if (found == suppliers_.end()) return false;
-    if (currentSupplierId_ != id) {
-        currentSupplierId_ = id;
-        emit currentSupplierChanged();
-        emit balanceChanged();
-    }
-    return true;
+QString Terminal::startReceipt(qint64 supplierId) {
+    if (!workDay_) return tr("Сесію не відкрито");
+    if (std::ranges::find(suppliers_, supplierId, &Supplier::id) == suppliers_.end())
+        return tr("Постачальника #%1 немає").arg(supplierId);
+    const OpenReceipt& receipt = workDay_->openReceipt(supplierId);
+    setActiveReceipt(receipt.id());
+    return {};
 }
 
-void Terminal::clearSupplier() {
-    if (!currentSupplierId_) return;
-    currentSupplierId_.reset();
-    emit currentSupplierChanged();
+void Terminal::activateReceipt(const QString& receiptId) {
+    const auto id = Uuid::parse(receiptId.toStdString());
+    if (workDay_ && id && workDay_->findReceipt(*id)) setActiveReceipt(*id);
+}
+
+QString Terminal::recordWeighing(const QString& cropCode, const QString& boxes, const QString& tarePerBox,
+                                 const QString& palletTare, const QString& price, const QString& manualWeight,
+                                 bool acceptUnstable) {
+    if (!workDay_ || !activeReceipt()) return tr("Спершу відкрийте чек постачальника");
+
+    Weighing weighing;
+    weighing.cropCode = cropCode.toStdString();
+    bool ok = false;
+    weighing.boxCount = boxes.trimmed().toInt(&ok);
+    if (!ok) return tr("Кількість ящиків — ціле число");
+    const auto boxTare = parseWeight(tarePerBox.toStdString());
+    if (!boxTare) return tr("Тара ящика — кілограми, напр. 0,35");
+    weighing.tarePerBox = *boxTare;
+    // Asked every time on purpose: pallets differ, and 0 is a real answer.
+    const auto pallet = parseWeight(palletTare.toStdString());
+    if (!pallet) return tr("Вкажіть вагу палети, кг (0 — без палети)");
+    weighing.palletTare = *pallet;
+
+    if (!price.trimmed().isEmpty()) {
+        const auto manual = parseMoney(price.toStdString());
+        if (!manual || manual->isZero()) return tr("Ціна — додатне число гривень, напр. 85 або 85,50");
+        weighing.pricePerKg = *manual;
+        weighing.priceSource = PriceSource::Manual;
+    }
+
+    if (!manualWeight.trimmed().isEmpty()) {
+        const auto typed = parseWeight(manualWeight.toStdString());
+        if (!typed) return tr("Вага брутто — кілограми, напр. 185,4");
+        weighing.gross = *typed;
+        weighing.weightSource = WeightSource::Manual;
+    } else if (const auto stable = scaleMonitor_.stableWeight()) {
+        weighing.gross = *stable;
+    } else if (const auto reading = scaleMonitor_.lastReading(); acceptUnstable && reading) {
+        // The scale steps by 200-500 g, so flipping between two steps is within that error.
+        weighing.gross = *reading;
+    } else {
+        return tr("Вага ще не стабільна: зачекайте або підтвердіть нестабільну");
+    }
+
+    if (const auto errors = weighing.validate(); !errors.empty()) return joined(errors);
+    workDay_->addWeighing(*activeReceiptId_, std::move(weighing), Clock::now());
+    emit receiptsChanged();
+    return {};
+}
+
+QString Terminal::cancelWeighing(int index) {
+    const OpenReceipt* receipt = activeReceipt();
+    if (!receipt || index < 0 || index >= static_cast<int>(receipt->weighings().size())) return tr("Немає такого рядка");
+    const auto i = static_cast<std::size_t>(index);
+    if (const auto errors = journal_.validateCancel(*receipt, i); !errors.empty()) return joined(errors);
+    workDay_->cancelWeighing(*activeReceiptId_, i, journal_);
+    emit receiptsChanged();
+    return {};
+}
+
+QStringList Terminal::receiptCloseBlockers(bool wholesale) const {
+    QStringList list;
+    const OpenReceipt* receipt = activeReceipt();
+    if (!receipt) return list;
+    for (const std::string& error : receipt->validateClose(wholesale ? Settlement::HandedOver : Settlement::OnSite))
+        list << QString::fromStdString(error);
+    return list;
+}
+
+void Terminal::closeReceipt(bool wholesale) {
+    if (!activeReceipt() || !receiptCloseBlockers(wholesale).isEmpty()) return;
+    journal_.add(workDay_->closeReceipt(*activeReceiptId_, wholesale ? Settlement::HandedOver : Settlement::OnSite));
+    const auto& left = workDay_->openReceipts();
+    setActiveReceipt(left.empty() ? std::nullopt : std::optional{left.front().id()});
+    emit journalChanged();
     emit balanceChanged();
 }
 
@@ -326,8 +468,9 @@ void Terminal::simulatePallet() {
 void Terminal::simulateEmptyScale() { simulator_.setScript({grams(0)}); }
 
 const Supplier* Terminal::currentSupplier() const noexcept {
-    if (!currentSupplierId_) return nullptr;
-    const auto found = std::ranges::find(suppliers_, *currentSupplierId_, &Supplier::id);
+    const OpenReceipt* receipt = activeReceipt();
+    if (!receipt) return nullptr;
+    const auto found = std::ranges::find(suppliers_, receipt->supplierId(), &Supplier::id);
     return found != suppliers_.end() ? &*found : nullptr;
 }
 
@@ -355,6 +498,18 @@ QVariantMap Terminal::truckInfo(const Truck& truck) const {
         {"status", statusText(truck.status())},
         {"loading", truck.acceptsCargo()},
     };
+}
+
+const OpenReceipt* Terminal::activeReceipt() const noexcept {
+    return workDay_ && activeReceiptId_ ? workDay_->findReceipt(*activeReceiptId_) : nullptr;
+}
+
+// Emits always: even for the same id its lines may have changed.
+void Terminal::setActiveReceipt(std::optional<Uuid> id) {
+    activeReceiptId_ = std::move(id);
+    emit receiptsChanged();
+    emit currentSupplierChanged();
+    emit balanceChanged();
 }
 
 } // namespace wms::ui

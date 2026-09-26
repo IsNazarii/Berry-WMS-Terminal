@@ -32,6 +32,8 @@ public:
     [[nodiscard]] QString driverName() const { return QString::fromStdString(driver_.name()); }
     // The only weight a weighing may be recorded with.
     [[nodiscard]] std::optional<Weight> stableWeight() const noexcept { return detector_.stableWeight(); }
+    // What the scale shows now, settled or not: the operator may accept it anyway.
+    [[nodiscard]] std::optional<Weight> lastReading() const noexcept { return detector_.lastReading(); }
 
 signals:
     void readingChanged();

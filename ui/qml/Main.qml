@@ -8,16 +8,18 @@ ApplicationWindow {
     id: window
     width: 1024
     height: 700
-    visible: true
+    minimumWidth: 1024
+    minimumHeight: 600
+    // A terminal on a laptop: the whole screen; the size above is what "restore" gives.
+    visibility: Window.Maximized
     title: qsTr("Berry WMS — термінал приймальника")
 
-    // Operator workflow goes left to right: open the day, who brought it, weigh, load, pay.
+    // Operator workflow goes left to right: open the day, receive, load, pay.
     header: TabBar {
         id: tabs
         visible: Terminal.loggedIn
         TabButton { text: qsTr("Сесія") }
-        TabButton { text: qsTr("Постачальник") }
-        TabButton { text: qsTr("Зважування") }
+        TabButton { text: qsTr("Прийом") }
         TabButton { text: qsTr("Розподіл") }
         TabButton { text: qsTr("Каса") }
     }
@@ -34,7 +36,7 @@ ApplicationWindow {
             Label {
                 text: Terminal.hasSupplier
                       ? qsTr("Постачальник: %1 · борг: %2").arg(Terminal.supplierName).arg(Terminal.supplierBalance)
-                      : qsTr("Постачальника не обрано")
+                      : qsTr("Чек не обрано")
                 Layout.fillWidth: true
             }
             Label {
@@ -67,10 +69,7 @@ ApplicationWindow {
         currentIndex: tabs.currentIndex
 
         SessionScreen {}
-        IdentificationScreen {
-            onProceed: tabs.currentIndex = 2
-        }
-        WeighingScreen {}
+        ReceivingScreen {}
         AllocationScreen {}
         CashScreen {}
     }

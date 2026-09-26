@@ -13,8 +13,8 @@ qt_add_qml_module(wms_ui
         qml/Main.qml
         qml/screens/LoginScreen.qml
         qml/screens/SessionScreen.qml
-        qml/screens/IdentificationScreen.qml
-        qml/screens/WeighingScreen.qml
+        qml/screens/ReceivingScreen.qml
+        qml/screens/SupplierPicker.qml
         qml/screens/AllocationScreen.qml
         qml/screens/CashScreen.qml
 )

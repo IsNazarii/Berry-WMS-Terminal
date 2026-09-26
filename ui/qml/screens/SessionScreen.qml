@@ -185,17 +185,23 @@ Page {
                             ColumnLayout {
                                 Layout.fillWidth: true
                                 Label {
+                                    Layout.fillWidth: true
+                                    elide: Text.ElideRight
                                     text: [truckCard.modelData.plate, truckCard.modelData.make]
                                           .filter(part => part !== "").join(" · ")
                                           + " — " + truckCard.modelData.status
                                     font.bold: true
                                 }
                                 Label {
+                                    Layout.fillWidth: true
+                                    elide: Text.ElideRight
                                     visible: text !== ""
                                     text: truckCard.modelData.note
                                     color: palette.placeholderText
                                 }
                                 Label {
+                                    Layout.fillWidth: true
+                                    elide: Text.ElideRight
                                     text: qsTr("Завантажено: %1 з %2")
                                           .arg(truckCard.modelData.load).arg(truckCard.modelData.capacity)
                                     color: truckCard.modelData.overloaded ? "#c62828" : palette.text
@@ -207,15 +213,19 @@ Page {
                                     value: Math.min(truckCard.modelData.fillPercent, 100)
                                 }
                             }
-                            Button {
+                            // Stacked, so the card fits next to the prices in a laptop-sized window.
+                            ColumnLayout {
                                 visible: truckCard.modelData.loading
-                                text: qsTr("Відправити")
-                                onClicked: Terminal.departTruck(truckCard.modelData.truckId)
-                            }
-                            Button {
-                                visible: truckCard.modelData.loading
-                                text: qsTr("Перенести")
-                                onClicked: Terminal.carryOverTruck(truckCard.modelData.truckId)
+                                Button {
+                                    text: qsTr("Відправити")
+                                    Layout.fillWidth: true
+                                    onClicked: Terminal.departTruck(truckCard.modelData.truckId)
+                                }
+                                Button {
+                                    text: qsTr("Перенести")
+                                    Layout.fillWidth: true
+                                    onClicked: Terminal.carryOverTruck(truckCard.modelData.truckId)
+                                }
                             }
                         }
                     }

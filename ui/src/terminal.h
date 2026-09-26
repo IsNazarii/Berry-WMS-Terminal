@@ -33,8 +33,8 @@ class Terminal : public QObject {
     // Fully qualified: the QML type registrar does not resolve names inside the namespace.
     Q_PROPERTY(wms::ui::SupplierListModel* suppliers READ supplierModel CONSTANT)
     Q_PROPERTY(wms::ui::ScaleMonitor* scales READ scaleMonitor CONSTANT)
+    // The supplier of the active receipt: whose berries are on the scale.
     Q_PROPERTY(bool hasSupplier READ hasSupplier NOTIFY currentSupplierChanged)
-    Q_PROPERTY(qint64 supplierId READ supplierId NOTIFY currentSupplierChanged)
     Q_PROPERTY(QString supplierName READ supplierName NOTIFY currentSupplierChanged)
     Q_PROPERTY(QString supplierBalance READ supplierBalance NOTIFY balanceChanged)
     // [{operatorId, name}] for the login picker; the PIN never leaves the core.
@@ -58,15 +58,22 @@ class Terminal : public QObject {
     // Why the session cannot be closed yet, straight from WorkDay::validateClose().
     Q_PROPERTY(QStringList closeBlockers READ closeBlockers NOTIFY trucksChanged)
 
+    // [{receiptId, supplierName, openedAt, total}] of the session, oldest first.
+    Q_PROPERTY(QVariantList openReceipts READ openReceiptList NOTIFY receiptsChanged)
+    // The receipt new weighings go into; empty when none is open.
+    Q_PROPERTY(QString activeReceiptId READ activeReceiptId NOTIFY receiptsChanged)
+    // [{index, crop, boxes, gross, tare, net, price, amount, manualPrice, manualWeight, cancelled}].
+    Q_PROPERTY(QVariantList activeLines READ activeLines NOTIFY receiptsChanged)
+    // "340 ящ. · 120.000 кг · 10200.00 грн" without cancelled lines.
+    Q_PROPERTY(QString activeTotal READ activeTotal NOTIFY receiptsChanged)
+
 public:
     explicit Terminal(QObject* parent = nullptr);
 
     [[nodiscard]] int journalSize() const noexcept;
     [[nodiscard]] SupplierListModel* supplierModel() noexcept { return &supplierModel_; }
     [[nodiscard]] ScaleMonitor* scaleMonitor() noexcept { return &scaleMonitor_; }
-    [[nodiscard]] bool hasSupplier() const noexcept { return currentSupplierId_.has_value(); }
-    // Meaningful only when hasSupplier is true.
-    [[nodiscard]] qint64 supplierId() const noexcept { return currentSupplierId_.value_or(0); }
+    [[nodiscard]] bool hasSupplier() const noexcept { return currentSupplier() != nullptr; }
     [[nodiscard]] QString supplierName() const;
     // What we owe the current supplier, formatted; empty without a supplier.
     [[nodiscard]] QString supplierBalance() const;
@@ -83,15 +90,15 @@ public:
     [[nodiscard]] QVariantList truckList() const;
     [[nodiscard]] QVariantList previousTruckList() const;
     [[nodiscard]] QStringList closeBlockers() const;
+    [[nodiscard]] QVariantList openReceiptList() const;
+    [[nodiscard]] QString activeReceiptId() const;
+    [[nodiscard]] QVariantList activeLines() const;
+    [[nodiscard]] QString activeTotal() const;
 
     // Returns false for an unknown operator or a wrong PIN.
     Q_INVOKABLE bool login(qint64 operatorId, const QString& pin);
-    // Also forgets the supplier: the next operator starts from a clean screen.
+    // Open receipts stay with the session; the next operator just picks one again.
     Q_INVOKABLE void logout();
-
-    // Returns false when there is no supplier with this id.
-    Q_INVOKABLE bool selectSupplier(qint64 id);
-    Q_INVOKABLE void clearSupplier();
 
     // Opened by the logged-in operator, named by today's date. Trucks carried
     // over from the previous session join it with their load. Does nothing
@@ -108,6 +115,24 @@ public:
     Q_INVOKABLE void carryOverTruck(const QString& truckId);
     // Does nothing while closeBlockers is not empty.
     Q_INVOKABLE void closeSession();
+
+    // Receiving. The supplier's open receipt, or a new one, becomes active;
+    // returns an operator-facing error, empty on success.
+    Q_INVOKABLE QString startReceipt(qint64 supplierId);
+    Q_INVOKABLE void activateReceipt(const QString& receiptId);
+    // A weighing into the active receipt. Weights in kilograms as typed. An
+    // empty price takes the day price, a typed one is a manual price. A typed
+    // weight is recorded as manual; otherwise the scale must be stable, unless
+    // the operator accepts the unstable reading.
+    Q_INVOKABLE QString recordWeighing(const QString& cropCode, const QString& boxes, const QString& tarePerBox,
+                                       const QString& palletTare, const QString& price, const QString& manualWeight,
+                                       bool acceptUnstable);
+    // Returns why the line cannot be cancelled, empty when it was.
+    Q_INVOKABLE QString cancelWeighing(int index);
+    // Why the active receipt cannot be closed as retail / wholesale yet.
+    [[nodiscard]] Q_INVOKABLE QStringList receiptCloseBlockers(bool wholesale) const;
+    // The receipt goes into the journal and the next open one becomes active.
+    Q_INVOKABLE void closeReceipt(bool wholesale);
 
     // Scale simulator controls, until real scales are connected.
     Q_INVOKABLE void simulatePallet();
@@ -128,12 +153,16 @@ signals:
     void pricesChanged();
     // Truck loads depend on both the session and the journal.
     void trucksChanged();
+    // Open receipts, their lines or which one is active.
+    void receiptsChanged();
 
 private:
     [[nodiscard]] const Supplier* currentSupplier() const noexcept;
     [[nodiscard]] const Operator* findOperator(OperatorId id) const noexcept;
     [[nodiscard]] QString operatorNameOf(OperatorId id) const;
     [[nodiscard]] QVariantMap truckInfo(const Truck& truck) const;
+    [[nodiscard]] const OpenReceipt* activeReceipt() const noexcept;
+    void setActiveReceipt(std::optional<Uuid> id);
 
     std::vector<Operator> operators_;
     std::vector<Supplier> suppliers_;
@@ -145,7 +174,8 @@ private:
     SupplierListModel supplierModel_;
     SimulatedScaleDriver simulator_;
     ScaleMonitor scaleMonitor_;
-    std::optional<SupplierId> currentSupplierId_;
+    // An id, not a pointer: the open receipts live in a vector that reallocates.
+    std::optional<Uuid> activeReceiptId_;
     std::optional<OperatorId> currentOperatorId_;
 };
 

@@ -21,10 +21,15 @@ CrossDockAllocation CrossDockAllocation::wholeWeighing(const Receipt& receipt, s
 
 CrossDockAllocation CrossDockAllocation::boxesOf(const Receipt& receipt, std::string_view cropCode, int boxes,
                                                  TruckId truckId) {
-    const Cargo crop = receipt.cargoOf(cropCode);
-    if (crop.boxes <= 0) throw std::invalid_argument("Receipt has no boxes of the requested crop");
+    return boxesOf(receipt, cropCode, boxes, truckId, receipt.cargoOf(cropCode));
+}
 
-    const Weight weight = grams(divideRounded(crop.weight.raw() * boxes, crop.boxes));
+CrossDockAllocation CrossDockAllocation::boxesOf(const Receipt& receipt, std::string_view cropCode, int boxes,
+                                                 TruckId truckId, const Cargo& available) {
+    if (receipt.cargoOf(cropCode).boxes <= 0) throw std::invalid_argument("Receipt has no boxes of the requested crop");
+
+    const Weight weight =
+        available.boxes > 0 ? grams(divideRounded(available.weight.raw() * boxes, available.boxes)) : Weight{};
     return CrossDockAllocation{Uuid::generateV7(), Clock::now(), receipt.id(), truckId, std::string{cropCode},
                                {.boxes = boxes, .weight = weight}, std::nullopt};
 }

@@ -67,6 +67,13 @@ Cargo Journal::unallocatedOf(const Uuid& receiptId, std::string_view cropCode) c
     return left;
 }
 
+CrossDockAllocation Journal::boxesOf(const Uuid& receiptId, std::string_view cropCode, int boxes,
+                                     TruckId truckId) const {
+    const Receipt* receipt = findReceipt(receiptId);
+    if (receipt == nullptr) throw std::invalid_argument("Receipt is not in the journal");
+    return CrossDockAllocation::boxesOf(*receipt, cropCode, boxes, truckId, unallocatedOf(receiptId, cropCode));
+}
+
 std::vector<std::string> Journal::validateAllocation(const CrossDockAllocation& allocation) const {
     std::vector<std::string> errors = allocation.validate();
     if (findReceipt(allocation.receiptId()) == nullptr) {

@@ -59,6 +59,19 @@ TEST(CrossDockAllocation, ProportionalWeightIsRoundedToGrams) {
     EXPECT_EQ(CrossDockAllocation::boxesOf(receipt, "strawberry", 2, 7).cargo().weight, grams(67));
 }
 
+TEST(CrossDockAllocation, BoxesOfSplitWhatIsStillAvailable) {
+    // 100 g over 3 boxes, one box already gone (33 g): the other two share the remaining 67 g.
+    const Receipt receipt = Receipt::create(42, Settlement::OnSite, {pallet("strawberry", 3, grams(100))});
+    const Cargo available{.boxes = 2, .weight = grams(67)};
+    EXPECT_EQ(CrossDockAllocation::boxesOf(receipt, "strawberry", 1, 7, available).cargo().weight, grams(34));
+    EXPECT_EQ(CrossDockAllocation::boxesOf(receipt, "strawberry", 2, 7, available).cargo().weight, grams(67));
+}
+
+TEST(CrossDockAllocation, NothingAvailableGivesInvalidAllocation) {
+    const Receipt receipt = Receipt::create(42, Settlement::OnSite, {pallet("strawberry", 3, grams(100))});
+    EXPECT_FALSE(CrossDockAllocation::boxesOf(receipt, "strawberry", 1, 7, Cargo{}).isValid());
+}
+
 TEST(CrossDockAllocation, BoxesOfUnknownCropIsProgrammerError) {
     EXPECT_THROW((void)CrossDockAllocation::boxesOf(sampleReceipt(), "strawberry", 1, 7), std::invalid_argument);
 }

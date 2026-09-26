@@ -170,3 +170,19 @@ TEST(Journal, KeepsAllocationOwnErrors) {
     const auto errors = journal.validateAllocation(CrossDockAllocation::boxesOf(receipt, "raspberry", 10, 0));
     EXPECT_TRUE(mentions(errors, "Не обрано фуру"));
 }
+
+TEST(Journal, LastBoxesTakeExactlyTheRemainingWeight) {
+    // 100 g over 3 boxes: splitting the full crop each time would give 33 + 33 + 33 = 99 g.
+    Journal journal;
+    const Receipt receipt = Receipt::create(42, Settlement::OnSite, {pallet("strawberry", 3, grams(100))});
+    journal.add(receipt);
+    for (int i = 0; i < 3; ++i) journal.add(journal.boxesOf(receipt.id(), "strawberry", 1, 7));
+
+    EXPECT_EQ(journal.loadOf(7), (Cargo{.boxes = 3, .weight = grams(100)}));
+    EXPECT_EQ(journal.unallocatedOf(receipt.id(), "strawberry"), Cargo{});
+}
+
+TEST(Journal, BoxesOfUnknownReceiptIsProgrammerError) {
+    const Journal journal;
+    EXPECT_THROW((void)journal.boxesOf(mixedReceipt().id(), "raspberry", 1, 7), std::invalid_argument);
+}

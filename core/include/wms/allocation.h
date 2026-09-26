@@ -31,6 +31,12 @@ public:
     // Throws std::invalid_argument when the receipt has no such crop.
     [[nodiscard]] static CrossDockAllocation boxesOf(const Receipt& receipt, std::string_view cropCode, int boxes,
                                                      TruckId truckId);
+    // Same, but the weight is split from what is still `available` of the crop
+    // (see Journal::unallocatedOf), so taking the last boxes takes exactly the
+    // remaining weight and rounding never loses or invents grams.
+    // With nothing available the weight is zero and validate() reports it.
+    [[nodiscard]] static CrossDockAllocation boxesOf(const Receipt& receipt, std::string_view cropCode, int boxes,
+                                                     TruckId truckId, const Cargo& available);
 
     [[nodiscard]] const Uuid& receiptId() const noexcept { return receiptId_; }
     [[nodiscard]] TruckId truckId() const noexcept { return truckId_; }

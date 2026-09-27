@@ -69,6 +69,18 @@ void addDemoHistory(Journal& journal, const TruckId& carriedOverTruck) {
     journal.add(receipt);
     journal.add(Allocation::wholeWeighing(receipt, 0, carriedOverTruck));
     journal.add(Payment::create(42, hryvnias(3'000), PaymentMethod::Cash));
+
+    // Strawberries that waited overnight in the warehouse: stock outlives the session.
+    const Receipt stored = Receipt::create(45, Settlement::OnSite, {{
+        .cropCode = "strawberry",
+        .gross = kilograms(90),
+        .boxCount = 30,
+        .tarePerBox = grams(300),
+        .palletTare = kilograms(20),
+        .pricePerKg = hryvnias(60),
+    }});
+    journal.add(stored);
+    journal.add(Allocation::wholeWeighing(stored, 0, ToWarehouse{}));
 }
 
 QString localTime(TimePoint at) {
@@ -423,6 +435,21 @@ QVariantList Terminal::destinationList() const {
     return list;
 }
 
+QVariantList Terminal::stockList() const {
+    QVariantList list;
+    for (const Crop& crop : kCrops) {
+        const Cargo held = journal_.stockOf(crop.code);
+        list.append(QVariantMap{
+            {"cropCode", QString::fromUtf8(crop.code)},
+            {"name", QString::fromUtf8(crop.name)},
+            {"boxes", held.boxes},
+            {"stock", held.boxes == 0 && held.weight.isZero() ? tr("порожньо") : describeCargo(held)},
+            {"negative", held.boxes < 0},
+        });
+    }
+    return list;
+}
+
 QVariantList Terminal::operatorList() const {
     QVariantList list;
     for (const Operator& op : operators_)
@@ -645,6 +672,23 @@ QString Terminal::allocateBoxes(const QString& cropCode, const QString& boxesTex
                                                          unallocated(journal_, *receipt, crop)));
         },
         *source);
+}
+
+QString Terminal::shipFromStock(const QString& cropCode, const QString& boxesText, const QString& truckId) {
+    bool ok = false;
+    const int boxes = boxesText.trimmed().toInt(&ok);
+    if (!ok || boxes <= 0) return tr("Кількість ящиків — ціле додатне число");
+    // From the warehouse only into a truck: "warehouse to warehouse" makes no sense.
+    if (truckId == kWarehouseId) return tr("Оберіть фуру");
+    const auto destination = destinationFor(truckId);
+    if (const auto* error = std::get_if<QString>(&destination)) return *error;
+
+    const StockShipment shipment =
+        journal_.shipmentOf(cropCode.toStdString(), boxes, std::get<TruckId>(std::get<Destination>(destination)));
+    if (const auto errors = journal_.validateShipment(shipment); !errors.empty()) return joined(errors);
+    journal_.add(shipment);
+    emit journalChanged();
+    return {};
 }
 
 void Terminal::simulatePallet() {

@@ -14,13 +14,14 @@ ApplicationWindow {
     visibility: Window.Maximized
     title: qsTr("Berry WMS — термінал приймальника")
 
-    // Operator workflow goes left to right: open the day, receive, load, pay.
+    // Operator workflow goes left to right: open the day, receive, load, ship from stock, pay.
     header: TabBar {
         id: tabs
         visible: Terminal.loggedIn
         TabButton { text: qsTr("Сесія") }
         TabButton { text: qsTr("Прийом") }
         TabButton { text: qsTr("Розподіл") }
+        TabButton { text: qsTr("Склад") }
         TabButton { text: qsTr("Каса") }
     }
 
@@ -71,6 +72,7 @@ ApplicationWindow {
         SessionScreen {}
         ReceivingScreen {}
         AllocationScreen {}
+        WarehouseScreen {}
         CashScreen {}
     }
 }

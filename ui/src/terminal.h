@@ -83,6 +83,10 @@ class Terminal : public QObject {
     // of the session still loading, then the warehouse (destinationId "warehouse").
     Q_PROPERTY(QVariantList destinations READ destinationList NOTIFY allocationChanged)
 
+    // Warehouse. [{cropCode, name, boxes, stock, negative}] for every crop, across all
+    // sessions; negative after an offline conflict, shown so the logistician can sort it out.
+    Q_PROPERTY(QVariantList stock READ stockList NOTIFY journalChanged)
+
 public:
     explicit Terminal(QObject* parent = nullptr);
 
@@ -116,6 +120,7 @@ public:
     [[nodiscard]] QVariantList allocationLines() const;
     [[nodiscard]] QVariantList allocationCrops() const;
     [[nodiscard]] QVariantList destinationList() const;
+    [[nodiscard]] QVariantList stockList() const;
 
     // Returns false for an unknown operator or a wrong PIN.
     Q_INVOKABLE bool login(qint64 operatorId, const QString& pin);
@@ -162,6 +167,10 @@ public:
     Q_INVOKABLE void selectAllocationReceipt(const QString& receiptId);
     Q_INVOKABLE QString allocateWeighing(int index, const QString& destinationId);
     Q_INVOKABLE QString allocateBoxes(const QString& cropCode, const QString& boxes, const QString& destinationId);
+
+    // Boxes of a crop from the warehouse into a truck of the session; the weight
+    // is split from the stock. Returns an operator-facing error, empty on success.
+    Q_INVOKABLE QString shipFromStock(const QString& cropCode, const QString& boxes, const QString& truckId);
 
     // Scale simulator controls, until real scales are connected.
     Q_INVOKABLE void simulatePallet();

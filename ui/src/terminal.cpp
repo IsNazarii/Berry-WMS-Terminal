@@ -130,6 +130,16 @@ Money amountOf(const OpenReceipt& receipt) {
 QString money(Money value) { return QString::fromStdString(formatMoney(value)); }
 QString weight(Weight value) { return QString::fromStdString(formatWeight(value)); }
 
+// As the operator types it, so "pay the whole debt" can fill the amount field.
+QString moneyInput(Money value) {
+    return QString("%1,%2").arg(value.raw() / 100).arg(value.raw() % 100, 2, 10, QChar('0'));
+}
+
+QString localDateTime(TimePoint at) {
+    const auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(at.time_since_epoch()).count();
+    return QDateTime::fromMSecsSinceEpoch(ms).toString("dd.MM HH:mm");
+}
+
 QString joined(const std::vector<std::string>& errors) {
     QStringList list;
     for (const std::string& error : errors) list << QString::fromStdString(error);
@@ -204,6 +214,7 @@ Terminal::Terminal(QObject* parent)
     // Journal and session changes already reach trucksChanged.
     connect(this, &Terminal::trucksChanged, this, &Terminal::allocationChanged);
     connect(this, &Terminal::receiptsChanged, this, &Terminal::allocationChanged);
+    connect(this, &Terminal::journalChanged, this, &Terminal::cashChanged);
 }
 
 int Terminal::journalSize() const noexcept { return static_cast<int>(journal_.size()); }
@@ -450,6 +461,60 @@ QVariantList Terminal::stockList() const {
     return list;
 }
 
+QVariantList Terminal::debtorList() const {
+    std::vector<std::pair<Money, const Supplier*>> nonZero;
+    for (const Supplier& supplier : suppliers_) {
+        if (const Money balance = journal_.balanceOf(supplier.id()); !balance.isZero())
+            nonZero.emplace_back(balance, &supplier);
+    }
+    std::ranges::sort(nonZero, std::ranges::greater{}, &std::pair<Money, const Supplier*>::first);
+
+    QVariantList list;
+    for (const auto& [balance, supplier] : nonZero) {
+        list.append(QVariantMap{
+            {"supplierId", qint64{supplier->id()}},
+            {"name", QString::fromStdString(supplier->fullName())},
+            {"balance", money(balance)},
+            {"overpaid", balance.isNegative()},
+        });
+    }
+    return list;
+}
+
+QString Terminal::cashSupplierName() const {
+    return cashSupplierId_ ? supplierNameOf(*cashSupplierId_) : QString{};
+}
+
+QString Terminal::cashBalance() const {
+    return cashSupplierId_ ? money(journal_.balanceOf(*cashSupplierId_)) : QString{};
+}
+
+QString Terminal::cashDebtInput() const {
+    if (!cashSupplierId_) return {};
+    const Money balance = journal_.balanceOf(*cashSupplierId_);
+    return balance.isPositive() ? moneyInput(balance) : QString{};
+}
+
+QVariantList Terminal::cashHistory() const {
+    QVariantList list;
+    if (!cashSupplierId_) return list;
+    for (const Transaction* record : journal_.historyOf(*cashSupplierId_)) {
+        // describe() is virtual: each record type tells its own story. The first
+        // line is the headline, the rest (receipt lines) is the detail.
+        const QString text = QString::fromStdString(record->describe());
+        const qsizetype newline = text.indexOf('\n');
+        const Money effect = record->balanceEffect();
+        list.append(QVariantMap{
+            {"at", localDateTime(record->createdAt())},
+            {"title", text.left(newline)},
+            {"detail", newline < 0 ? QString{} : text.mid(newline + 1)},
+            {"effect", effect.isNegative() ? money(effect) : "+" + money(effect)},
+            {"payment", record->kind() == TransactionKind::Payment},
+        });
+    }
+    return list;
+}
+
 QVariantList Terminal::operatorList() const {
     QVariantList list;
     for (const Operator& op : operators_)
@@ -688,6 +753,31 @@ QString Terminal::shipFromStock(const QString& cropCode, const QString& boxesTex
     if (const auto errors = journal_.validateShipment(shipment); !errors.empty()) return joined(errors);
     journal_.add(shipment);
     emit journalChanged();
+    return {};
+}
+
+void Terminal::selectCashSupplier(qint64 supplierId) {
+    const auto found = std::ranges::find(suppliers_, supplierId, &Supplier::id);
+    cashSupplierId_ = found != suppliers_.end() ? std::optional<SupplierId>{found->id()} : std::nullopt;
+    emit cashChanged();
+}
+
+QString Terminal::balanceAfter(const QString& amount) const {
+    const auto paid = parseMoney(amount.toStdString());
+    if (!cashSupplierId_ || !paid) return {};
+    return money(journal_.balanceOf(*cashSupplierId_) - *paid);
+}
+
+QString Terminal::pay(const QString& amount, bool bankTransfer) {
+    if (!cashSupplierId_) return tr("Оберіть постачальника");
+    const auto paid = parseMoney(amount.toStdString());
+    if (!paid) return tr("Сума — число гривень, напр. 1500 або 1500,50");
+    const Payment payment = Payment::create(*cashSupplierId_, *paid,
+                                            bankTransfer ? PaymentMethod::BankTransfer : PaymentMethod::Cash);
+    if (const auto errors = payment.validate(); !errors.empty()) return joined(errors);
+    journal_.add(payment);
+    emit journalChanged();
+    emit balanceChanged();
     return {};
 }
 

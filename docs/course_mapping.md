@@ -48,7 +48,7 @@ classDiagram
 
 | # | Вид | Де |
 |---|---|---|
-| 1 | Динамічний (віртуальні методи) | `Transaction::kind/balanceEffect/validate/describe` у 4 нащадках |
+| 1 | Динамічний (віртуальні методи) | `Transaction::kind/balanceEffect/validate/describe` у 4 нащадках; `Journal::historyOf` віддає `const Transaction*` — Каса показує чеки й виплати через `describe()`/`balanceEffect()` |
 | 2 | Динамічний (інтерфейс) | `IScaleDriver` — `ScaleMonitor` працює з будь-яким драйвером |
 | 3 | Статичний (шаблон з тегом) | `Quantity<Tag>`: `Money` і `Weight` — різні типи |
 | 4 | Статичний (`std::variant` + `std::visit`) | `Destination = variant<TruckId, ToWarehouse>` в `Allocation::describe`, `Journal::loadOf/stockOf` |
@@ -59,7 +59,7 @@ classDiagram
 
 `Weighing::net/amount/validate`, `Receipt::total/cargoOf/amount/validate/describe`,
 `OpenReceipt::add/cancel/validateClose/close`, `Allocation::wholeWeighing/boxesOf`,
-`Journal::balanceOf/loadOf/stockOf/unallocatedOf/destinationOf/waitingForAllocation/validateAllocation/validateCancel/validateShipment/shipmentOf`,
+`Journal::balanceOf/historyOf/loadOf/stockOf/unallocatedOf/destinationOf/waitingForAllocation/validateAllocation/validateCancel/validateShipment/shipmentOf`,
 `Truck::depart/carryOver/remaining/isOverloaded/fillPercent`, `DayPrices::priceAt`,
 `WorkDay::openReceipt/addWeighing/cancelWeighing/closeReceipt/validateClose/close/repeatTruck/adoptTruck/trucksForNextSession`,
 `Uuid::generateV7/parse/toString/timestamp`, `StabilityDetector::push/isStable/stableWeight`,
@@ -80,12 +80,12 @@ classDiagram
 | Вимога | Мінімум | Стан |
 |---|---|---|
 | Логіка відділена від GUI | так | ядро без Qt; `Terminal` — тонкий міст, правила лише в `core/` ([ui.md](ui.md)) |
-| Вікна / екрани | 4 | Вхід, Сесія, Прийом, Розподіл, Склад, пошук постачальника (+ діалоги закриття сесії і чека); Каса — заглушка |
+| Вікна / екрани | 4 | Вхід, Сесія, Прийом, Розподіл, Склад, Каса, пошук постачальника (+ діалоги закриття сесії, чека й підтвердження виплати) |
 | Елементи керування | 20 | > 20: `Button`, `TextField`, `ComboBox`, `RadioButton`, `TabButton`, `ToolButton`, `Dialog`… |
-| Контейнер | 1 | `ListView` (постачальники, відкриті чеки, рядки чека, чеки до розподілу, фури/склад), `Repeater` (ціни, фури, культури із залишком, залишок складу) |
+| Контейнер | 1 | `ListView` (постачальники, відкриті чеки, рядки чека, чеки до розподілу, фури/склад), `ListView` (борги, історія розрахунків), `Repeater` (ціни, фури, культури із залишком, залишок складу) |
 | Обробники подій | 10 | > 30 (`onClicked`, `onAccepted`, `Shortcut` F2, `Connections`…) |
 
-Залишилось до альфи (23.10.2026): екран Каса.
+Усі екрани альфи є; до 23.10.2026 — прохід по UX.
 
 ## Лабораторна 3 — зовнішня бібліотека ⏳
 

@@ -87,6 +87,19 @@ class Terminal : public QObject {
     // sessions; negative after an offline conflict, shown so the logistician can sort it out.
     Q_PROPERTY(QVariantList stock READ stockList NOTIFY journalChanged)
 
+    // Cash desk. [{supplierId, name, balance, overpaid}] of suppliers whose balance is
+    // not zero, biggest debt first; overpaid ones (they owe us) at the end.
+    Q_PROPERTY(QVariantList debtors READ debtorList NOTIFY journalChanged)
+    // The supplier the cash screen works on; 0 when none is chosen. Independent
+    // of the active receipt, so paying one supplier never touches the scale.
+    Q_PROPERTY(qint64 cashSupplierId READ cashSupplierId NOTIFY cashChanged)
+    Q_PROPERTY(QString cashSupplierName READ cashSupplierName NOTIFY cashChanged)
+    Q_PROPERTY(QString cashBalance READ cashBalance NOTIFY cashChanged)
+    // The whole debt as the operator would type it ("1234,50"); empty when we owe nothing.
+    Q_PROPERTY(QString cashDebtInput READ cashDebtInput NOTIFY cashChanged)
+    // [{at, title, detail, effect, payment}] of the chosen supplier, oldest first.
+    Q_PROPERTY(QVariantList cashHistory READ cashHistory NOTIFY cashChanged)
+
 public:
     explicit Terminal(QObject* parent = nullptr);
 
@@ -121,6 +134,12 @@ public:
     [[nodiscard]] QVariantList allocationCrops() const;
     [[nodiscard]] QVariantList destinationList() const;
     [[nodiscard]] QVariantList stockList() const;
+    [[nodiscard]] QVariantList debtorList() const;
+    [[nodiscard]] qint64 cashSupplierId() const noexcept { return cashSupplierId_.value_or(0); }
+    [[nodiscard]] QString cashSupplierName() const;
+    [[nodiscard]] QString cashBalance() const;
+    [[nodiscard]] QString cashDebtInput() const;
+    [[nodiscard]] QVariantList cashHistory() const;
 
     // Returns false for an unknown operator or a wrong PIN.
     Q_INVOKABLE bool login(qint64 operatorId, const QString& pin);
@@ -172,6 +191,14 @@ public:
     // is split from the stock. Returns an operator-facing error, empty on success.
     Q_INVOKABLE QString shipFromStock(const QString& cropCode, const QString& boxes, const QString& truckId);
 
+    // Cash desk. A payment to the chosen supplier; the amount in hryvnias as typed.
+    // Paying more than the debt is allowed: the supplier then owes us.
+    Q_INVOKABLE void selectCashSupplier(qint64 supplierId);
+    // What the chosen supplier's balance becomes after paying `amount`; empty for bad input.
+    [[nodiscard]] Q_INVOKABLE QString balanceAfter(const QString& amount) const;
+    // Returns an operator-facing error, empty on success.
+    Q_INVOKABLE QString pay(const QString& amount, bool bankTransfer);
+
     // Scale simulator controls, until real scales are connected.
     Q_INVOKABLE void simulatePallet();
     Q_INVOKABLE void simulateEmptyScale();
@@ -195,6 +222,8 @@ signals:
     void receiptsChanged();
     // Anything the allocation screen shows: receipts, trucks, the journal.
     void allocationChanged();
+    // The chosen supplier of the cash screen or its records.
+    void cashChanged();
 
 private:
     [[nodiscard]] const Supplier* currentSupplier() const noexcept;
@@ -227,6 +256,7 @@ private:
     // An id, not a pointer: the open receipts live in a vector that reallocates.
     std::optional<Uuid> activeReceiptId_;
     std::optional<Uuid> allocationReceiptId_;
+    std::optional<SupplierId> cashSupplierId_;
     std::optional<OperatorId> currentOperatorId_;
 };
 

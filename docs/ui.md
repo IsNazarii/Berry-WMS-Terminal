@@ -17,7 +17,7 @@ UI — QML-модуль `BerryWms.Ui` (статична бібліотека `wm
 | `ui/qml/screens/ReceivingScreen.qml` | прийом: відкриті чеки, ваги, форма, рядки чека |
 | `ui/qml/screens/SupplierPicker.qml` | спливний пошук постачальника (стане в пригоді й у Касі) |
 | `ui/qml/screens/AllocationScreen.qml` | розподіл: чеки з нерозподіленим, палети/ящики, фури і склад |
-| `ui/qml/screens/CashScreen.qml` | каса — заглушка |
+| `ui/qml/screens/CashScreen.qml` | каса: борги, виплата, історія |
 
 ## 2. Вікно (`Main.qml`)
 
@@ -125,9 +125,19 @@ UI — QML-модуль `BerryWms.Ui` (статична бібліотека `wm
 залишку (останні ящики забирають рівно залишок ваги), `validateShipment` не дає взяти більше, ніж є.
 На склад ягода потрапляє лише з чека — на екрані «Розподіл».
 
-### 3.7 Каса
+### 3.7 Каса (`CashScreen.qml`)
 
-Поки заглушка. Ядро готове: `Payment`, `Journal::balanceOf`.
+Борги спільні для всіх сесій, тож каса працює й без відкритої сесії.
+
+- **Зліва — борги** (`debtors`): постачальники з ненульовим балансом, найбільший борг зверху;
+  переплачені (винні нам) — червоним унизу. «Інший постачальник (F2)» — той самий `SupplierPicker`.
+- **По центру — обраний постачальник** (`cashSupplierId`, окремий від активного чека прийому):
+  борг, сума (`parseMoney`, «Весь борг» підставляє `cashDebtInput`), готівка / переказ,
+  «Виплатити…» → діалог підтвердження з боргом після виплати (`balanceAfter`). Виплатити більше,
+  ніж борг, можна (аванс) — діалог попереджає, що постачальник буде винен нам.
+- **Справа — історія** (`cashHistory` з `Journal::historyOf`): чеки й виплати в порядку часу.
+  Текст дає віртуальний `describe()` (перший рядок — заголовок, решта — рядки чека), суму зі
+  знаком — `balanceEffect()`: екран не знає, якого типу запис.
 
 ## 4. `Terminal` — міст QML → ядро
 
@@ -161,6 +171,8 @@ UI — QML-модуль `BerryWms.Ui` (статична бібліотека `wm
 | `openReceipts`, `activeReceiptId`, `activeLines`, `activeTotal` | `receiptsChanged` | прийом |
 | `allocationSources`, `allocationReceiptId`, `allocationSupplierName`, `allocationLines`, `allocationCrops`, `destinations` | `allocationChanged` | розподіл |
 | `stock` | `journalChanged` | `[{cropCode, name, boxes, stock, negative}]` — залишок складу за культурами |
+| `debtors` | `journalChanged` | `[{supplierId, name, balance, overpaid}]` — ненульові баланси |
+| `cashSupplierId`, `cashSupplierName`, `cashBalance`, `cashDebtInput`, `cashHistory` | `cashChanged` | каса |
 | `hasSupplier`, `supplierName` | `currentSupplierChanged` | постачальник активного чека |
 | `supplierBalance` | `balanceChanged` | його борг |
 | `journalSize` | `journalChanged` | записів у журналі |
@@ -186,6 +198,8 @@ UI — QML-модуль `BerryWms.Ui` (статична бібліотека `wm
 | `selectAllocationReceipt(id)` | обрати чек для розподілу |
 | `allocateWeighing(i, destinationId)`, `allocateBoxes(crop, boxes, destinationId)` | палету / N ящиків — у фуру (UUID) або на склад (`"warehouse"`) |
 | `shipFromStock(crop, boxes, truckId)` | N ящиків зі складу у фуру сесії |
+| `selectCashSupplier(id)`, `balanceAfter(amount)` | каса: обрати постачальника / борг після виплати |
+| `pay(amount, bankTransfer)` | виплата `Payment` обраному постачальнику |
 | `simulatePallet()`, `simulateEmptyScale()` | керування симулятором ваг |
 
 ### 4.3 Каскад сигналів
@@ -197,6 +211,7 @@ flowchart LR
     S --> R[receiptsChanged]
     J[journalChanged] --> T
     J --> M["SupplierListModel::refreshBalances"]
+    J --> C[cashChanged]
     T --> A[allocationChanged]
     R --> A
 ```

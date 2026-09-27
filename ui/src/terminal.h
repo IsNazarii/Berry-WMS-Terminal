@@ -17,6 +17,7 @@
 #include <QtQml/qqmlregistration.h>
 
 #include <optional>
+#include <variant>
 #include <vector>
 
 namespace wms::ui {
@@ -67,6 +68,21 @@ class Terminal : public QObject {
     // "340 ящ. · 120.000 кг · 10200.00 грн" without cancelled lines.
     Q_PROPERTY(QString activeTotal READ activeTotal NOTIFY receiptsChanged)
 
+    // Allocation. [{receiptId, supplierName, openedAt, open, left}]: open receipts
+    // of the session, then closed ones, that still have boxes to allocate.
+    Q_PROPERTY(QVariantList allocationSources READ allocationSources NOTIFY allocationChanged)
+    // The receipt the allocation screen works on; independent of the active one,
+    // so loading a truck never changes where the next weighing goes.
+    Q_PROPERTY(QString allocationReceiptId READ allocationReceiptId NOTIFY allocationChanged)
+    Q_PROPERTY(QString allocationSupplierName READ allocationSupplierName NOTIFY allocationChanged)
+    // [{index, crop, boxes, net, cancelled, placedIn}]; placedIn is empty while the pallet is free.
+    Q_PROPERTY(QVariantList allocationLines READ allocationLines NOTIFY allocationChanged)
+    // [{cropCode, name, leftBoxes, left}] of the selected receipt, only crops with boxes left.
+    Q_PROPERTY(QVariantList allocationCrops READ allocationCrops NOTIFY allocationChanged)
+    // [{destinationId, title, detail, fillPercent, overloaded, warehouse}]: trucks
+    // of the session still loading, then the warehouse (destinationId "warehouse").
+    Q_PROPERTY(QVariantList destinations READ destinationList NOTIFY allocationChanged)
+
 public:
     explicit Terminal(QObject* parent = nullptr);
 
@@ -94,6 +110,12 @@ public:
     [[nodiscard]] QString activeReceiptId() const;
     [[nodiscard]] QVariantList activeLines() const;
     [[nodiscard]] QString activeTotal() const;
+    [[nodiscard]] QVariantList allocationSources() const;
+    [[nodiscard]] QString allocationReceiptId() const;
+    [[nodiscard]] QString allocationSupplierName() const;
+    [[nodiscard]] QVariantList allocationLines() const;
+    [[nodiscard]] QVariantList allocationCrops() const;
+    [[nodiscard]] QVariantList destinationList() const;
 
     // Returns false for an unknown operator or a wrong PIN.
     Q_INVOKABLE bool login(qint64 operatorId, const QString& pin);
@@ -134,6 +156,13 @@ public:
     // The receipt goes into the journal and the next open one becomes active.
     Q_INVOKABLE void closeReceipt(bool wholesale);
 
+    // Allocation of the selected receipt into a truck or the warehouse
+    // (destinationId as in `destinations`). Each returns an operator-facing
+    // error, empty on success.
+    Q_INVOKABLE void selectAllocationReceipt(const QString& receiptId);
+    Q_INVOKABLE QString allocateWeighing(int index, const QString& destinationId);
+    Q_INVOKABLE QString allocateBoxes(const QString& cropCode, const QString& boxes, const QString& destinationId);
+
     // Scale simulator controls, until real scales are connected.
     Q_INVOKABLE void simulatePallet();
     Q_INVOKABLE void simulateEmptyScale();
@@ -155,6 +184,8 @@ signals:
     void trucksChanged();
     // Open receipts, their lines or which one is active.
     void receiptsChanged();
+    // Anything the allocation screen shows: receipts, trucks, the journal.
+    void allocationChanged();
 
 private:
     [[nodiscard]] const Supplier* currentSupplier() const noexcept;
@@ -163,6 +194,16 @@ private:
     [[nodiscard]] QVariantMap truckInfo(const Truck& truck) const;
     [[nodiscard]] const OpenReceipt* activeReceipt() const noexcept;
     void setActiveReceipt(std::optional<Uuid> id);
+    // A receipt to allocate from is either still open in the session or closed in the journal.
+    using SourceReceipt = std::variant<const OpenReceipt*, const Receipt*>;
+    [[nodiscard]] std::optional<SourceReceipt> findSource(const Uuid& id) const noexcept;
+    [[nodiscard]] QString supplierNameOf(SupplierId id) const;
+    // Plate of a truck of this or the previous session.
+    [[nodiscard]] QString plateOf(const TruckId& id) const;
+    // Checks the operator's choice: a truck must be of this session and still loading.
+    [[nodiscard]] std::variant<Destination, QString> destinationFor(const QString& destinationId) const;
+    // Validates against the journal and adds; returns the errors, joined.
+    QString allocate(const SourceReceipt& source, const Allocation& allocation);
 
     std::vector<Operator> operators_;
     std::vector<Supplier> suppliers_;
@@ -176,6 +217,7 @@ private:
     ScaleMonitor scaleMonitor_;
     // An id, not a pointer: the open receipts live in a vector that reallocates.
     std::optional<Uuid> activeReceiptId_;
+    std::optional<Uuid> allocationReceiptId_;
     std::optional<OperatorId> currentOperatorId_;
 };
 

@@ -124,6 +124,41 @@ QString joined(const std::vector<std::string>& errors) {
     return list.join("\n");
 }
 
+// The two kinds of receipt ask the journal differently: a closed one is found
+// by id, an open one is not in the journal yet. Overloads let std::visit treat
+// them alike.
+Cargo unallocated(const Journal& journal, const OpenReceipt& receipt, std::string_view cropCode) {
+    return journal.unallocatedOf(receipt, cropCode);
+}
+Cargo unallocated(const Journal& journal, const Receipt& receipt, std::string_view cropCode) {
+    return journal.unallocatedOf(receipt.id(), cropCode);
+}
+std::vector<std::string> check(const Journal& journal, const Allocation& allocation, const OpenReceipt& receipt) {
+    return journal.validateAllocation(allocation, receipt);
+}
+std::vector<std::string> check(const Journal& journal, const Allocation& allocation, const Receipt&) {
+    return journal.validateAllocation(allocation);
+}
+
+// Crops of the lines that count, in the order they were weighed.
+template <WeighedReceipt R>
+std::vector<std::string> cropsOf(const R& receipt) {
+    std::vector<std::string> crops;
+    for (const Weighing& w : receipt.weighings()) {
+        if (!w.cancelled && std::ranges::find(crops, w.cropCode) == crops.end()) crops.push_back(w.cropCode);
+    }
+    return crops;
+}
+
+template <WeighedReceipt R>
+Cargo unallocatedTotal(const Journal& journal, const R& receipt) {
+    Cargo left;
+    for (const std::string& crop : cropsOf(receipt)) left += unallocated(journal, receipt, crop);
+    return left;
+}
+
+constexpr auto kWarehouseId = "warehouse";
+
 // Step of the simulated scales; real ones are set to 200 or 500 g.
 constexpr Weight kSimulatedDivision = grams(200);
 
@@ -154,6 +189,9 @@ Terminal::Terminal(QObject* parent)
     connect(this, &Terminal::sessionChanged, this, &Terminal::trucksChanged);
     connect(this, &Terminal::sessionChanged, this, &Terminal::pricesChanged);
     connect(this, &Terminal::sessionChanged, this, &Terminal::receiptsChanged);
+    // Journal and session changes already reach trucksChanged.
+    connect(this, &Terminal::trucksChanged, this, &Terminal::allocationChanged);
+    connect(this, &Terminal::receiptsChanged, this, &Terminal::allocationChanged);
 }
 
 int Terminal::journalSize() const noexcept { return static_cast<int>(journal_.size()); }
@@ -232,11 +270,9 @@ QVariantList Terminal::openReceiptList() const {
     QVariantList list;
     if (!workDay_) return list;
     for (const OpenReceipt& receipt : workDay_->openReceipts()) {
-        const auto supplier = std::ranges::find(suppliers_, receipt.supplierId(), &Supplier::id);
         list.append(QVariantMap{
             {"receiptId", QString::fromStdString(receipt.id().toString())},
-            {"supplierName", supplier != suppliers_.end() ? QString::fromStdString(supplier->fullName())
-                                                          : QString("#%1").arg(receipt.supplierId())},
+            {"supplierName", supplierNameOf(receipt.supplierId())},
             {"openedAt", localTime(receipt.openedAt())},
             {"total", describeCargo(receipt.total())},
         });
@@ -275,6 +311,116 @@ QString Terminal::activeTotal() const {
     const OpenReceipt* receipt = activeReceipt();
     if (!receipt) return {};
     return QString("%1 · %2").arg(describeCargo(receipt->total()), money(amountOf(*receipt)));
+}
+
+QVariantList Terminal::allocationSources() const {
+    QVariantList list;
+    const auto add = [&](const auto& receipt, TimePoint openedAt, bool open) {
+        const Cargo left = unallocatedTotal(journal_, receipt);
+        if (left.boxes <= 0) return;
+        list.append(QVariantMap{
+            {"receiptId", QString::fromStdString(receipt.id().toString())},
+            {"supplierName", supplierNameOf(receipt.supplierId())},
+            {"openedAt", localTime(openedAt)},
+            {"open", open},
+            {"left", describeCargo(left)},
+        });
+    };
+    if (workDay_) {
+        for (const OpenReceipt& receipt : workDay_->openReceipts()) add(receipt, receipt.openedAt(), true);
+    }
+    for (const Receipt* receipt : journal_.waitingForAllocation()) add(*receipt, receipt->createdAt(), false);
+    return list;
+}
+
+QString Terminal::allocationReceiptId() const {
+    return allocationReceiptId_ ? QString::fromStdString(allocationReceiptId_->toString()) : QString{};
+}
+
+QString Terminal::allocationSupplierName() const {
+    const auto source = allocationReceiptId_ ? findSource(*allocationReceiptId_) : std::nullopt;
+    if (!source) return {};
+    return std::visit([&](const auto* receipt) { return supplierNameOf(receipt->supplierId()); }, *source);
+}
+
+QVariantList Terminal::allocationLines() const {
+    QVariantList list;
+    const auto source = allocationReceiptId_ ? findSource(*allocationReceiptId_) : std::nullopt;
+    if (!source) return list;
+    std::visit(
+        [&](const auto* receipt) {
+            for (std::size_t i = 0; i < receipt->weighings().size(); ++i) {
+                const Weighing& w = receipt->weighings()[i];
+                QString placedIn;
+                if (const auto destination = journal_.destinationOf(receipt->id(), i)) {
+                    const auto* truckId = std::get_if<TruckId>(&*destination);
+                    placedIn = truckId ? tr("у фурі %1").arg(plateOf(*truckId)) : tr("на складі");
+                }
+                list.append(QVariantMap{
+                    {"index", static_cast<int>(i)},
+                    {"crop", cropName(w.cropCode)},
+                    {"boxes", w.boxCount},
+                    {"net", weight(w.net())},
+                    {"cancelled", w.cancelled},
+                    {"placedIn", placedIn},
+                });
+            }
+        },
+        *source);
+    return list;
+}
+
+QVariantList Terminal::allocationCrops() const {
+    QVariantList list;
+    const auto source = allocationReceiptId_ ? findSource(*allocationReceiptId_) : std::nullopt;
+    if (!source) return list;
+    std::visit(
+        [&](const auto* receipt) {
+            for (const std::string& crop : cropsOf(*receipt)) {
+                const Cargo left = unallocated(journal_, *receipt, crop);
+                if (left.boxes <= 0) continue;
+                list.append(QVariantMap{
+                    {"cropCode", QString::fromStdString(crop)},
+                    {"name", cropName(crop)},
+                    {"leftBoxes", left.boxes},
+                    {"left", describeCargo(left)},
+                });
+            }
+        },
+        *source);
+    return list;
+}
+
+QVariantList Terminal::destinationList() const {
+    QVariantList list;
+    if (!workDay_) return list;
+    for (const Truck& truck : workDay_->trucks()) {
+        if (!truck.acceptsCargo()) continue;
+        const QVariantMap info = truckInfo(truck);
+        const QString make = info["make"].toString();
+        list.append(QVariantMap{
+            {"destinationId", info["truckId"]},
+            {"title", make.isEmpty() ? info["plate"].toString() : QString("%1 · %2").arg(info["plate"].toString(), make)},
+            {"detail", tr("%1 з %2").arg(info["load"].toString(), info["capacity"].toString())},
+            {"fillPercent", info["fillPercent"]},
+            {"overloaded", info["overloaded"]},
+            {"warehouse", false},
+        });
+    }
+    QStringList stock;
+    for (const Crop& crop : kCrops) {
+        if (const Cargo held = journal_.stockOf(crop.code); held.boxes != 0)
+            stock << QString("%1 %2").arg(QString::fromUtf8(crop.name), describeCargo(held));
+    }
+    list.append(QVariantMap{
+        {"destinationId", QString(kWarehouseId)},
+        {"title", tr("Склад")},
+        {"detail", stock.isEmpty() ? tr("порожньо") : stock.join(", ")},
+        {"fillPercent", 0},
+        {"overloaded", false},
+        {"warehouse", true},
+    });
+    return list;
 }
 
 QVariantList Terminal::operatorList() const {
@@ -459,6 +605,48 @@ void Terminal::closeReceipt(bool wholesale) {
     emit balanceChanged();
 }
 
+void Terminal::selectAllocationReceipt(const QString& receiptId) {
+    const auto id = Uuid::parse(receiptId.toStdString());
+    if (!id || !findSource(*id)) return;
+    allocationReceiptId_ = *id;
+    emit allocationChanged();
+}
+
+QString Terminal::allocateWeighing(int index, const QString& destinationId) {
+    const auto source = allocationReceiptId_ ? findSource(*allocationReceiptId_) : std::nullopt;
+    if (!source) return tr("Оберіть чек");
+    const auto destination = destinationFor(destinationId);
+    if (const auto* error = std::get_if<QString>(&destination)) return *error;
+
+    return std::visit(
+        [&](const auto* receipt) {
+            if (index < 0 || index >= static_cast<int>(receipt->weighings().size())) return tr("Немає такого рядка");
+            return allocate(*source, Allocation::wholeWeighing(*receipt, static_cast<std::size_t>(index),
+                                                               std::get<Destination>(destination)));
+        },
+        *source);
+}
+
+QString Terminal::allocateBoxes(const QString& cropCode, const QString& boxesText, const QString& destinationId) {
+    const auto source = allocationReceiptId_ ? findSource(*allocationReceiptId_) : std::nullopt;
+    if (!source) return tr("Оберіть чек");
+    bool ok = false;
+    const int boxes = boxesText.trimmed().toInt(&ok);
+    if (!ok || boxes <= 0) return tr("Кількість ящиків — ціле додатне число");
+    const auto destination = destinationFor(destinationId);
+    if (const auto* error = std::get_if<QString>(&destination)) return *error;
+
+    const std::string crop = cropCode.toStdString();
+    return std::visit(
+        [&](const auto* receipt) {
+            // Allocation::boxesOf() throws for a crop the receipt does not have.
+            if (receipt->cargoOf(crop).boxes <= 0) return tr("У чеку немає цієї культури");
+            return allocate(*source, Allocation::boxesOf(*receipt, crop, boxes, std::get<Destination>(destination),
+                                                         unallocated(journal_, *receipt, crop)));
+        },
+        *source);
+}
+
 void Terminal::simulatePallet() {
     // 150-260 kg, a typical pallet of berries on platform scales.
     const auto kg = QRandomGenerator::global()->bounded(150, 260);
@@ -502,6 +690,45 @@ QVariantMap Terminal::truckInfo(const Truck& truck) const {
 
 const OpenReceipt* Terminal::activeReceipt() const noexcept {
     return workDay_ && activeReceiptId_ ? workDay_->findReceipt(*activeReceiptId_) : nullptr;
+}
+
+std::optional<Terminal::SourceReceipt> Terminal::findSource(const Uuid& id) const noexcept {
+    if (workDay_) {
+        if (const OpenReceipt* open = workDay_->findReceipt(id)) return open;
+    }
+    if (const Receipt* closed = journal_.findReceipt(id)) return closed;
+    return std::nullopt;
+}
+
+QString Terminal::supplierNameOf(SupplierId id) const {
+    const auto found = std::ranges::find(suppliers_, id, &Supplier::id);
+    return found != suppliers_.end() ? QString::fromStdString(found->fullName()) : QString("#%1").arg(id);
+}
+
+QString Terminal::plateOf(const TruckId& id) const {
+    if (workDay_) {
+        if (const Truck* truck = workDay_->findTruck(id)) return QString::fromStdString(truck->plate());
+    }
+    const auto found = std::ranges::find(previousTrucks_, id, &Truck::id);
+    return found != previousTrucks_.end() ? QString::fromStdString(found->plate()) : tr("(невідома)");
+}
+
+std::variant<Destination, QString> Terminal::destinationFor(const QString& destinationId) const {
+    if (!workDay_) return tr("Сесію не відкрито");
+    if (destinationId == kWarehouseId) return Destination{ToWarehouse{}};
+    const auto id = Uuid::parse(destinationId.toStdString());
+    const Truck* truck = id ? workDay_->findTruck(*id) : nullptr;
+    if (!truck) return tr("Оберіть фуру або склад");
+    if (!truck->acceptsCargo()) return tr("Фура %1 вже не завантажується").arg(QString::fromStdString(truck->plate()));
+    return Destination{truck->id()};
+}
+
+QString Terminal::allocate(const SourceReceipt& source, const Allocation& allocation) {
+    const auto errors = std::visit([&](const auto* receipt) { return check(journal_, allocation, *receipt); }, source);
+    if (!errors.empty()) return joined(errors);
+    journal_.add(allocation);
+    emit journalChanged();
+    return {};
 }
 
 // Emits always: even for the same id its lines may have changed.

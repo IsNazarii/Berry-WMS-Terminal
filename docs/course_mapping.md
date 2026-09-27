@@ -59,7 +59,7 @@ classDiagram
 
 `Weighing::net/amount/validate`, `Receipt::total/cargoOf/amount/validate/describe`,
 `OpenReceipt::add/cancel/validateClose/close`, `Allocation::wholeWeighing/boxesOf`,
-`Journal::balanceOf/loadOf/stockOf/unallocatedOf/validateAllocation/validateCancel/validateShipment/shipmentOf`,
+`Journal::balanceOf/loadOf/stockOf/unallocatedOf/destinationOf/waitingForAllocation/validateAllocation/validateCancel/validateShipment/shipmentOf`,
 `Truck::depart/carryOver/remaining/isOverloaded/fillPercent`, `DayPrices::priceAt`,
 `WorkDay::openReceipt/addWeighing/cancelWeighing/closeReceipt/validateClose/close/repeatTruck/adoptTruck/trucksForNextSession`,
 `Uuid::generateV7/parse/toString/timestamp`, `StabilityDetector::push/isStable/stableWeight`,
@@ -80,12 +80,12 @@ classDiagram
 | Вимога | Мінімум | Стан |
 |---|---|---|
 | Логіка відділена від GUI | так | ядро без Qt; `Terminal` — тонкий міст, правила лише в `core/` ([ui.md](ui.md)) |
-| Вікна / екрани | 4 | Вхід, Сесія, Прийом, пошук постачальника (+ діалоги закриття сесії і чека); Розподіл і Каса — заглушки |
+| Вікна / екрани | 4 | Вхід, Сесія, Прийом, Розподіл, пошук постачальника (+ діалоги закриття сесії і чека); Каса — заглушка |
 | Елементи керування | 20 | > 20: `Button`, `TextField`, `ComboBox`, `RadioButton`, `TabButton`, `ToolButton`, `Dialog`… |
-| Контейнер | 1 | `ListView` (постачальники, відкриті чеки, рядки чека), `Repeater` (ціни, фури) |
+| Контейнер | 1 | `ListView` (постачальники, відкриті чеки, рядки чека, чеки до розподілу, фури/склад), `Repeater` (ціни, фури, культури із залишком) |
 | Обробники подій | 10 | > 30 (`onClicked`, `onAccepted`, `Shortcut` F2, `Connections`…) |
 
-Залишилось до альфи (23.10.2026): екрани Розподіл, Склад, Каса.
+Залишилось до альфи (23.10.2026): екрани Склад (відвантаження зі складу у фуру) і Каса.
 
 ## Лабораторна 3 — зовнішня бібліотека ⏳
 

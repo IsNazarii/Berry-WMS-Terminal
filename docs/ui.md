@@ -16,7 +16,7 @@ UI — QML-модуль `BerryWms.Ui` (статична бібліотека `wm
 | `ui/qml/screens/SessionScreen.qml` | сесія: ціни, фури, закриття |
 | `ui/qml/screens/ReceivingScreen.qml` | прийом: відкриті чеки, ваги, форма, рядки чека |
 | `ui/qml/screens/SupplierPicker.qml` | спливний пошук постачальника (стане в пригоді й у Касі) |
-| `ui/qml/screens/AllocationScreen.qml` | розподіл — заглушка |
+| `ui/qml/screens/AllocationScreen.qml` | розподіл: чеки з нерозподіленим, палети/ящики, фури і склад |
 | `ui/qml/screens/CashScreen.qml` | каса — заглушка |
 
 ## 2. Вікно (`Main.qml`)
@@ -93,10 +93,28 @@ UI — QML-модуль `BerryWms.Ui` (статична бібліотека `wm
 Спливне вікно з полем «Пошук: номер або частина прізвища» і `ListView` результатів з боргом
 кожного постачальника. Enter бере єдиний збіг; «Нікого не знайдено» при порожньому результаті.
 
-### 3.5 Розподіл і Каса
+### 3.5 Розподіл (`AllocationScreen.qml`)
 
-Поки заглушки. Ядро для них уже готове: `Allocation`, `StockShipment`, `Journal::validateAllocation`,
-`Journal::shipmentOf`, `Payment`, `Journal::balanceOf`.
+Три колонки:
+
+- **Зліва — чеки до розподілу** (`allocationSources`): спершу відкриті чеки сесії («зважується» —
+  палети йдуть у фуру ще під час розвантаження), потім закриті з журналу, у яких лишились ящики
+  (`Journal::waitingForAllocation`). У кожного — «лишилось: N ящ. · M кг». Повністю розподілений
+  чек зникає зі списку, але лишається обраним, щоб оператор бачив, куди все пішло.
+- **Справа — куди**: фури сесії, що ще завантажуються (номер, «завантажено з ліміту», смуга
+  заповнення, червоне «Перевантажено» — лише показ, не заборона), і «Склад» із залишком за культурами.
+  Оператор обирає місце один раз, далі шле в нього кілька палет.
+- **По центру — обраний чек**: рядки-палети з кнопкою «Палету →» або позначкою «у фурі …» / «на
+  складі» (`Journal::destinationOf`); анульовані — бліді. Нижче — «Ящиками»: для кожної культури із
+  залишком поле кількості й «Відвантажити» (вага ділиться пропорційно із залишку).
+
+Обраний чек розподілу **окремий від активного чека прийому**: завантаження фури не змінює, куди
+піде наступне зважування. Обране місце тримає QML; ядро перевіряє його при кожному розподілі
+(фура цієї сесії й ще завантажується).
+
+### 3.6 Каса
+
+Поки заглушка. Ядро готове: `Payment`, `Journal::balanceOf`.
 
 ## 4. `Terminal` — міст QML → ядро
 
@@ -110,6 +128,7 @@ UI — QML-модуль `BerryWms.Ui` (статична бібліотека `wm
 | `journal_` | `Journal` |
 | `supplierModel_`, `simulator_`, `scaleMonitor_` | модель списку, симулятор ваг і монітор |
 | `activeReceiptId_` | UUID активного чека — **не вказівник**, бо відкриті чеки живуть у векторі, що перевиділяє пам'ять |
+| `allocationReceiptId_` | UUID чека, обраного на екрані «Розподіл» (відкритого або закритого) |
 | `currentOperatorId_` | хто увійшов |
 
 Порядок оголошення полів важливий: модель і монітор оголошені після даних, які читають, тож
@@ -127,6 +146,7 @@ UI — QML-модуль `BerryWms.Ui` (статична бібліотека `wm
 | `previousTrucks` | `sessionChanged` | учорашні фури для «повторити» |
 | `closeBlockers` | `trucksChanged` | `WorkDay::validateClose()` |
 | `openReceipts`, `activeReceiptId`, `activeLines`, `activeTotal` | `receiptsChanged` | прийом |
+| `allocationSources`, `allocationReceiptId`, `allocationSupplierName`, `allocationLines`, `allocationCrops`, `destinations` | `allocationChanged` | розподіл |
 | `hasSupplier`, `supplierName` | `currentSupplierChanged` | постачальник активного чека |
 | `supplierBalance` | `balanceChanged` | його борг |
 | `journalSize` | `journalChanged` | записів у журналі |
@@ -149,6 +169,8 @@ UI — QML-модуль `BerryWms.Ui` (статична бібліотека `wm
 | `recordWeighing(crop, boxes, tare, pallet, price, manualWeight, acceptUnstable)` | зважування в активний чек |
 | `cancelWeighing(i)` | анулювати рядок або повернути причину |
 | `receiptCloseBlockers(wholesale)`, `closeReceipt(wholesale)` | закриття чека |
+| `selectAllocationReceipt(id)` | обрати чек для розподілу |
+| `allocateWeighing(i, destinationId)`, `allocateBoxes(crop, boxes, destinationId)` | палету / N ящиків — у фуру (UUID) або на склад (`"warehouse"`) |
 | `simulatePallet()`, `simulateEmptyScale()` | керування симулятором ваг |
 
 ### 4.3 Каскад сигналів
@@ -160,10 +182,22 @@ flowchart LR
     S --> R[receiptsChanged]
     J[journalChanged] --> T
     J --> M["SupplierListModel::refreshBalances"]
+    T --> A[allocationChanged]
+    R --> A
 ```
 
 `sessionChanged` означає лише «відкрито / закрито». Завантаження фур залежить і від сесії, і від
-журналу, тому `trucksChanged` під'єднано до обох.
+журналу, тому `trucksChanged` під'єднано до обох. Екран розподілу залежить від фур, журналу й
+відкритих чеків — `allocationChanged` іде від `trucksChanged` і `receiptsChanged`.
+
+### 4.5 Відкритий чи закритий чек: `std::visit`
+
+Розподіляти можна і з відкритого чека (`OpenReceipt`, ще не в журналі), і з закритого (`Receipt`).
+`Terminal` тримає обраний як `std::variant<const OpenReceipt*, const Receipt*>`, а різницю в
+запитах до журналу (`unallocatedOf(receipt, …)` проти `unallocatedOf(id, …)`) ховають перевантажені
+функції `unallocated()` / `check()` у `terminal.cpp`. Тоді один узагальнений лямбда-вираз у
+`std::visit` обслуговує обидва типи, а `Allocation::wholeWeighing/boxesOf` приймають будь-який
+`WeighedReceipt`.
 
 ### 4.4 Урок: стала модель рядків
 

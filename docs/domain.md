@@ -125,7 +125,10 @@ classDiagram
         +balanceOf(supplier) Money
         +loadOf(truck) Cargo
         +stockOf(crop) Cargo
+        +findReceipt(id) Receipt*
         +unallocatedOf(...) Cargo
+        +destinationOf(receipt, i) Destination?
+        +waitingForAllocation() Receipt*[]
         +validateAllocation(...)
         +validateCancel(...)
         +validateShipment(...)

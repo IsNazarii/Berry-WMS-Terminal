@@ -8,6 +8,7 @@
 #include "wms/supplier.h"
 
 #include <cstddef>
+#include <optional>
 #include <set>
 #include <string>
 #include <string_view>
@@ -30,6 +31,8 @@ public:
     bool add(StockShipment shipment);
 
     [[nodiscard]] std::size_t size() const noexcept { return ids_.size(); }
+    // A closed receipt; nullptr when it is not in the journal (still open or unknown).
+    [[nodiscard]] const Receipt* findReceipt(const Uuid& id) const noexcept;
 
     // What we owe the supplier: positive = we owe them, negative = they were overpaid.
     [[nodiscard]] Money balanceOf(SupplierId supplierId) const noexcept;
@@ -46,6 +49,15 @@ public:
     // Same for a receipt still being weighed: it is not in the journal yet,
     // but its pallets may already be in a truck.
     [[nodiscard]] Cargo unallocatedOf(const OpenReceipt& receipt, std::string_view cropCode) const noexcept;
+
+    // Where a whole weighing went; nullopt when it is still free. Boxes
+    // allocated by count are not tied to a weighing and do not show here.
+    [[nodiscard]] std::optional<Destination> destinationOf(const Uuid& receiptId,
+                                                           std::size_t weighingIndex) const noexcept;
+    // Closed receipts with boxes that neither a truck nor the warehouse has
+    // taken yet, oldest first: the allocation screen's to-do list. Pointers
+    // are valid until the next add().
+    [[nodiscard]] std::vector<const Receipt*> waitingForAllocation() const;
 
     // Preferred way to allocate boxes: the weight is split from what is left,
     // not from the whole crop. Still check it with validateAllocation().
@@ -78,7 +90,6 @@ public:
 private:
     // Remembers the id; false when it was already there.
     bool registerId(const Uuid& id);
-    [[nodiscard]] const Receipt* findReceipt(const Uuid& id) const noexcept;
     // What allocations have already taken of the crop from the receipt.
     [[nodiscard]] Cargo allocatedOf(const Uuid& receiptId, std::string_view cropCode) const noexcept;
     // The checks shared by closed and open receipts.

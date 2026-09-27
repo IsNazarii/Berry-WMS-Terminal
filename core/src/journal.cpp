@@ -1,5 +1,6 @@
 #include "wms/journal.h"
 
+#include <algorithm>
 #include <format>
 #include <stdexcept>
 #include <utility>
@@ -93,6 +94,25 @@ Cargo Journal::allocatedOf(const Uuid& receiptId, std::string_view cropCode) con
         if (a.receiptId() == receiptId && a.cropCode() == cropCode) taken += a.cargo();
     }
     return taken;
+}
+
+std::optional<Destination> Journal::destinationOf(const Uuid& receiptId, std::size_t weighingIndex) const noexcept {
+    for (const auto& a : allocations_) {
+        if (a.receiptId() == receiptId && a.weighingIndex() == weighingIndex) return a.destination();
+    }
+    return std::nullopt;
+}
+
+std::vector<const Receipt*> Journal::waitingForAllocation() const {
+    std::vector<const Receipt*> waiting;
+    for (const auto& r : receipts_) {
+        // Box counts decide, as in checkAllocation(): weight may differ by rounding.
+        const bool anyLeft = std::ranges::any_of(r.weighings(), [&](const Weighing& w) {
+            return !w.cancelled && unallocatedOf(r.id(), w.cropCode).boxes > 0;
+        });
+        if (anyLeft) waiting.push_back(&r);
+    }
+    return waiting;
 }
 
 Allocation Journal::boxesOf(const Uuid& receiptId, std::string_view cropCode, int boxes,

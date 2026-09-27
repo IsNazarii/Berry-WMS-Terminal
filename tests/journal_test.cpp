@@ -3,6 +3,7 @@
 
 #include <gtest/gtest.h>
 
+#include <optional>
 #include <stdexcept>
 #include <string>
 #include <string_view>
@@ -404,4 +405,57 @@ TEST(Journal, CancelledPalletCannotBeCancelledAgain) {
     OpenReceipt open = unloading();
     open.cancel(0);
     EXPECT_TRUE(mentions(journal.validateCancel(open, 0), "вже анульовано"));
+}
+
+TEST(Journal, KnowsWhereAWholePalletWent) {
+    Journal journal;
+    const OpenReceipt open = unloading();
+    journal.add(Allocation::wholeWeighing(open, 0, kTruck));
+
+    EXPECT_EQ(journal.destinationOf(open.id(), 0), Destination{kTruck});
+    EXPECT_EQ(journal.destinationOf(open.id(), 1), std::nullopt);
+}
+
+TEST(Journal, BoxesByCountAreNotTiedToAPallet) {
+    Journal journal;
+    const OpenReceipt open = unloading();
+    journal.add(journal.boxesOf(open, "raspberry", 20, ToWarehouse{}));
+
+    EXPECT_EQ(journal.destinationOf(open.id(), 0), std::nullopt);
+    EXPECT_EQ(journal.destinationOf(open.id(), 1), std::nullopt);
+}
+
+TEST(Journal, FindsClosedReceiptById) {
+    Journal journal;
+    const Receipt receipt = Receipt::create(42, Settlement::OnSite, {pallet("raspberry", 10, kilograms(20))});
+    journal.add(receipt);
+
+    ASSERT_NE(journal.findReceipt(receipt.id()), nullptr);
+    EXPECT_EQ(journal.findReceipt(receipt.id())->supplierId(), 42);
+    EXPECT_EQ(journal.findReceipt(Uuid::generateV7()), nullptr);
+}
+
+TEST(Journal, ListsClosedReceiptsWithBerriesLeftToAllocate) {
+    Journal journal;
+    const Receipt done = Receipt::create(42, Settlement::OnSite, {pallet("raspberry", 10, kilograms(20))});
+    const Receipt partly = Receipt::create(
+        43, Settlement::OnSite, {pallet("raspberry", 10, kilograms(20)), pallet("blueberry", 5, kilograms(8))});
+    journal.add(done);
+    journal.add(partly);
+    journal.add(Allocation::wholeWeighing(done, 0, kTruck));
+    journal.add(Allocation::wholeWeighing(partly, 0, kTruck)); // blueberry still waits
+
+    const auto waiting = journal.waitingForAllocation();
+    ASSERT_EQ(waiting.size(), 1U);
+    EXPECT_EQ(waiting[0]->id(), partly.id());
+}
+
+TEST(Journal, CancelledLinesDoNotWaitForAllocation) {
+    OpenReceipt open = unloading();
+    open.cancel(0);
+    open.cancel(1);
+    Journal journal;
+    journal.add(Receipt{open.id(), open.openedAt(), 42, Settlement::OnSite, open.weighings()});
+
+    EXPECT_TRUE(journal.waitingForAllocation().empty());
 }

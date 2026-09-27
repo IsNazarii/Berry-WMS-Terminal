@@ -45,6 +45,19 @@ Money Journal::balanceOf(SupplierId supplierId) const noexcept {
     return balance;
 }
 
+std::vector<const Transaction*> Journal::historyOf(SupplierId supplierId) const {
+    std::vector<const Transaction*> history;
+    for (const auto& r : receipts_) {
+        if (r.supplierId() == supplierId) history.push_back(&r);
+    }
+    for (const auto& p : payments_) {
+        if (p.supplierId() == supplierId) history.push_back(&p);
+    }
+    // Stable: records made in the same instant keep receipts before payments.
+    std::ranges::stable_sort(history, {}, &Transaction::createdAt);
+    return history;
+}
+
 Cargo Journal::loadOf(const TruckId& truckId) const noexcept {
     Cargo load;
     for (const auto& a : allocations_) {

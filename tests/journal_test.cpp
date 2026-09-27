@@ -3,6 +3,7 @@
 
 #include <gtest/gtest.h>
 
+#include <chrono>
 #include <optional>
 #include <stdexcept>
 #include <string>
@@ -57,6 +58,34 @@ TEST(Journal, WholesaleReceiptCreatesNoDebt) {
     Journal journal;
     journal.add(Receipt::create(42, Settlement::HandedOver, {pallet("raspberry", 10, kilograms(20), Money{})}));
     EXPECT_TRUE(journal.balanceOf(42).isZero());
+}
+
+TEST(Journal, HistoryListsReceiptsAndPaymentsOfThatSupplierByTime) {
+    // Synced records arrive in any order; the cash screen shows them as they happened.
+    const TimePoint morning{std::chrono::hours{8}};
+    const Receipt receipt{Uuid::generateV7(morning, 1, 1), morning, 42, Settlement::OnSite,
+                          {pallet("raspberry", 10, kilograms(20))}};
+    const Payment payment{Uuid::generateV7(morning, 1, 2), morning + std::chrono::hours{2}, 42, hryvnias(1000),
+                          PaymentMethod::Cash};
+    const Payment otherSupplier = Payment::create(7, hryvnias(500), PaymentMethod::Cash);
+
+    Journal journal;
+    journal.add(payment);
+    journal.add(otherSupplier);
+    journal.add(receipt);
+
+    const std::vector<const Transaction*> history = journal.historyOf(42);
+    ASSERT_EQ(history.size(), 2U);
+    EXPECT_EQ(history[0]->id(), receipt.id());
+    EXPECT_EQ(history[1]->id(), payment.id());
+    // The balance is the sum of what the history shows.
+    EXPECT_EQ(history[0]->balanceEffect() + history[1]->balanceEffect(), journal.balanceOf(42));
+}
+
+TEST(Journal, SupplierWithoutRecordsHasEmptyHistory) {
+    Journal journal;
+    journal.add(Payment::create(7, hryvnias(500), PaymentMethod::Cash));
+    EXPECT_TRUE(journal.historyOf(42).empty());
 }
 
 TEST(Journal, SameRecordIsAddedOnlyOnce) {

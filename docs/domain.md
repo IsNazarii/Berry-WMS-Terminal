@@ -123,6 +123,7 @@ classDiagram
     class Journal {
         +add(Receipt|Payment|Allocation|StockShipment) bool
         +balanceOf(supplier) Money
+        +historyOf(supplier) Transaction*[]
         +loadOf(truck) Cargo
         +stockOf(crop) Cargo
         +findReceipt(id) Receipt*
@@ -466,6 +467,7 @@ Append-only сховище фактів. Для кожного типу — ок
 | Метод | Результат |
 |---|---|
 | `balanceOf(supplier)` | Σ `balanceEffect()` чеків і виплат постачальника; + ми винні, − переплачено |
+| `historyOf(supplier)` | чеки й виплати постачальника як `const Transaction*`, за часом — звідки баланс |
 | `loadOf(truck)` | Σ розподілів у фуру + Σ відвантажень зі складу у фуру |
 | `stockOf(crop)` | розподіли на склад − відвантаження; може бути від'ємним після офлайн-конфлікту |
 | `unallocatedOf(receiptId, crop)` | скільки культури з закритого чека ще не розподілено |

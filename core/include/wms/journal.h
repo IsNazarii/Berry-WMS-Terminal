@@ -36,6 +36,9 @@ public:
 
     // What we owe the supplier: positive = we owe them, negative = they were overpaid.
     [[nodiscard]] Money balanceOf(SupplierId supplierId) const noexcept;
+    // Receipts and payments of the supplier, oldest first: where the balance comes
+    // from. Pointers are valid until the next add().
+    [[nodiscard]] std::vector<const Transaction*> historyOf(SupplierId supplierId) const;
     // Everything put into the truck, from receipts and from the warehouse;
     // compare with Truck::capacity() to spot overload.
     [[nodiscard]] Cargo loadOf(const TruckId& truckId) const noexcept;

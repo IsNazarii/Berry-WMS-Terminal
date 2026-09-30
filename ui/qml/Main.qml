@@ -1,3 +1,6 @@
+pragma ComponentBehavior: Bound
+
+import QtCore
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
@@ -42,6 +45,24 @@ ApplicationWindow {
         link: Theme.accent
     }
 
+    // Read by main.cpp at startup (key "ui/scale"); a change applies after a restart.
+    Settings {
+        id: uiSettings
+        category: "ui"
+        property real scale: 1.25
+    }
+    // The scale this run was started with (set by main.cpp), to tell the operator a restart is pending.
+    required property real startScale
+
+    // Not "scale": that is every Item's own transform.
+    component ScaleItem: MenuItem {
+        required property real factor
+        text: qsTr("%1%").arg(Math.round(factor * 100))
+        checkable: true
+        checked: uiSettings.scale === factor
+        onTriggered: uiSettings.scale = factor
+    }
+
     // Operator workflow goes left to right: open the day, receive, load, ship from stock, pay.
     header: TabBar {
         id: tabs
@@ -74,6 +95,22 @@ ApplicationWindow {
             }
             Label { text: qsTr("Записів у журналі: %1").arg(Terminal.journalSize) }
             Label { text: qsTr("Оператор: %1").arg(Terminal.operatorName) }
+            // Set once per terminal: laptops differ, and Qt only takes a scale at startup.
+            ToolButton {
+                text: window.startScale === uiSettings.scale
+                      ? qsTr("Масштаб %1%").arg(Math.round(uiSettings.scale * 100))
+                      : qsTr("Масштаб %1% — після перезапуску").arg(Math.round(uiSettings.scale * 100))
+                onClicked: scaleMenu.open()
+
+                Menu {
+                    id: scaleMenu
+                    y: -height
+                    ScaleItem { factor: 1 }
+                    ScaleItem { factor: 1.25 }
+                    ScaleItem { factor: 1.5 }
+                    ScaleItem { factor: 1.75 }
+                }
+            }
             // A shed in daylight wants light, an evening shift wants dark.
             ToolButton {
                 text: Theme.dark ? qsTr("Світла тема") : qsTr("Темна тема")

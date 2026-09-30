@@ -21,7 +21,7 @@ Page {
         anchors.centerIn: parent
         visible: !Terminal.sessionOpen
         text: qsTr("Розподіл можливий лише у відкритій сесії")
-        font.pixelSize: 20
+        font.pixelSize: Theme.fontSizeLarge
     }
 
     RowLayout {
@@ -50,7 +50,7 @@ Page {
                     anchors.centerIn: parent
                     visible: sourceList.count === 0
                     text: qsTr("Усе розподілено")
-                    color: palette.placeholderText
+                    color: Theme.textMuted
                 }
 
                 delegate: ItemDelegate {
@@ -73,7 +73,7 @@ Page {
                         Label {
                             text: sourceRow.modelData.openedAt + " · "
                                   + (sourceRow.modelData.open ? qsTr("зважується") : qsTr("закритий"))
-                            color: palette.placeholderText
+                            color: Theme.textMuted
                         }
                         Label {
                             text: qsTr("лишилось: %1").arg(sourceRow.modelData.left)
@@ -93,7 +93,7 @@ Page {
 
             Label {
                 text: screen.hasReceipt ? Terminal.allocationSupplierName : qsTr("Оберіть чек зліва")
-                font.pixelSize: 18
+                font.pixelSize: Theme.fontSizeTitle
                 font.bold: true
                 elide: Text.ElideRight
                 Layout.fillWidth: true
@@ -101,14 +101,14 @@ Page {
             Label {
                 text: screen.destinationId !== "" ? qsTr("Куди: %1").arg(screen.destinationTitle)
                                                   : qsTr("Оберіть фуру або склад справа")
-                color: screen.destinationId !== "" ? palette.windowText : "#ef6c00"
+                color: screen.destinationId !== "" ? Theme.text : Theme.warn
                 font.bold: true
             }
 
             Label {
                 visible: screen.hasReceipt
                 text: qsTr("Палетами")
-                color: palette.placeholderText
+                color: Theme.textMuted
             }
             ListView {
                 id: lineList
@@ -123,7 +123,7 @@ Page {
                     id: line
                     required property var modelData
                     width: ListView.view.width
-                    opacity: modelData.cancelled ? 0.45 : 1
+                    opacity: modelData.cancelled ? Theme.cancelledOpacity : 1
 
                     RowLayout {
                         anchors.fill: parent
@@ -138,7 +138,7 @@ Page {
                         Label {
                             visible: line.modelData.placedIn !== "" || line.modelData.cancelled
                             text: line.modelData.cancelled ? qsTr("анульовано") : line.modelData.placedIn
-                            color: palette.placeholderText
+                            color: Theme.textMuted
                         }
                         Button {
                             visible: line.modelData.placedIn === "" && !line.modelData.cancelled
@@ -154,7 +154,7 @@ Page {
             Label {
                 visible: screen.hasReceipt
                 text: qsTr("Ящиками (вага — пропорційно)")
-                color: palette.placeholderText
+                color: Theme.textMuted
             }
             // Rebuilt after every allocation, which also clears the typed count: that is wanted here.
             Repeater {
@@ -194,7 +194,7 @@ Page {
             Label {
                 id: allocationError
                 visible: text !== ""
-                color: "#c62828"
+                color: Theme.danger
                 wrapMode: Text.WordWrap
                 Layout.fillWidth: true
             }
@@ -251,7 +251,7 @@ Page {
                         Label {
                             visible: destination.modelData.overloaded
                             text: qsTr("Перевантажено: %1%").arg(destination.modelData.fillPercent)
-                            color: "#c62828"
+                            color: Theme.danger
                             font.bold: true
                         }
                     }

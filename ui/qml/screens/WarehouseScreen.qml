@@ -31,14 +31,14 @@ Page {
 
             Label {
                 text: qsTr("Залишок на складі")
-                font.pixelSize: 18
+                font.pixelSize: Theme.fontSizeTitle
                 font.bold: true
             }
             Label {
                 text: !Terminal.sessionOpen ? qsTr("Відвантаження можливе лише у відкритій сесії")
                       : screen.truckId !== "" ? qsTr("Куди: %1").arg(screen.truckTitle)
                                               : qsTr("Оберіть фуру справа")
-                color: screen.truckId !== "" ? palette.windowText : "#ef6c00"
+                color: screen.truckId !== "" ? Theme.text : Theme.warn
                 font.bold: true
             }
 
@@ -66,7 +66,7 @@ Page {
                         Label {
                             text: cropRow.modelData.stock
                             // Two terminals shipped the same boxes offline; the logistician sorts it out.
-                            color: cropRow.modelData.negative ? "#c62828" : palette.windowText
+                            color: cropRow.modelData.negative ? Theme.danger : Theme.text
                             elide: Text.ElideRight
                             Layout.fillWidth: true
                         }
@@ -92,7 +92,7 @@ Page {
             Label {
                 id: shipmentError
                 visible: text !== ""
-                color: "#c62828"
+                color: Theme.danger
                 wrapMode: Text.WordWrap
                 Layout.fillWidth: true
             }
@@ -120,7 +120,7 @@ Page {
                     anchors.centerIn: parent
                     visible: truckList.count === 0
                     text: qsTr("Немає фур, що завантажуються")
-                    color: palette.placeholderText
+                    color: Theme.textMuted
                 }
 
                 delegate: ItemDelegate {
@@ -155,7 +155,7 @@ Page {
                         Label {
                             visible: truck.modelData.overloaded
                             text: qsTr("Перевантажено: %1%").arg(truck.modelData.fillPercent)
-                            color: "#c62828"
+                            color: Theme.danger
                             font.bold: true
                         }
                     }

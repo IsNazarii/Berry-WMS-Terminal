@@ -33,7 +33,7 @@ Page {
 
         Label {
             text: screen.title
-            font.pixelSize: 24
+            font.pixelSize: Theme.fontSizeHeading
             font.bold: true
             Layout.alignment: Qt.AlignHCenter
         }
@@ -59,7 +59,7 @@ Page {
             id: error
             visible: false
             text: qsTr("Невірний PIN")
-            color: "#c62828"
+            color: Theme.danger
         }
         Button {
             Layout.fillWidth: true

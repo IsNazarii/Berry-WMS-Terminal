@@ -19,12 +19,12 @@ Page {
 
         Label {
             text: qsTr("Сесію не відкрито")
-            font.pixelSize: 24
+            font.pixelSize: Theme.fontSizeHeading
             Layout.alignment: Qt.AlignHCenter
         }
         Label {
             text: qsTr("Перенесені фури з попередньої сесії додадуться автоматично.")
-            color: palette.placeholderText
+            color: Theme.textMuted
             Layout.alignment: Qt.AlignHCenter
         }
         Button {
@@ -45,12 +45,12 @@ Page {
             Layout.fillWidth: true
             Label {
                 text: Terminal.sessionTitle
-                font.pixelSize: 22
+                font.pixelSize: Theme.fontSizeHeading
                 font.bold: true
             }
             Label {
                 text: Terminal.sessionOpenedBy
-                color: palette.placeholderText
+                color: Theme.textMuted
                 Layout.fillWidth: true
             }
             Button {
@@ -66,7 +66,7 @@ Page {
             Label {
                 required property string modelData
                 text: "• " + modelData
-                color: "#c62828"
+                color: Theme.danger
             }
         }
 
@@ -87,7 +87,7 @@ Page {
 
                 Label {
                     text: qsTr("Ціни за кг")
-                    font.pixelSize: 18
+                    font.pixelSize: Theme.fontSizeTitle
                     font.bold: true
                 }
                 Repeater {
@@ -119,7 +119,7 @@ Page {
                             }
                             Label {
                                 text: priceRow.price !== "" ? priceRow.price : qsTr("не задано")
-                                color: priceRow.price !== "" ? palette.text : "#c62828"
+                                color: priceRow.price !== "" ? Theme.text : Theme.danger
                                 Layout.preferredWidth: 100
                             }
                             TextField {
@@ -134,7 +134,7 @@ Page {
                         Label {
                             id: priceError
                             visible: text !== ""
-                            color: "#c62828"
+                            color: Theme.danger
                             wrapMode: Text.WordWrap
                             Layout.fillWidth: true
                         }
@@ -155,7 +155,7 @@ Page {
 
                 Label {
                     text: qsTr("Фури")
-                    font.pixelSize: 18
+                    font.pixelSize: Theme.fontSizeTitle
                     font.bold: true
                 }
                 ListView {
@@ -170,7 +170,7 @@ Page {
                         anchors.centerIn: parent
                         visible: truckList.count === 0
                         text: qsTr("Фур ще немає")
-                        color: palette.placeholderText
+                        color: Theme.textMuted
                     }
 
                     delegate: Frame {
@@ -197,14 +197,14 @@ Page {
                                     elide: Text.ElideRight
                                     visible: text !== ""
                                     text: truckCard.modelData.note
-                                    color: palette.placeholderText
+                                    color: Theme.textMuted
                                 }
                                 Label {
                                     Layout.fillWidth: true
                                     elide: Text.ElideRight
                                     text: qsTr("Завантажено: %1 з %2")
                                           .arg(truckCard.modelData.load).arg(truckCard.modelData.capacity)
-                                    color: truckCard.modelData.overloaded ? "#c62828" : palette.text
+                                    color: truckCard.modelData.overloaded ? Theme.danger : Theme.text
                                 }
                                 ProgressBar {
                                     Layout.fillWidth: true
@@ -312,7 +312,7 @@ Page {
                 Label {
                     id: truckError
                     visible: text !== ""
-                    color: "#c62828"
+                    color: Theme.danger
                 }
             }
         }

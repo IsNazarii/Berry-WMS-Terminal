@@ -1,4 +1,7 @@
 # QML screens and thin Qt adapters over the core. No business rules here.
+# Design tokens, one instance for the whole UI.
+set_source_files_properties(qml/Theme.qml PROPERTIES QT_QML_SINGLETON_TYPE TRUE)
+
 qt_add_library(wms_ui STATIC)
 qt_add_qml_module(wms_ui
     URI BerryWms.Ui
@@ -11,6 +14,7 @@ qt_add_qml_module(wms_ui
         src/scale_monitor.cpp
     QML_FILES
         qml/Main.qml
+        qml/Theme.qml
         qml/screens/LoginScreen.qml
         qml/screens/SessionScreen.qml
         qml/screens/ReceivingScreen.qml
@@ -18,6 +22,11 @@ qt_add_qml_module(wms_ui
         qml/screens/AllocationScreen.qml
         qml/screens/WarehouseScreen.qml
         qml/screens/CashScreen.qml
+    RESOURCES
+        fonts/Onest-Regular.ttf
+        fonts/Onest-Medium.ttf
+        fonts/Onest-SemiBold.ttf
+        fonts/Onest-Bold.ttf
 )
 
 # The generated QML type registration includes headers by bare name.

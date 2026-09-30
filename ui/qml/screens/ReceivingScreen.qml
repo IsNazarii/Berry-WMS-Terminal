@@ -26,7 +26,7 @@ Page {
         anchors.centerIn: parent
         visible: !Terminal.sessionOpen
         text: qsTr("Прийом можливий лише у відкритій сесії")
-        font.pixelSize: 20
+        font.pixelSize: Theme.fontSizeLarge
     }
 
     RowLayout {
@@ -57,7 +57,7 @@ Page {
                     anchors.centerIn: parent
                     visible: receiptList.count === 0
                     text: qsTr("Відкритих чеків немає")
-                    color: palette.placeholderText
+                    color: Theme.textMuted
                 }
 
                 delegate: ItemDelegate {
@@ -76,7 +76,7 @@ Page {
                         }
                         Label {
                             text: receiptRow.modelData.openedAt + " · " + receiptRow.modelData.total
-                            color: palette.placeholderText
+                            color: Theme.textMuted
                         }
                     }
                 }
@@ -113,18 +113,17 @@ Page {
                     Label {
                         Layout.alignment: Qt.AlignHCenter
                         text: screen.scales.display
-                        font.pixelSize: 56
-                        font.family: "monospace"
+                        font.pixelSize: Theme.fontSizeScale
                     }
                     Label {
                         Layout.alignment: Qt.AlignHCenter
                         text: screen.scales.stable ? qsTr("● СТАБІЛЬНО") : qsTr("○ вага змінюється…")
-                        color: screen.scales.stable ? "#2e7d32" : "#ef6c00"
+                        color: screen.scales.stable ? Theme.ok : Theme.warn
                         font.bold: true
                     }
                     RowLayout {
                         Layout.alignment: Qt.AlignHCenter
-                        Label { text: screen.scales.driverName; opacity: 0.6 }
+                        Label { text: screen.scales.driverName; color: Theme.textMuted }
                         Button {
                             text: qsTr("Поставити палету")
                             flat: true
@@ -215,7 +214,7 @@ Page {
             Label {
                 id: weighingError
                 visible: text !== ""
-                color: "#c62828"
+                color: Theme.danger
                 wrapMode: Text.WordWrap
                 Layout.fillWidth: true
             }
@@ -229,7 +228,7 @@ Page {
 
             Label {
                 text: screen.hasReceipt ? Terminal.supplierName : qsTr("Чек не обрано")
-                font.pixelSize: 18
+                font.pixelSize: Theme.fontSizeTitle
                 font.bold: true
                 elide: Text.ElideRight
                 Layout.fillWidth: true
@@ -237,7 +236,7 @@ Page {
             Label {
                 visible: screen.hasReceipt
                 text: qsTr("Борг до чека: %1").arg(Terminal.supplierBalance)
-                color: palette.placeholderText
+                color: Theme.textMuted
             }
 
             ListView {
@@ -253,7 +252,7 @@ Page {
                     anchors.centerIn: parent
                     visible: screen.hasReceipt && lineList.count === 0
                     text: qsTr("Зважувань ще немає")
-                    color: palette.placeholderText
+                    color: Theme.textMuted
                 }
 
                 delegate: Frame {
@@ -261,7 +260,7 @@ Page {
                     required property var modelData
                     width: ListView.view.width
                     // A cancelled line stays visible: the trace of the mistake is kept.
-                    opacity: modelData.cancelled ? 0.45 : 1
+                    opacity: modelData.cancelled ? Theme.cancelledOpacity : 1
 
                     RowLayout {
                         anchors.fill: parent
@@ -310,7 +309,7 @@ Page {
             Label {
                 id: receiptError
                 visible: text !== ""
-                color: "#c62828"
+                color: Theme.danger
                 wrapMode: Text.WordWrap
                 Layout.fillWidth: true
             }
@@ -368,7 +367,7 @@ Page {
                 Label {
                     required property string modelData
                     text: "• " + modelData
-                    color: "#c62828"
+                    color: Theme.danger
                 }
             }
         }

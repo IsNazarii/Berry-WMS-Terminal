@@ -14,6 +14,34 @@ ApplicationWindow {
     visibility: Window.Maximized
     title: qsTr("Berry WMS — термінал приймальника")
 
+    // Stock controls draw from the palette, so feeding it the tokens themes
+    // them too; custom-drawn controls use Theme directly.
+    color: Theme.bg
+    font.family: Theme.fontUi
+    font.pixelSize: Theme.fontSizeBody
+    font.features: Theme.fontFeatures
+    palette {
+        window: Theme.bg
+        windowText: Theme.text
+        base: Theme.surface
+        alternateBase: Theme.surfaceAlt
+        text: Theme.text
+        button: Theme.surface
+        buttonText: Theme.text
+        highlight: Theme.accent
+        highlightedText: Theme.onAccent
+        placeholderText: Theme.textMuted
+        toolTipBase: Theme.surface
+        toolTipText: Theme.text
+        light: Theme.surface
+        midlight: Theme.surfaceAlt
+        mid: Theme.border
+        dark: Theme.border
+        shadow: Theme.border
+        brightText: Theme.onAccent
+        link: Theme.accent
+    }
+
     // Operator workflow goes left to right: open the day, receive, load, ship from stock, pay.
     header: TabBar {
         id: tabs
@@ -42,10 +70,15 @@ ApplicationWindow {
             }
             Label {
                 text: Terminal.sessionOpen ? Terminal.sessionTitle : qsTr("Сесію не відкрито")
-                color: Terminal.sessionOpen ? palette.windowText : "#c62828"
+                color: Terminal.sessionOpen ? Theme.text : Theme.danger
             }
             Label { text: qsTr("Записів у журналі: %1").arg(Terminal.journalSize) }
             Label { text: qsTr("Оператор: %1").arg(Terminal.operatorName) }
+            // A shed in daylight wants light, an evening shift wants dark.
+            ToolButton {
+                text: Theme.dark ? qsTr("Світла тема") : qsTr("Темна тема")
+                onClicked: Theme.dark = !Theme.dark
+            }
             ToolButton {
                 text: qsTr("Вийти")
                 onClicked: Terminal.logout()

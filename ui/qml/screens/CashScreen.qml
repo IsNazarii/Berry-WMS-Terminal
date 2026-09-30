@@ -52,7 +52,7 @@ Page {
                     anchors.centerIn: parent
                     visible: debtorList.count === 0
                     text: qsTr("Ми нікому не винні")
-                    color: palette.placeholderText
+                    color: Theme.textMuted
                 }
 
                 delegate: ItemDelegate {
@@ -71,7 +71,7 @@ Page {
                         Label {
                             text: debtor.modelData.balance
                             // Overpaid: the supplier owes us.
-                            color: debtor.modelData.overpaid ? "#c62828" : palette.windowText
+                            color: debtor.modelData.overpaid ? Theme.danger : Theme.text
                             font.bold: true
                         }
                     }
@@ -92,13 +92,13 @@ Page {
             Label {
                 visible: !screen.hasSupplier
                 text: qsTr("Оберіть постачальника зліва або F2")
-                color: "#ef6c00"
+                color: Theme.warn
                 font.bold: true
             }
             Label {
                 visible: screen.hasSupplier
                 text: Terminal.cashSupplierName
-                font.pixelSize: 18
+                font.pixelSize: Theme.fontSizeTitle
                 font.bold: true
                 elide: Text.ElideRight
                 Layout.fillWidth: true
@@ -106,7 +106,7 @@ Page {
             Label {
                 visible: screen.hasSupplier
                 text: qsTr("Борг: %1").arg(Terminal.cashBalance)
-                font.pixelSize: 24
+                font.pixelSize: Theme.fontSizeHeading
             }
 
             GridLayout {
@@ -161,7 +161,7 @@ Page {
             Label {
                 id: paymentError
                 visible: text !== ""
-                color: "#c62828"
+                color: Theme.danger
                 wrapMode: Text.WordWrap
                 Layout.fillWidth: true
             }
@@ -192,7 +192,7 @@ Page {
                     anchors.centerIn: parent
                     visible: history.count === 0
                     text: qsTr("Записів немає")
-                    color: palette.placeholderText
+                    color: Theme.textMuted
                 }
 
                 delegate: Frame {
@@ -213,14 +213,14 @@ Page {
                             }
                             Label {
                                 text: record.modelData.effect
-                                color: record.modelData.payment ? "#2e7d32" : palette.windowText
+                                color: record.modelData.payment ? Theme.ok : Theme.text
                                 font.bold: true
                             }
                         }
                         Label {
                             visible: text !== ""
                             text: record.modelData.detail
-                            color: palette.placeholderText
+                            color: Theme.textMuted
                             wrapMode: Text.WordWrap
                             Layout.fillWidth: true
                         }
@@ -257,7 +257,7 @@ Page {
             Label {
                 visible: Terminal.balanceAfter(amount.text).startsWith("-")
                 text: qsTr("Більше, ніж борг: постачальник буде винен нам")
-                color: "#c62828"
+                color: Theme.danger
             }
         }
 

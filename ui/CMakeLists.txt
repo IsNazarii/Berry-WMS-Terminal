@@ -11,6 +11,8 @@ qt_add_qml_module(wms_ui
         src/supplier_list_model.cpp
         src/scale_monitor.h
         src/scale_monitor.cpp
+        src/display_format.h
+        src/display_format.cpp
     QML_FILES
         qml/Main.qml
         qml/screens/LoginScreen.qml

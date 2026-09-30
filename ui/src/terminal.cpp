@@ -1,5 +1,7 @@
 #include "terminal.h"
 
+#include "display_format.h"
+
 #include "wms/allocation.h"
 #include "wms/payment.h"
 #include "wms/receipt.h"
@@ -226,7 +228,7 @@ QString Terminal::supplierName() const {
 
 QString Terminal::supplierBalance() const {
     const Supplier* supplier = currentSupplier();
-    return supplier ? QString::fromStdString(formatMoney(journal_.balanceOf(supplier->id()))) : QString{};
+    return supplier ? QString("%1 грн").arg(hryvniasText(journal_.balanceOf(supplier->id()))) : QString{};
 }
 
 QString Terminal::sessionTitle() const {
@@ -251,7 +253,7 @@ QVariantMap Terminal::priceMap() const {
     if (!workDay_) return map;
     for (const Crop& crop : kCrops) {
         if (const auto price = workDay_->prices().current(crop.code))
-            map.insert(QString::fromUtf8(crop.code), QString::fromStdString(formatMoney(*price)));
+            map.insert(QString::fromUtf8(crop.code), hryvniasText(*price));
     }
     return map;
 }
@@ -297,7 +299,8 @@ QVariantList Terminal::openReceiptList() const {
             {"receiptId", QString::fromStdString(receipt.id().toString())},
             {"supplierName", supplierNameOf(receipt.supplierId())},
             {"openedAt", localTime(receipt.openedAt())},
-            {"total", describeCargo(receipt.total())},
+            {"boxes", receipt.total().boxes},
+            {"amount", hryvniasText(amountOf(receipt))},
         });
     }
     return list;
@@ -317,11 +320,11 @@ QVariantList Terminal::activeLines() const {
             {"index", static_cast<int>(i)},
             {"crop", cropName(w.cropCode)},
             {"boxes", w.boxCount},
-            {"gross", weight(w.gross)},
-            {"tare", weight(w.tare())},
-            {"net", weight(w.net())},
-            {"price", w.pricePerKg.isZero() ? QString("—") : money(w.pricePerKg)},
-            {"amount", money(w.amount())},
+            {"gross", kilogramsText(w.gross)},
+            {"tare", kilogramsText(w.tare())},
+            {"net", kilogramsText(w.net())},
+            {"price", w.pricePerKg.isZero() ? QString("—") : hryvniasText(w.pricePerKg)},
+            {"amount", hryvniasText(w.amount())},
             {"manualPrice", w.priceSource == PriceSource::Manual},
             {"manualWeight", w.weightSource == WeightSource::Manual},
             {"cancelled", w.cancelled},
@@ -330,10 +333,16 @@ QVariantList Terminal::activeLines() const {
     return list;
 }
 
-QString Terminal::activeTotal() const {
+QVariantMap Terminal::activeSummary() const {
     const OpenReceipt* receipt = activeReceipt();
     if (!receipt) return {};
-    return QString("%1 · %2").arg(describeCargo(receipt->total()), money(amountOf(*receipt)));
+    const Cargo total = receipt->total();
+    return {
+        {"openedAt", localTime(receipt->openedAt())},
+        {"boxes", total.boxes},
+        {"net", kilogramsText(total.weight)},
+        {"amount", hryvniasText(amountOf(*receipt))},
+    };
 }
 
 QVariantList Terminal::allocationSources() const {

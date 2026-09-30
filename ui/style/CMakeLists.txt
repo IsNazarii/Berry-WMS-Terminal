@@ -25,6 +25,7 @@ qt_add_qml_module(wms_style
         ProgressBar.qml
         ScrollBar.qml
         ToolTip.qml
+        WarningButton.qml
     RESOURCES
         fonts/Onest-Regular.ttf
         fonts/Onest-Medium.ttf

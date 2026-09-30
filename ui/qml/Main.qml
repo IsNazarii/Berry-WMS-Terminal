@@ -29,7 +29,7 @@ ApplicationWindow {
         button: Theme.surface
         buttonText: Theme.text
         highlight: Theme.accent
-        highlightedText: Theme.onAccent
+        highlightedText: Theme.textOnAccent
         placeholderText: Theme.textMuted
         toolTipBase: Theme.surface
         toolTipText: Theme.text
@@ -38,7 +38,7 @@ ApplicationWindow {
         mid: Theme.border
         dark: Theme.border
         shadow: Theme.border
-        brightText: Theme.onAccent
+        brightText: Theme.textOnAccent
         link: Theme.accent
     }
 

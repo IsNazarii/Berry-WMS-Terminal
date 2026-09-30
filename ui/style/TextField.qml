@@ -18,7 +18,7 @@ T.TextField {
     font.weight: Font.Medium
     color: Theme.text
     selectionColor: Theme.accent
-    selectedTextColor: Theme.onAccent
+    selectedTextColor: Theme.textOnAccent
     placeholderTextColor: Theme.textMuted
     verticalAlignment: TextInput.AlignVCenter
     opacity: control.enabled ? 1 : Theme.disabledOpacity

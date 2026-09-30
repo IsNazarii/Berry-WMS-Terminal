@@ -50,7 +50,7 @@ class Terminal : public QObject {
     // [{cropCode, name}]. Kept apart from the prices: a Repeater over a list that
     // changes rebuilds its rows and would wipe what the operator is typing.
     Q_PROPERTY(QVariantList crops READ cropList CONSTANT)
-    // {cropCode: formatted price}; a crop without a price is missing.
+    // {cropCode: price in hryvnias, "85,00"}; a crop without a price is missing.
     Q_PROPERTY(QVariantMap prices READ priceMap NOTIFY pricesChanged)
     // [{truckId, plate, make, note, capacity, load, fillPercent, overloaded, status, loading}] of the session.
     Q_PROPERTY(QVariantList trucks READ truckList NOTIFY trucksChanged)
@@ -59,14 +59,15 @@ class Terminal : public QObject {
     // Why the session cannot be closed yet, straight from WorkDay::validateClose().
     Q_PROPERTY(QStringList closeBlockers READ closeBlockers NOTIFY trucksChanged)
 
-    // [{receiptId, supplierName, openedAt, total}] of the session, oldest first.
+    // [{receiptId, supplierName, openedAt, boxes, amount}] of the session, oldest first; amount as "8 823,00".
     Q_PROPERTY(QVariantList openReceipts READ openReceiptList NOTIFY receiptsChanged)
     // The receipt new weighings go into; empty when none is open.
     Q_PROPERTY(QString activeReceiptId READ activeReceiptId NOTIFY receiptsChanged)
-    // [{index, crop, boxes, gross, tare, net, price, amount, manualPrice, manualWeight, cancelled}].
+    // [{index, crop, boxes, gross, tare, net, price, amount, manualPrice, manualWeight, cancelled}];
+    // weights in kg and money in hryvnias as bare numbers ("142,6", "8 823,00") for a table.
     Q_PROPERTY(QVariantList activeLines READ activeLines NOTIFY receiptsChanged)
-    // "340 ящ. · 120.000 кг · 10200.00 грн" without cancelled lines.
-    Q_PROPERTY(QString activeTotal READ activeTotal NOTIFY receiptsChanged)
+    // {openedAt, boxes, net, amount} of the active receipt without cancelled lines; empty when none.
+    Q_PROPERTY(QVariantMap activeSummary READ activeSummary NOTIFY receiptsChanged)
 
     // Allocation. [{receiptId, supplierName, openedAt, open, left}]: open receipts
     // of the session, then closed ones, that still have boxes to allocate.
@@ -126,7 +127,7 @@ public:
     [[nodiscard]] QVariantList openReceiptList() const;
     [[nodiscard]] QString activeReceiptId() const;
     [[nodiscard]] QVariantList activeLines() const;
-    [[nodiscard]] QString activeTotal() const;
+    [[nodiscard]] QVariantMap activeSummary() const;
     [[nodiscard]] QVariantList allocationSources() const;
     [[nodiscard]] QString allocationReceiptId() const;
     [[nodiscard]] QString allocationSupplierName() const;

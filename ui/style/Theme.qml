@@ -20,7 +20,7 @@ QtObject {
     // The one accent: primary actions and selection.
     readonly property color accent: dark ? "#8F95F2" : "#3A3F94"
     readonly property color accentSoft: dark ? "#2B2D52" : "#E2E3F6"
-    readonly property color onAccent: dark ? "#12132A" : "#FFFFFF"
+    readonly property color textOnAccent: dark ? "#12132A" : "#FFFFFF"
 
     // State colors are separate from the accent: good / attention / error.
     readonly property color ok: dark ? "#5CCB8A" : "#1E7A45"

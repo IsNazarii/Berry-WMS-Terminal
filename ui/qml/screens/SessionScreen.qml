@@ -118,7 +118,7 @@ Page {
                                 Layout.preferredWidth: 90
                             }
                             Label {
-                                text: priceRow.price !== "" ? priceRow.price : qsTr("не задано")
+                                text: priceRow.price !== "" ? qsTr("%1 грн").arg(priceRow.price) : qsTr("не задано")
                                 color: priceRow.price !== "" ? Theme.text : Theme.danger
                                 Layout.preferredWidth: 100
                             }

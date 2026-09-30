@@ -1,5 +1,7 @@
 #include "scale_monitor.h"
 
+#include "display_format.h"
+
 #include <chrono>
 
 namespace wms::ui {
@@ -25,7 +27,12 @@ ScaleMonitor::ScaleMonitor(IScaleDriver& driver, QObject* parent)
 
 QString ScaleMonitor::display() const {
     const auto reading = detector_.lastReading();
-    return reading ? QString::fromStdString(formatWeight(*reading)) : QStringLiteral("—");
+    return reading ? kilogramsText(*reading) : QStringLiteral("—");
+}
+
+bool ScaleMonitor::isZero() const noexcept {
+    const auto reading = detector_.lastReading();
+    return reading && reading->isZero();
 }
 
 void ScaleMonitor::poll() {

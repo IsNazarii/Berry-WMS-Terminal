@@ -23,41 +23,6 @@ Page {
         onActivated: screen.newReceipt()
     }
 
-    // Small uppercase caption above a group: "ВІДКРИТІ ЧЕКИ", "КУЛЬТУРА".
-    component SectionCaption: Label {
-        font.pixelSize: Theme.fontSizeCaption
-        font.weight: Font.DemiBold
-        font.capitalization: Font.AllUppercase
-        font.letterSpacing: 0.8
-        color: Theme.textMuted
-    }
-
-    // A field caption with its hint on the same line, so every field of a row
-    // starts at the same height whatever the hint's length.
-    component FieldCaption: RowLayout {
-        id: fieldCaption
-        required property string caption
-        property string hint: ""
-        spacing: Theme.spacingS
-        Layout.fillWidth: true
-
-        Label {
-            text: fieldCaption.caption
-            font.pixelSize: Theme.fontSizeCaption
-            font.weight: Font.Medium
-            color: Theme.textMuted
-        }
-        Label {
-            text: fieldCaption.hint
-            font.pixelSize: Theme.fontSizeCaption
-            color: Theme.textMuted
-            opacity: 0.8
-            elide: Text.ElideRight
-            horizontalAlignment: Text.AlignRight
-            Layout.fillWidth: true
-        }
-    }
-
     // A crop is one press: its name and today's price on a big key.
     component CropButton: AbstractButton {
         id: cropButton

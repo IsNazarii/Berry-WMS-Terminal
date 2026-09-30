@@ -7,290 +7,491 @@ import BerryWms.Ui
 
 // The working session: opened around noon, prices of the day, trucks to load,
 // and closing once every truck has been sent off or carried over.
+// Prices on the left, the trucks in the middle, a new truck on the right.
 Page {
     id: screen
     title: qsTr("Сесія")
 
+    // An error under a form, on the same soft background as on the receiving screen.
+    component ErrorLabel: Label {
+        visible: text !== ""
+        color: Theme.danger
+        wrapMode: Text.WordWrap
+        padding: Theme.spacingS
+        Layout.fillWidth: true
+        background: Rectangle {
+            color: Theme.dangerSoft
+            radius: Theme.radiusS
+        }
+    }
+
     // Closed session: the only thing to do is to open a new one.
-    ColumnLayout {
+    Frame {
         anchors.centerIn: parent
         visible: !Terminal.sessionOpen
-        spacing: 12
+        padding: Theme.spacingXl
 
-        Label {
-            text: qsTr("Сесію не відкрито")
-            font.pixelSize: Theme.fontSizeHeading
-            Layout.alignment: Qt.AlignHCenter
-        }
-        Label {
-            text: qsTr("Перенесені фури з попередньої сесії додадуться автоматично.")
-            color: Theme.textMuted
-            Layout.alignment: Qt.AlignHCenter
-        }
-        Button {
-            text: qsTr("Відкрити сесію")
-            highlighted: true
-            Layout.alignment: Qt.AlignHCenter
-            onClicked: Terminal.openSession()
+        ColumnLayout {
+            spacing: Theme.spacingM
+
+            Label {
+                text: qsTr("Сесію не відкрито")
+                font.pixelSize: Theme.fontSizeHeading
+                font.weight: Font.Bold
+                Layout.alignment: Qt.AlignHCenter
+            }
+            Label {
+                text: qsTr("Перенесені фури з попередньої сесії додадуться автоматично.")
+                color: Theme.textMuted
+                Layout.alignment: Qt.AlignHCenter
+            }
+            Button {
+                text: qsTr("Відкрити сесію")
+                highlighted: true
+                font.pixelSize: Theme.fontSizeField
+                Layout.preferredHeight: Theme.controlHeightLarge
+                Layout.alignment: Qt.AlignHCenter
+                onClicked: Terminal.openSession()
+            }
         }
     }
 
     ColumnLayout {
         anchors.fill: parent
-        anchors.margins: 16
+        anchors.margins: Theme.spacingM
         visible: Terminal.sessionOpen
-        spacing: 12
+        spacing: Theme.spacingM
 
         RowLayout {
             Layout.fillWidth: true
+            spacing: Theme.spacingM
+
             Label {
                 text: Terminal.sessionTitle
                 font.pixelSize: Theme.fontSizeHeading
-                font.bold: true
+                font.weight: Font.Bold
             }
             Label {
                 text: Terminal.sessionOpenedBy
                 color: Theme.textMuted
+                elide: Text.ElideRight
                 Layout.fillWidth: true
             }
             Button {
-                text: qsTr("Закрити сесію")
+                text: qsTr("Закрити сесію…")
                 enabled: Terminal.closeBlockers.length === 0
                 onClicked: confirmClose.open()
             }
         }
 
         // Shown right away rather than on a failed click: the operator sees what is left to do.
-        Repeater {
-            model: Terminal.closeBlockers
-            Label {
-                required property string modelData
-                text: "• " + modelData
-                color: Theme.danger
-            }
+        ErrorLabel {
+            visible: Terminal.closeBlockers.length > 0
+            text: qsTr("Закрити сесію ще не можна:") + "\n• " + Terminal.closeBlockers.join("\n• ")
         }
 
         RowLayout {
             Layout.fillWidth: true
             Layout.fillHeight: true
-            spacing: 24
+            spacing: Theme.spacingM
 
             // Prices of the day. A new price applies to weighings from now on.
-            ColumnLayout {
-                id: prices
-                Layout.preferredWidth: 340
-                Layout.alignment: Qt.AlignTop
-                spacing: 8
+            Frame {
+                Layout.preferredWidth: 280
+                Layout.fillHeight: true
 
-                // Every filled field at once: the operator usually sets all prices together.
-                signal applyAll()
+                ColumnLayout {
+                    id: prices
+                    anchors.fill: parent
+                    spacing: Theme.spacingS
 
-                Label {
-                    text: qsTr("Ціни за кг")
-                    font.pixelSize: Theme.fontSizeTitle
-                    font.bold: true
-                }
-                Repeater {
-                    model: Terminal.crops
+                    // Every filled field at once: the operator usually sets all prices together.
+                    signal applyAll()
 
-                    ColumnLayout {
-                        id: priceRow
-                        required property var modelData
-                        readonly property string price: Terminal.prices[modelData.cropCode] ?? ""
+                    SectionCaption { text: qsTr("Ціни дня, грн/кг") }
 
-                        // An empty field keeps the price; a rejected one keeps its text to be fixed.
-                        function apply() {
-                            if (newPrice.text.trim() === "")
-                                return
-                            priceError.text = Terminal.setPrice(modelData.cropCode, newPrice.text)
-                            if (priceError.text === "")
-                                newPrice.clear()
-                        }
+                    Repeater {
+                        model: Terminal.crops
 
-                        Connections {
-                            target: prices
-                            function onApplyAll() { priceRow.apply() }
-                        }
-
-                        RowLayout {
-                            Label {
-                                text: priceRow.modelData.name
-                                Layout.preferredWidth: 90
-                            }
-                            Label {
-                                text: priceRow.price !== "" ? qsTr("%1 грн").arg(priceRow.price) : qsTr("не задано")
-                                color: priceRow.price !== "" ? Theme.text : Theme.danger
-                                Layout.preferredWidth: 100
-                            }
-                            TextField {
-                                id: newPrice
-                                placeholderText: qsTr("нова, грн")
-                                inputMethodHints: Qt.ImhFormattedNumbersOnly
-                                Layout.fillWidth: true
-                                onTextEdited: priceError.text = ""
-                                onAccepted: prices.applyAll()
-                            }
-                        }
-                        Label {
-                            id: priceError
-                            visible: text !== ""
-                            color: Theme.danger
-                            wrapMode: Text.WordWrap
+                        ColumnLayout {
+                            id: priceRow
+                            required property var modelData
+                            readonly property string price: Terminal.prices[modelData.cropCode] ?? ""
+                            spacing: Theme.spacingXs
                             Layout.fillWidth: true
+
+                            // An empty field keeps the price; a rejected one keeps its text to be fixed.
+                            function apply() {
+                                if (newPrice.text.trim() === "")
+                                    return
+                                priceError.text = Terminal.setPrice(modelData.cropCode, newPrice.text)
+                                if (priceError.text === "")
+                                    newPrice.clear()
+                            }
+
+                            Connections {
+                                target: prices
+                                function onApplyAll() { priceRow.apply() }
+                            }
+
+                            RowLayout {
+                                spacing: Theme.spacingS
+                                Layout.fillWidth: true
+
+                                Label {
+                                    text: priceRow.modelData.name
+                                    font.weight: Font.DemiBold
+                                    elide: Text.ElideRight
+                                    Layout.fillWidth: true
+                                }
+                                // The current price, big: this is what goes into the next weighing.
+                                Label {
+                                    text: priceRow.price !== "" ? priceRow.price : qsTr("не задано")
+                                    font.pixelSize: priceRow.price !== "" ? Theme.fontSizeTitle : Theme.fontSizeCaption
+                                    font.weight: Font.DemiBold
+                                    color: priceRow.price !== "" ? Theme.text : Theme.warn
+                                    horizontalAlignment: Text.AlignRight
+                                    Layout.preferredWidth: 80
+                                }
+                                TextField {
+                                    id: newPrice
+                                    placeholderText: qsTr("нова")
+                                    inputMethodHints: Qt.ImhFormattedNumbersOnly
+                                    Layout.preferredWidth: 80
+                                    onTextEdited: priceError.text = ""
+                                    onAccepted: prices.applyAll()
+                                }
+                            }
+                            ErrorLabel { id: priceError }
                         }
                     }
-                }
-                Button {
-                    text: qsTr("Зберегти ціни")
-                    Layout.alignment: Qt.AlignRight
-                    onClicked: prices.applyAll()
+
+                    Button {
+                        text: qsTr("Зберегти ціни")
+                        highlighted: true
+                        Layout.fillWidth: true
+                        onClicked: prices.applyAll()
+                    }
+                    Label {
+                        text: qsTr("Нова ціна діє для наступних зважувань; записані лишаються з попередньою.")
+                        font.pixelSize: Theme.fontSizeCaption
+                        color: Theme.textMuted
+                        wrapMode: Text.WordWrap
+                        Layout.fillWidth: true
+                    }
+                    Item { Layout.fillHeight: true }
                 }
             }
 
             // Trucks of this session with their load, and the operator's decision for each.
-            ColumnLayout {
+            Frame {
                 Layout.fillWidth: true
                 Layout.fillHeight: true
-                spacing: 8
 
-                Label {
-                    text: qsTr("Фури")
-                    font.pixelSize: Theme.fontSizeTitle
-                    font.bold: true
-                }
-                ListView {
-                    id: truckList
-                    Layout.fillWidth: true
-                    Layout.fillHeight: true
-                    clip: true
-                    spacing: 6
-                    model: Terminal.trucks
+                ColumnLayout {
+                    anchors.fill: parent
+                    spacing: Theme.spacingS
 
-                    Label {
-                        anchors.centerIn: parent
-                        visible: truckList.count === 0
-                        text: qsTr("Фур ще немає")
-                        color: Theme.textMuted
+                    RowLayout {
+                        Layout.fillWidth: true
+                        SectionCaption {
+                            text: qsTr("Фури сесії")
+                            Layout.fillWidth: true
+                        }
+                        Button {
+                            text: qsTr("Додати фуру…")
+                            onClicked: truckDialog.open()
+                        }
                     }
 
-                    delegate: Frame {
-                        id: truckCard
-                        required property var modelData
-                        width: ListView.view.width
+                    ListView {
+                        id: truckList
+                        Layout.fillWidth: true
+                        Layout.fillHeight: true
+                        clip: true
+                        model: Terminal.trucks
+                        headerPositioning: ListView.OverlayHeader
+                        ScrollBar.vertical: ScrollBar {}
 
-                        RowLayout {
-                            anchors.fill: parent
-                            spacing: 12
+                        // Column widths shared by the header and the rows; the truck takes the rest.
+                        readonly property int boxesWidth: 64
+                        readonly property int kgWidth: 84
+                        readonly property int fillWidth: 72
+                        readonly property int actionWidth: 224
+                        readonly property int columnSpacing: Theme.spacingM
 
-                            ColumnLayout {
-                                Layout.fillWidth: true
+                        Label {
+                            anchors.centerIn: parent
+                            visible: truckList.count === 0
+                            text: qsTr("Фур ще немає")
+                            color: Theme.textMuted
+                        }
+
+                        header: Rectangle {
+                            z: 2
+                            width: ListView.view.width
+                            height: 28
+                            visible: truckList.count > 0
+                            color: Theme.surface
+
+                            component HeaderCell: Label {
+                                font.pixelSize: 11
+                                font.weight: Font.DemiBold
+                                font.capitalization: Font.AllUppercase
+                                color: Theme.textMuted
+                                horizontalAlignment: Text.AlignRight
+                                elide: Text.ElideRight
+                            }
+
+                            RowLayout {
+                                anchors.fill: parent
+                                spacing: truckList.columnSpacing
+                                HeaderCell { text: qsTr("Фура"); horizontalAlignment: Text.AlignLeft; Layout.fillWidth: true }
+                                HeaderCell { text: qsTr("Ящиків"); Layout.preferredWidth: truckList.boxesWidth }
+                                HeaderCell { text: qsTr("Кг"); Layout.preferredWidth: truckList.kgWidth }
+                                HeaderCell { text: qsTr("Заповн."); Layout.preferredWidth: truckList.fillWidth }
+                                Item { Layout.preferredWidth: truckList.actionWidth }
+                            }
+                            Rectangle {
+                                anchors.bottom: parent.bottom
+                                width: parent.width
+                                height: 1
+                                color: Theme.border
+                            }
+                        }
+
+                        delegate: Rectangle {
+                            id: truckRow
+                            required property var modelData
+                            width: ListView.view.width
+                            height: 60
+                            color: rowHover.hovered ? Theme.surfaceAlt : "transparent"
+
+                            HoverHandler { id: rowHover }
+
+                            // A load over its limit; the limit itself is the muted line below.
+                            component LoadCell: ColumnLayout {
+                                id: loadCell
+                                required property string load
+                                required property string limit
+                                spacing: 0
                                 Label {
-                                    Layout.fillWidth: true
-                                    elide: Text.ElideRight
-                                    text: [truckCard.modelData.plate, truckCard.modelData.make]
-                                          .filter(part => part !== "").join(" · ")
-                                          + " — " + truckCard.modelData.status
-                                    font.bold: true
+                                    text: loadCell.load
+                                    font.weight: Font.DemiBold
+                                    color: truckRow.modelData.overloaded ? Theme.danger : Theme.text
+                                    Layout.alignment: Qt.AlignRight
                                 }
                                 Label {
-                                    Layout.fillWidth: true
-                                    elide: Text.ElideRight
-                                    visible: text !== ""
-                                    text: truckCard.modelData.note
+                                    text: loadCell.limit !== "" ? qsTr("з %1").arg(loadCell.limit) : qsTr("без ліміту")
+                                    font.pixelSize: Theme.fontSizeCaption
                                     color: Theme.textMuted
-                                }
-                                Label {
-                                    Layout.fillWidth: true
-                                    elide: Text.ElideRight
-                                    text: qsTr("Завантажено: %1 з %2")
-                                          .arg(truckCard.modelData.load).arg(truckCard.modelData.capacity)
-                                    color: truckCard.modelData.overloaded ? Theme.danger : Theme.text
-                                }
-                                ProgressBar {
-                                    Layout.fillWidth: true
-                                    from: 0
-                                    to: 100
-                                    value: Math.min(truckCard.modelData.fillPercent, 100)
+                                    Layout.alignment: Qt.AlignRight
                                 }
                             }
-                            // Stacked, so the card fits next to the prices in a laptop-sized window.
-                            ColumnLayout {
-                                visible: truckCard.modelData.loading
-                                Button {
-                                    text: qsTr("Відправити")
+
+                            RowLayout {
+                                anchors.fill: parent
+                                spacing: truckList.columnSpacing
+
+                                ColumnLayout {
+                                    spacing: 0
                                     Layout.fillWidth: true
-                                    onClicked: Terminal.departTruck(truckCard.modelData.truckId)
+                                    Label {
+                                        text: [truckRow.modelData.plate, truckRow.modelData.make]
+                                              .filter(part => part !== "").join(" · ")
+                                        font.weight: Font.DemiBold
+                                        elide: Text.ElideRight
+                                        Layout.fillWidth: true
+                                    }
+                                    Label {
+                                        visible: text !== ""
+                                        text: truckRow.modelData.note
+                                        font.pixelSize: Theme.fontSizeCaption
+                                        color: Theme.textMuted
+                                        elide: Text.ElideRight
+                                        Layout.fillWidth: true
+                                    }
                                 }
-                                Button {
-                                    text: qsTr("Перенести")
-                                    Layout.fillWidth: true
-                                    onClicked: Terminal.carryOverTruck(truckCard.modelData.truckId)
+                                LoadCell {
+                                    load: truckRow.modelData.loadBoxes
+                                    limit: truckRow.modelData.limitBoxes
+                                    Layout.preferredWidth: truckList.boxesWidth
+                                    Layout.minimumWidth: truckList.boxesWidth
+                                    Layout.maximumWidth: truckList.boxesWidth
                                 }
+                                LoadCell {
+                                    load: truckRow.modelData.loadKg
+                                    limit: truckRow.modelData.limitKg
+                                    Layout.preferredWidth: truckList.kgWidth
+                                    Layout.minimumWidth: truckList.kgWidth
+                                    Layout.maximumWidth: truckList.kgWidth
+                                }
+                                // Full is fine, over the limit is said in red: the facts are
+                                // accepted and the logistician sorts the overload out.
+                                ColumnLayout {
+                                    spacing: Theme.spacingXs
+                                    Layout.preferredWidth: truckList.fillWidth
+                                    Layout.minimumWidth: truckList.fillWidth
+                                    Layout.maximumWidth: truckList.fillWidth
+                                    Label {
+                                        text: truckRow.modelData.overloaded ? qsTr("понад") : truckRow.modelData.fillPercent + "%"
+                                        font.pixelSize: Theme.fontSizeCaption
+                                        font.weight: truckRow.modelData.overloaded ? Font.DemiBold : Font.Normal
+                                        color: truckRow.modelData.overloaded ? Theme.danger : Theme.textMuted
+                                        Layout.alignment: Qt.AlignRight
+                                    }
+                                    ProgressBar {
+                                        from: 0
+                                        to: 100
+                                        value: Math.min(truckRow.modelData.fillPercent, 100)
+                                        Layout.fillWidth: true
+                                    }
+                                }
+                                // A loading truck waits for the decision; a decided one shows it.
+                                RowLayout {
+                                    spacing: Theme.spacingXs
+                                    Layout.preferredWidth: truckList.actionWidth
+                                    Layout.minimumWidth: truckList.actionWidth
+                                    Layout.maximumWidth: truckList.actionWidth
+
+                                    Button {
+                                        visible: truckRow.modelData.loading
+                                        text: qsTr("Відправити")
+                                        Layout.fillWidth: true
+                                        onClicked: Terminal.departTruck(truckRow.modelData.truckId)
+                                    }
+                                    Button {
+                                        visible: truckRow.modelData.loading
+                                        text: qsTr("Перенести")
+                                        Layout.fillWidth: true
+                                        ToolTip.visible: hovered
+                                        ToolTip.text: qsTr("У наступну сесію з тим самим завантаженням")
+                                        onClicked: Terminal.carryOverTruck(truckRow.modelData.truckId)
+                                    }
+                                    Label {
+                                        visible: !truckRow.modelData.loading
+                                        text: truckRow.modelData.status
+                                        font.pixelSize: Theme.fontSizeCaption
+                                        color: Theme.textMuted
+                                        elide: Text.ElideRight
+                                        horizontalAlignment: Text.AlignRight
+                                        Layout.fillWidth: true
+                                    }
+                                }
+                            }
+                            Rectangle {
+                                anchors.bottom: parent.bottom
+                                width: parent.width
+                                height: 1
+                                color: Theme.surfaceAlt
                             }
                         }
                     }
                 }
+            }
+        }
+    }
 
-                // New truck: at least one limit, an empty field means "no limit".
-                GridLayout {
-                    id: newTruck
+    // A new truck (at least one limit, an empty field means "no limit"), or the
+    // same plate and limits as a truck of the previous session on a new trip.
+    Dialog {
+        id: truckDialog
+        anchors.centerIn: parent
+        width: 420
+        modal: true
+        title: qsTr("Нова фура")
+        standardButtons: Dialog.Cancel
+
+        function add() {
+            truckError.text = Terminal.addTruck(plate.text, make.text, note.text,
+                                                boxLimit.text, weightLimit.text)
+            if (truckError.text === "")
+                close()
+        }
+
+        onOpened: {
+            plate.clear()
+            make.clear()
+            note.clear()
+            boxLimit.clear()
+            weightLimit.clear()
+            truckError.text = ""
+            plate.forceActiveFocus()
+        }
+
+        ColumnLayout {
+            anchors.fill: parent
+            spacing: Theme.spacingS
+
+            GridLayout {
+                Layout.fillWidth: true
+                columns: 2
+                columnSpacing: Theme.spacingM
+                rowSpacing: Theme.spacingXs
+
+                FieldCaption { caption: qsTr("Номер") }
+                FieldCaption { caption: qsTr("Марка") }
+                TextField {
+                    id: plate
+                    placeholderText: qsTr("BI1234AA")
                     Layout.fillWidth: true
-                    columns: 4
-
-                    function add() {
-                        truckError.text = Terminal.addTruck(plate.text, make.text, note.text,
-                                                            boxLimit.text, weightLimit.text)
-                        if (truckError.text === "") {
-                            plate.clear()
-                            make.clear()
-                            note.clear()
-                            boxLimit.clear()
-                            weightLimit.clear()
-                        }
-                    }
-
-                    TextField {
-                        id: plate
-                        placeholderText: qsTr("Номер, напр. BI1234AA")
-                        Layout.fillWidth: true
-                    }
-                    TextField {
-                        id: make
-                        placeholderText: qsTr("Марка")
-                        Layout.fillWidth: true
-                    }
-                    TextField {
-                        id: boxLimit
-                        placeholderText: qsTr("ящиків")
-                        inputMethodHints: Qt.ImhDigitsOnly
-                        validator: IntValidator { bottom: 0 }
-                        Layout.preferredWidth: 80
-                    }
-                    TextField {
-                        id: weightLimit
-                        placeholderText: qsTr("кг")
-                        inputMethodHints: Qt.ImhDigitsOnly
-                        validator: IntValidator { bottom: 0 }
-                        Layout.preferredWidth: 80
-                    }
-                    TextField {
-                        id: note
-                        placeholderText: qsTr("Водій / куди їде")
-                        Layout.columnSpan: 2
-                        Layout.fillWidth: true
-                    }
-                    Button {
-                        text: qsTr("Додати фуру")
-                        Layout.columnSpan: 2
-                        Layout.fillWidth: true
-                        onClicked: newTruck.add()
-                    }
+                    onAccepted: truckDialog.add()
+                }
+                TextField {
+                    id: make
+                    Layout.fillWidth: true
+                    onAccepted: truckDialog.add()
                 }
 
-                // Same plate and limits as a truck from the previous session, but a new trip.
+                FieldCaption { caption: qsTr("Ліміт, ящиків") }
+                FieldCaption { caption: qsTr("Ліміт, кг") }
+                TextField {
+                    id: boxLimit
+                    inputMethodHints: Qt.ImhDigitsOnly
+                    validator: IntValidator { bottom: 0 }
+                    Layout.fillWidth: true
+                    onAccepted: truckDialog.add()
+                }
+                TextField {
+                    id: weightLimit
+                    inputMethodHints: Qt.ImhDigitsOnly
+                    validator: IntValidator { bottom: 0 }
+                    Layout.fillWidth: true
+                    onAccepted: truckDialog.add()
+                }
+
+                FieldCaption { caption: qsTr("Водій / куди їде"); Layout.columnSpan: 2 }
+                TextField {
+                    id: note
+                    Layout.columnSpan: 2
+                    Layout.fillWidth: true
+                    onAccepted: truckDialog.add()
+                }
+            }
+            Label {
+                text: qsTr("Потрібен хоча б один ліміт; порожнє поле — без ліміту.")
+                font.pixelSize: Theme.fontSizeCaption
+                color: Theme.textMuted
+                wrapMode: Text.WordWrap
+                Layout.fillWidth: true
+            }
+            Button {
+                text: qsTr("Додати фуру")
+                highlighted: true
+                Layout.fillWidth: true
+                onClicked: truckDialog.add()
+            }
+
+            ColumnLayout {
+                visible: Terminal.previousTrucks.length > 0
+                spacing: Theme.spacingS
+                Layout.fillWidth: true
+                Layout.topMargin: Theme.spacingM
+
+                SectionCaption { text: qsTr("Або повторити з минулої сесії") }
                 RowLayout {
+                    spacing: Theme.spacingS
                     Layout.fillWidth: true
-                    visible: Terminal.previousTrucks.length > 0
 
                     ComboBox {
                         id: previousTruck
@@ -303,18 +504,18 @@ Page {
                                      .arg(Terminal.previousTrucks[currentIndex].capacity)
                     }
                     Button {
-                        text: qsTr("Повторити фуру з минулої сесії")
+                        text: qsTr("Повторити")
                         enabled: previousTruck.currentIndex >= 0
-                        onClicked: truckError.text = Terminal.repeatTruck(previousTruck.currentValue)
+                        onClicked: {
+                            truckError.text = Terminal.repeatTruck(previousTruck.currentValue)
+                            if (truckError.text === "")
+                                truckDialog.close()
+                        }
                     }
                 }
-
-                Label {
-                    id: truckError
-                    visible: text !== ""
-                    color: Theme.danger
-                }
             }
+
+            ErrorLabel { id: truckError }
         }
     }
 
@@ -323,10 +524,21 @@ Page {
         anchors.centerIn: parent
         modal: true
         title: qsTr("Закрити сесію?")
-        standardButtons: Dialog.Yes | Dialog.No
 
         Label {
             text: qsTr("Після закриття змінити сесію можна лише поправкою з поясненням.")
+        }
+
+        footer: DialogButtonBox {
+            Button {
+                text: qsTr("Закрити сесію")
+                highlighted: true
+                DialogButtonBox.buttonRole: DialogButtonBox.AcceptRole
+            }
+            Button {
+                text: qsTr("Скасувати")
+                DialogButtonBox.buttonRole: DialogButtonBox.RejectRole
+            }
         }
         onAccepted: Terminal.closeSession()
     }

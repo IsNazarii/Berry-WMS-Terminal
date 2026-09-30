@@ -824,6 +824,11 @@ QVariantMap Terminal::truckInfo(const Truck& truck) const {
         {"note", QString::fromStdString(truck.details().note)},
         {"capacity", describeCargo(truck.capacity())},
         {"load", describeCargo(load)},
+        // Bare numbers for the session table; an empty limit means "no limit".
+        {"loadBoxes", QString::number(load.boxes)},
+        {"loadKg", kilogramsText(load.weight)},
+        {"limitBoxes", truck.capacity().boxes != 0 ? QString::number(truck.capacity().boxes) : QString{}},
+        {"limitKg", truck.capacity().weight.isZero() ? QString{} : kilogramsText(truck.capacity().weight)},
         {"fillPercent", truck.fillPercent(load)},
         {"overloaded", truck.isOverloaded(load)},
         {"status", statusText(truck.status())},

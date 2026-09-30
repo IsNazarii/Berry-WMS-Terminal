@@ -52,7 +52,8 @@ class Terminal : public QObject {
     Q_PROPERTY(QVariantList crops READ cropList CONSTANT)
     // {cropCode: price in hryvnias, "85,00"}; a crop without a price is missing.
     Q_PROPERTY(QVariantMap prices READ priceMap NOTIFY pricesChanged)
-    // [{truckId, plate, make, note, capacity, load, fillPercent, overloaded, status, loading}] of the session.
+    // [{truckId, plate, make, note, capacity, load, loadBoxes, loadKg, limitBoxes, limitKg,
+    //   fillPercent, overloaded, status, loading}] of the session.
     Q_PROPERTY(QVariantList trucks READ truckList NOTIFY trucksChanged)
     // [{index, plate, make, note, capacity}] of the previous session, for "repeat the truck from yesterday".
     Q_PROPERTY(QVariantList previousTrucks READ previousTruckList NOTIFY sessionChanged)

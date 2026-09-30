@@ -21,6 +21,7 @@ qt_add_qml_module(wms_ui
         qml/screens/SupplierPicker.qml
         qml/screens/SectionCaption.qml
         qml/screens/FieldCaption.qml
+        qml/screens/ColumnHeader.qml
         qml/screens/AllocationScreen.qml
         qml/screens/WarehouseScreen.qml
         qml/screens/CashScreen.qml

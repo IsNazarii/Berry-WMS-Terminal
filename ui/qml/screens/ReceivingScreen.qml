@@ -514,24 +514,16 @@ Page {
                         visible: lineList.count > 0
                         color: Theme.surface
 
-                        component HeaderCell: Label {
-                            font.pixelSize: 11
-                            font.weight: Font.DemiBold
-                            font.capitalization: Font.AllUppercase
-                            color: Theme.textMuted
-                            horizontalAlignment: Text.AlignRight
-                            elide: Text.ElideRight
-                        }
 
                         RowLayout {
                             anchors.fill: parent
                             spacing: lineList.columnSpacing
-                            HeaderCell { text: qsTr("№"); horizontalAlignment: Text.AlignLeft; Layout.preferredWidth: lineList.indexWidth }
-                            HeaderCell { text: qsTr("Культура"); horizontalAlignment: Text.AlignLeft; Layout.fillWidth: true }
-                            HeaderCell { text: qsTr("Ящ."); Layout.preferredWidth: lineList.boxesWidth }
-                            HeaderCell { text: qsTr("Нетто, кг"); Layout.preferredWidth: lineList.netWidth }
-                            HeaderCell { text: qsTr("Ціна"); Layout.preferredWidth: lineList.priceWidth }
-                            HeaderCell { text: qsTr("Сума, грн"); Layout.preferredWidth: lineList.amountWidth }
+                            ColumnHeader { text: qsTr("№"); horizontalAlignment: Text.AlignLeft; Layout.preferredWidth: lineList.indexWidth }
+                            ColumnHeader { text: qsTr("Культура"); horizontalAlignment: Text.AlignLeft; Layout.fillWidth: true }
+                            ColumnHeader { text: qsTr("Ящ."); Layout.preferredWidth: lineList.boxesWidth }
+                            ColumnHeader { text: qsTr("Нетто, кг"); Layout.preferredWidth: lineList.netWidth }
+                            ColumnHeader { text: qsTr("Ціна"); Layout.preferredWidth: lineList.priceWidth }
+                            ColumnHeader { text: qsTr("Сума, грн"); Layout.preferredWidth: lineList.amountWidth }
                             Item { Layout.preferredWidth: lineList.actionWidth }
                         }
                         Rectangle {

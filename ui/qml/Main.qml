@@ -87,6 +87,7 @@ ApplicationWindow {
                 text: Terminal.hasSupplier
                       ? qsTr("Постачальник: %1 · борг: %2").arg(Terminal.supplierName).arg(Terminal.supplierBalance)
                       : qsTr("Чек не обрано")
+                elide: Text.ElideRight
                 Layout.fillWidth: true
             }
             Label {

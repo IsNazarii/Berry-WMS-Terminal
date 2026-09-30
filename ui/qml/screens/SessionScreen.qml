@@ -234,22 +234,14 @@ Page {
                             visible: truckList.count > 0
                             color: Theme.surface
 
-                            component HeaderCell: Label {
-                                font.pixelSize: 11
-                                font.weight: Font.DemiBold
-                                font.capitalization: Font.AllUppercase
-                                color: Theme.textMuted
-                                horizontalAlignment: Text.AlignRight
-                                elide: Text.ElideRight
-                            }
 
                             RowLayout {
                                 anchors.fill: parent
                                 spacing: truckList.columnSpacing
-                                HeaderCell { text: qsTr("Фура"); horizontalAlignment: Text.AlignLeft; Layout.fillWidth: true }
-                                HeaderCell { text: qsTr("Ящиків"); Layout.preferredWidth: truckList.boxesWidth }
-                                HeaderCell { text: qsTr("Кг"); Layout.preferredWidth: truckList.kgWidth }
-                                HeaderCell { text: qsTr("Заповн."); Layout.preferredWidth: truckList.fillWidth }
+                                ColumnHeader { text: qsTr("Фура"); horizontalAlignment: Text.AlignLeft; Layout.fillWidth: true }
+                                ColumnHeader { text: qsTr("Ящиків"); Layout.preferredWidth: truckList.boxesWidth }
+                                ColumnHeader { text: qsTr("Кг"); Layout.preferredWidth: truckList.kgWidth }
+                                ColumnHeader { text: qsTr("Заповн."); Layout.preferredWidth: truckList.fillWidth }
                                 Item { Layout.preferredWidth: truckList.actionWidth }
                             }
                             Rectangle {

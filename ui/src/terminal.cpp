@@ -94,7 +94,7 @@ QString localTime(TimePoint at) {
 QString describeCargo(const Cargo& cargo) {
     QStringList parts;
     if (cargo.boxes != 0) parts << QString("%1 ящ.").arg(cargo.boxes);
-    if (!cargo.weight.isZero()) parts << QString::fromStdString(formatWeight(cargo.weight));
+    if (!cargo.weight.isZero()) parts << QString("%1 кг").arg(kilogramsText(cargo.weight));
     return parts.isEmpty() ? QString("0") : parts.join(" · ");
 }
 
@@ -130,7 +130,6 @@ Money amountOf(const OpenReceipt& receipt) {
 }
 
 QString money(Money value) { return QString::fromStdString(formatMoney(value)); }
-QString weight(Weight value) { return QString::fromStdString(formatWeight(value)); }
 
 // As the operator types it, so "pay the whole debt" can fill the amount field.
 QString moneyInput(Money value) {
@@ -355,7 +354,8 @@ QVariantList Terminal::allocationSources() const {
             {"supplierName", supplierNameOf(receipt.supplierId())},
             {"openedAt", localTime(openedAt)},
             {"open", open},
-            {"left", describeCargo(left)},
+            {"leftBoxes", left.boxes},
+            {"leftKg", kilogramsText(left.weight)},
         });
     };
     if (workDay_) {
@@ -392,7 +392,7 @@ QVariantList Terminal::allocationLines() const {
                     {"index", static_cast<int>(i)},
                     {"crop", cropName(w.cropCode)},
                     {"boxes", w.boxCount},
-                    {"net", weight(w.net())},
+                    {"net", kilogramsText(w.net())},
                     {"cancelled", w.cancelled},
                     {"placedIn", placedIn},
                 });
@@ -415,7 +415,7 @@ QVariantList Terminal::allocationCrops() const {
                     {"cropCode", QString::fromStdString(crop)},
                     {"name", cropName(crop)},
                     {"leftBoxes", left.boxes},
-                    {"left", describeCargo(left)},
+                    {"leftKg", kilogramsText(left.weight)},
                 });
             }
         },
@@ -434,6 +434,10 @@ QVariantList Terminal::destinationList() const {
             {"destinationId", info["truckId"]},
             {"title", make.isEmpty() ? info["plate"].toString() : QString("%1 · %2").arg(info["plate"].toString(), make)},
             {"detail", tr("%1 з %2").arg(info["load"].toString(), info["capacity"].toString())},
+            {"loadBoxes", info["loadBoxes"]},
+            {"loadKg", info["loadKg"]},
+            {"limitBoxes", info["limitBoxes"]},
+            {"limitKg", info["limitKg"]},
             {"fillPercent", info["fillPercent"]},
             {"overloaded", info["overloaded"]},
             {"warehouse", false},

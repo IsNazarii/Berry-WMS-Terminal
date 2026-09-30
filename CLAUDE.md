@@ -137,7 +137,7 @@ $CM/cmake -S . -B build -G Ninja && $CM/cmake --build build && $CM/ctest --test-
 - Git: гілка `main`, remote `origin` = git@github.com:IsNazarii/Berry-WMS-Terminal.git (SSH-ключ `~/.ssh/id_ed25519` працює — push можна робити з термінала).
 - GoogleTest у системі не встановлено — тягнеться FetchContent (потрібна мережа при першій конфігурації).
 
-## Стан і наступні кроки (оновлено 26.09.2026)
+## Стан і наступні кроки (оновлено 30.09.2026)
 Ядро (`core/`): `Receipt` = постачальник + `Settlement` (`OnSite`/`HandedOver`) + `vector<Weighing>`
 (`priceSource`: `DayPrice`/`Manual`; `cancelled` — рядок лишається, не рахується); `Payment`;
 `OpenReceipt` (чек, що зважується: `add`/`cancel`, `validateClose`/`close(settlement)` → `Receipt` з тим самим
@@ -185,7 +185,9 @@ UI (`ui/`, модуль `BerryWms.Ui`, статична бібліотека + `
 
 Екран «Сесія» — у стилі «Прийому» ✅: ціни дня (панель зліва), фури таблицею з голими числами
 (`truckInfo`: `loadBoxes`/`loadKg`/`limitBoxes`/`limitKg`), нова фура й «повторити з минулої» — діалог
-«Додати фуру…». Спільні підписи — файли `SectionCaption.qml`, `FieldCaption.qml`. Урок: колонки таблиці
+«Додати фуру…». Спільні підписи — файли `SectionCaption.qml`, `FieldCaption.qml`, `ColumnHeader.qml`.
+Екран «Розподіл» — у стилі «Прийому» ✅: таблиця палет (№ · культура · ящ. · нетто · де), смуга «Куди», фури з
+`loadBoxes`/`limitBoxes`/`loadKg`/`limitKg`. `describeCargo` (рядки UI) тепер у екранному форматі (`2 000,0 кг`). Урок: колонки таблиці
 з кнопками — фіксувати `Layout.minimumWidth`/`maximumWidth`, інакше кнопки розтягують колонку й вона
 не збігається із заголовком. Знімок екрана без вікна: тимчасово в `main.cpp` `grabWindow().save()` за таймером.
 
@@ -222,8 +224,10 @@ F2 → `SupplierPicker`; по центру обраний `cashSupplierId` (ок
 сума — `balanceEffect()`). Сигнал `cashChanged` ← `journalChanged`. `Payment` не знає оператора — ❓ додати разом зі SQLite.
 
 Наступні кроки (кожен — окремий коміт, ядро тест-першим):
-1. UI: інші екрани (Розподіл, Склад, Каса; Сесія ✅) — у стилі «Прийому»: панелі `Frame`, підписи-капітель,
-   таблиці з голими числами (`display_format.h`) замість рядків «X кг · Y грн» з ядра.
+1. UI: екрани «Склад», потім «Каса» — у стилі «Прийому» (Сесія ✅, Розподіл ✅): панелі `Frame`, `SectionCaption`,
+   таблиці з `ColumnHeader` і голими числами (`display_format.h`), фіксовані ширини колонок з кнопками.
+   «Склад» використовує `destinations` (поле `detail` — рядок; для фур уже є `loadBoxes`/`limitBoxes`/…) і `stock`.
+   Перевірка: знімки при 1024×600 і 1440×860 з `QT_SCALE_FACTOR=1` (тимчасовий harness у `main.cpp`, відкотити).
 2. UI: прохід по UX. Стандартні кнопки діалогів англійською («Cancel») — підключити переклад Qt (`qtbase_uk`).
 - Історії руху складу (прихід/відвантаження) в UI нема — `Journal` не віддає записи; за потреби — запит у ядрі.
 - Повідомлення ядра про розподіл містять код культури (`raspberry`), а не назву — назви живуть у UI (`kCrops`).

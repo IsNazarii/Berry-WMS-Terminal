@@ -70,19 +70,19 @@ class Terminal : public QObject {
     // {openedAt, boxes, net, amount} of the active receipt without cancelled lines; empty when none.
     Q_PROPERTY(QVariantMap activeSummary READ activeSummary NOTIFY receiptsChanged)
 
-    // Allocation. [{receiptId, supplierName, openedAt, open, left}]: open receipts
+    // Allocation. [{receiptId, supplierName, openedAt, open, leftBoxes, leftKg}]: open receipts
     // of the session, then closed ones, that still have boxes to allocate.
     Q_PROPERTY(QVariantList allocationSources READ allocationSources NOTIFY allocationChanged)
     // The receipt the allocation screen works on; independent of the active one,
     // so loading a truck never changes where the next weighing goes.
     Q_PROPERTY(QString allocationReceiptId READ allocationReceiptId NOTIFY allocationChanged)
     Q_PROPERTY(QString allocationSupplierName READ allocationSupplierName NOTIFY allocationChanged)
-    // [{index, crop, boxes, net, cancelled, placedIn}]; placedIn is empty while the pallet is free.
+    // [{index, crop, boxes, net, cancelled, placedIn}], net in kg as a bare number; placedIn is empty while the pallet is free.
     Q_PROPERTY(QVariantList allocationLines READ allocationLines NOTIFY allocationChanged)
-    // [{cropCode, name, leftBoxes, left}] of the selected receipt, only crops with boxes left.
+    // [{cropCode, name, leftBoxes, leftKg}] of the selected receipt, only crops with boxes left.
     Q_PROPERTY(QVariantList allocationCrops READ allocationCrops NOTIFY allocationChanged)
-    // [{destinationId, title, detail, fillPercent, overloaded, warehouse}]: trucks
-    // of the session still loading, then the warehouse (destinationId "warehouse").
+    // [{destinationId, title, detail, loadBoxes, loadKg, limitBoxes, limitKg, fillPercent, overloaded,
+    //   warehouse}]: trucks of the session still loading, then the warehouse (destinationId "warehouse").
     Q_PROPERTY(QVariantList destinations READ destinationList NOTIFY allocationChanged)
 
     // Warehouse. [{cropCode, name, boxes, stock, negative}] for every crop, across all

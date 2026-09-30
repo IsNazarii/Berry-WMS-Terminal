@@ -28,6 +28,9 @@ QtObject {
     readonly property color danger: dark ? "#F2807A" : "#B3261E"
     readonly property color dangerSoft: dark ? "#3A1F22" : "#FBE7E5"
 
+    // Dims the window behind a modal dialog.
+    readonly property color overlay: dark ? "#99000000" : "#661C1B2B"
+
     // The scale indicator is an instrument, dark in both themes.
     readonly property color scaleBg: dark ? "#0B0B10" : "#15161F"
     readonly property color scaleDigit: "#7CF0B0"
@@ -36,6 +39,7 @@ QtObject {
 
     // A cancelled weighing stays visible, faded.
     readonly property real cancelledOpacity: 0.45
+    readonly property real disabledOpacity: 0.4
 
     readonly property int spacingXs: 4
     readonly property int spacingS: 8
@@ -49,12 +53,12 @@ QtObject {
     readonly property int controlHeight: 40
     readonly property int controlHeightLarge: 48
 
-    // Onest ships with the app (ui/fonts): the terminal must look the same on
+    // Onest ships with the app (ui/style/fonts): the terminal must look the same on
     // any laptop. One loader per weight, all under the family "Onest".
-    readonly property FontLoader onestRegular: FontLoader { source: "../fonts/Onest-Regular.ttf" }
-    readonly property FontLoader onestMedium: FontLoader { source: "../fonts/Onest-Medium.ttf" }
-    readonly property FontLoader onestSemiBold: FontLoader { source: "../fonts/Onest-SemiBold.ttf" }
-    readonly property FontLoader onestBold: FontLoader { source: "../fonts/Onest-Bold.ttf" }
+    readonly property FontLoader onestRegular: FontLoader { source: "fonts/Onest-Regular.ttf" }
+    readonly property FontLoader onestMedium: FontLoader { source: "fonts/Onest-Medium.ttf" }
+    readonly property FontLoader onestSemiBold: FontLoader { source: "fonts/Onest-SemiBold.ttf" }
+    readonly property FontLoader onestBold: FontLoader { source: "fonts/Onest-Bold.ttf" }
     readonly property string fontUi: onestRegular.font.family
     // Tabular figures: every digit is equally wide, so weights and sums line up
     // in columns and the scale readout does not jitter.

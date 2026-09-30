@@ -14,8 +14,8 @@ ApplicationWindow {
     visibility: Window.Maximized
     title: qsTr("Berry WMS — термінал приймальника")
 
-    // Stock controls draw from the palette, so feeding it the tokens themes
-    // them too; custom-drawn controls use Theme directly.
+    // Our style (ui/style) draws from Theme; controls it does not override
+    // fall back to Basic, which draws from the palette — so it gets the tokens too.
     color: Theme.bg
     font.family: Theme.fontUi
     font.pixelSize: Theme.fontSizeBody

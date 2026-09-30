@@ -1,0 +1,45 @@
+import QtQuick
+import QtQuick.Templates as T
+
+// Three looks: outlined (default), accent fill (`highlighted` — the one primary
+// action of a panel) and text-only (`flat` — secondary, rarely used actions).
+T.Button {
+    id: control
+
+    implicitWidth: Math.max(implicitBackgroundWidth + leftInset + rightInset,
+                            implicitContentWidth + leftPadding + rightPadding)
+    implicitHeight: Math.max(implicitBackgroundHeight + topInset + bottomInset,
+                             implicitContentHeight + topPadding + bottomPadding)
+    padding: Theme.spacingS
+    horizontalPadding: control.flat ? Theme.spacingS : Theme.spacingL
+    font.weight: control.flat ? Font.Medium : Font.DemiBold
+    opacity: control.enabled ? 1 : Theme.disabledOpacity
+
+    contentItem: Text {
+        text: control.text
+        font: control.font
+        color: control.highlighted ? Theme.onAccent : control.flat ? Theme.textMuted : Theme.text
+        horizontalAlignment: Text.AlignHCenter
+        verticalAlignment: Text.AlignVCenter
+        elide: Text.ElideRight
+    }
+
+    background: Rectangle {
+        implicitWidth: 64
+        implicitHeight: control.flat ? 32 : Theme.controlHeight
+        radius: Theme.radiusS
+        color: {
+            if (control.highlighted)
+                return control.down ? Qt.darker(Theme.accent, 1.15)
+                     : control.hovered ? Qt.lighter(Theme.accent, 1.1) : Theme.accent
+            if (control.down)
+                return Theme.border
+            if (control.hovered || control.checked)
+                return Theme.surfaceAlt
+            return control.flat ? "transparent" : Theme.surface
+        }
+        // Keyboard focus must be visible: the operator works with Tab and Enter.
+        border.width: control.visualFocus ? 2 : (control.flat || control.highlighted ? 0 : 1)
+        border.color: control.visualFocus ? (control.highlighted ? Theme.text : Theme.accent) : Theme.border
+    }
+}

@@ -195,9 +195,10 @@ UI — QML-модуль `BerryWms.Ui` (статична бібліотека `wm
 
 Склад не зникає між сесіями, тож залишок видно й без відкритої сесії.
 
-- **Зліва — залишок** (`stock`) за кожною культурою: «N ящ. · M кг» або «порожньо». Від'ємний
-  залишок (два термінали офлайн відвантажили ті самі ящики) — червоним: факти не відхиляються,
-  розбирається логіст. Біля культури із залишком — поле кількості й «Відвантажити».
+- **Зліва — залишок** (`stock`) таблицею «Культура · Ящ. · Вага, кг» (голі числа; порожні культури
+  приглушені). Від'ємний залишок (два термінали офлайн відвантажили ті самі ящики) — червоним: факти
+  не відхиляються, розбирається логіст. Над таблицею смуга «Куди: <фура>»; у відкритій сесії біля
+  культури із залишком — поле кількості й «У фуру →» (колонка фіксованої ширини).
 - **Справа — фури сесії**, що ще завантажуються (ті самі дані, що й на «Розподілі», без самого складу).
 
 Відвантаження — `shipFromStock(crop, boxes, truckId)`: `Journal::shipmentOf` ділить вагу із
@@ -249,7 +250,7 @@ UI — QML-модуль `BerryWms.Ui` (статична бібліотека `wm
 | `closeBlockers` | `trucksChanged` | `WorkDay::validateClose()` |
 | `openReceipts`, `activeReceiptId`, `activeLines`, `activeSummary` | `receiptsChanged` | прийом; вага й гроші — голі числа для таблиці (`display_format.h`) |
 | `allocationSources`, `allocationReceiptId`, `allocationSupplierName`, `allocationLines`, `allocationCrops`, `destinations` | `allocationChanged` | розподіл |
-| `stock` | `journalChanged` | `[{cropCode, name, boxes, stock, negative}]` — залишок складу за культурами |
+| `stock` | `journalChanged` | `[{cropCode, name, boxes, kg, empty, negative}]` — залишок складу за культурами (`kg` — голе число) |
 | `debtors` | `journalChanged` | `[{supplierId, name, balance, overpaid}]` — ненульові баланси |
 | `cashSupplierId`, `cashSupplierName`, `cashBalance`, `cashDebtInput`, `cashHistory` | `cashChanged` | каса |
 | `hasSupplier`, `supplierName` | `currentSupplierChanged` | постачальник активного чека |

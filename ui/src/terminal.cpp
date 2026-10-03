@@ -467,7 +467,8 @@ QVariantList Terminal::stockList() const {
             {"cropCode", QString::fromUtf8(crop.code)},
             {"name", QString::fromUtf8(crop.name)},
             {"boxes", held.boxes},
-            {"stock", held.boxes == 0 && held.weight.isZero() ? tr("порожньо") : describeCargo(held)},
+            {"kg", kilogramsText(held.weight)},
+            {"empty", held.boxes == 0 && held.weight.isZero()},
             {"negative", held.boxes < 0},
         });
     }

@@ -85,7 +85,7 @@ class Terminal : public QObject {
     //   warehouse}]: trucks of the session still loading, then the warehouse (destinationId "warehouse").
     Q_PROPERTY(QVariantList destinations READ destinationList NOTIFY allocationChanged)
 
-    // Warehouse. [{cropCode, name, boxes, stock, negative}] for every crop, across all
+    // Warehouse. [{cropCode, name, boxes, kg, empty, negative}] for every crop (kg a bare number), across all
     // sessions; negative after an offline conflict, shown so the logistician can sort it out.
     Q_PROPERTY(QVariantList stock READ stockList NOTIFY journalChanged)
 

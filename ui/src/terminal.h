@@ -100,6 +100,7 @@ class Terminal : public QObject {
     // The whole debt as the operator would type it ("1234,50"); empty when we owe nothing.
     Q_PROPERTY(QString cashDebtInput READ cashDebtInput NOTIFY cashChanged)
     // [{at, title, detail, effect, payment}] of the chosen supplier, oldest first.
+    // Sums here and in debtors/cashBalance/balanceAfter are bare hryvnias ("8 823,00", "−50,00").
     Q_PROPERTY(QVariantList cashHistory READ cashHistory NOTIFY cashChanged)
 
 public:

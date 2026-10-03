@@ -129,8 +129,6 @@ Money amountOf(const OpenReceipt& receipt) {
     return sum;
 }
 
-QString money(Money value) { return QString::fromStdString(formatMoney(value)); }
-
 // As the operator types it, so "pay the whole debt" can fill the amount field.
 QString moneyInput(Money value) {
     return QString("%1,%2").arg(value.raw() / 100).arg(value.raw() % 100, 2, 10, QChar('0'));
@@ -488,7 +486,7 @@ QVariantList Terminal::debtorList() const {
         list.append(QVariantMap{
             {"supplierId", qint64{supplier->id()}},
             {"name", QString::fromStdString(supplier->fullName())},
-            {"balance", money(balance)},
+            {"balance", hryvniasText(balance)},
             {"overpaid", balance.isNegative()},
         });
     }
@@ -500,7 +498,7 @@ QString Terminal::cashSupplierName() const {
 }
 
 QString Terminal::cashBalance() const {
-    return cashSupplierId_ ? money(journal_.balanceOf(*cashSupplierId_)) : QString{};
+    return cashSupplierId_ ? hryvniasText(journal_.balanceOf(*cashSupplierId_)) : QString{};
 }
 
 QString Terminal::cashDebtInput() const {
@@ -522,7 +520,7 @@ QVariantList Terminal::cashHistory() const {
             {"at", localDateTime(record->createdAt())},
             {"title", text.left(newline)},
             {"detail", newline < 0 ? QString{} : text.mid(newline + 1)},
-            {"effect", effect.isNegative() ? money(effect) : "+" + money(effect)},
+            {"effect", effect.isNegative() ? hryvniasText(effect) : "+" + hryvniasText(effect)},
             {"payment", record->kind() == TransactionKind::Payment},
         });
     }
@@ -779,7 +777,7 @@ void Terminal::selectCashSupplier(qint64 supplierId) {
 QString Terminal::balanceAfter(const QString& amount) const {
     const auto paid = parseMoney(amount.toStdString());
     if (!cashSupplierId_ || !paid) return {};
-    return money(journal_.balanceOf(*cashSupplierId_) - *paid);
+    return hryvniasText(journal_.balanceOf(*cashSupplierId_) - *paid);
 }
 
 QString Terminal::pay(const QString& amount, bool bankTransfer) {

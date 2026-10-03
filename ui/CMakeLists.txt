@@ -22,6 +22,7 @@ qt_add_qml_module(wms_ui
         qml/screens/SectionCaption.qml
         qml/screens/FieldCaption.qml
         qml/screens/ColumnHeader.qml
+        qml/screens/NoSessionNotice.qml
         qml/screens/AllocationScreen.qml
         qml/screens/WarehouseScreen.qml
         qml/screens/CashScreen.qml

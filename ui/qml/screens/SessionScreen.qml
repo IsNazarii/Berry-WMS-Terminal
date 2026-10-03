@@ -85,9 +85,18 @@ Page {
         }
 
         // Shown right away rather than on a failed click: the operator sees what is left to do.
-        ErrorLabel {
+        // A to-do list, not an error: the warning tone, not the danger one.
+        Label {
             visible: Terminal.closeBlockers.length > 0
-            text: qsTr("Закрити сесію ще не можна:") + "\n• " + Terminal.closeBlockers.join("\n• ")
+            text: qsTr("Щоб закрити сесію:") + "\n• " + Terminal.closeBlockers.join("\n• ")
+            color: Theme.warn
+            wrapMode: Text.WordWrap
+            padding: Theme.spacingS
+            Layout.fillWidth: true
+            background: Rectangle {
+                color: Theme.surfaceAlt
+                radius: Theme.radiusS
+            }
         }
 
         RowLayout {

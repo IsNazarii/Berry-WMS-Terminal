@@ -141,8 +141,8 @@ ApplicationWindow {
         currentIndex: tabs.currentIndex
 
         SessionScreen {}
-        ReceivingScreen {}
-        AllocationScreen {}
+        ReceivingScreen { onSessionRequested: tabs.currentIndex = 0 }
+        AllocationScreen { onSessionRequested: tabs.currentIndex = 0 }
         WarehouseScreen {}
         CashScreen {}
     }

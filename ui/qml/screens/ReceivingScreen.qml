@@ -10,6 +10,9 @@ import BerryWms.Ui
 // Layout follows the HTML mockup (see CLAUDE.md, "Стиль").
 Page {
     id: screen
+
+    // No session: the main window switches to the session screen.
+    signal sessionRequested()
     title: qsTr("Прийом")
 
     readonly property ScaleMonitor scales: Terminal.scales
@@ -84,11 +87,10 @@ Page {
         }
     }
 
-    Label {
-        anchors.centerIn: parent
+    NoSessionNotice {
         visible: !Terminal.sessionOpen
-        text: qsTr("Прийом можливий лише у відкритій сесії")
-        font.pixelSize: Theme.fontSizeLarge
+        text: qsTr("Прийом можливий лише у відкритій сесії.")
+        onSessionRequested: screen.sessionRequested()
     }
 
     RowLayout {
@@ -412,12 +414,16 @@ Page {
                 }
 
                 RowLayout {
+                    id: recordActions
                     Layout.fillWidth: true
                     enabled: screen.hasReceipt
                     spacing: Theme.spacingS
 
+                    // The main action never gets elided: on a narrow screen it says less,
+                    // and the warning button gives way instead.
                     Button {
-                        text: qsTr("Записати зважування  ·  Enter")
+                        text: recordActions.width < 520 ? qsTr("Записати  ·  Enter") : qsTr("Записати зважування  ·  Enter")
+                        Layout.minimumWidth: implicitWidth
                         highlighted: true
                         font.pixelSize: Theme.fontSizeField
                         enabled: screen.scales.stable || manualWeight.text.trim() !== ""
@@ -428,6 +434,8 @@ Page {
                     // A separate, deliberate action: the scale may keep flipping between two steps.
                     WarningButton {
                         text: qsTr("Прийняти нестабільну")
+                        Layout.fillWidth: true
+                        Layout.maximumWidth: implicitWidth
                         enabled: !screen.scales.stable && manualWeight.text.trim() === ""
                         Layout.preferredHeight: Theme.controlHeightLarge
                         onClicked: weighingForm.record(true)

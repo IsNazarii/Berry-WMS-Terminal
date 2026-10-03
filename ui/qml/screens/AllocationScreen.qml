@@ -10,6 +10,9 @@ import BerryWms.Ui
 // picks a destination once and then sends pallets or boxes into it.
 Page {
     id: screen
+
+    // No session: the main window switches to the session screen.
+    signal sessionRequested()
     title: qsTr("Розподіл по фурах")
 
     // A truck id or "warehouse"; kept in QML, the core checks it on every allocation.
@@ -32,11 +35,10 @@ Page {
         color: Theme.surfaceAlt
     }
 
-    Label {
-        anchors.centerIn: parent
+    NoSessionNotice {
         visible: !Terminal.sessionOpen
-        text: qsTr("Розподіл можливий лише у відкритій сесії")
-        font.pixelSize: Theme.fontSizeLarge
+        text: qsTr("Розподіл можливий лише у відкритій сесії.")
+        onSessionRequested: screen.sessionRequested()
     }
 
     RowLayout {

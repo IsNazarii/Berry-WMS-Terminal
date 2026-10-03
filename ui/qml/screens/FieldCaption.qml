@@ -21,7 +21,8 @@ RowLayout {
         text: fieldCaption.hint
         font.pixelSize: Theme.fontSizeCaption
         color: Theme.textMuted
-        opacity: 0.8
+        // A hint cut to "порожнь…" says nothing: it rather disappears when it does not fit.
+        opacity: truncated ? 0 : 0.8
         elide: Text.ElideRight
         horizontalAlignment: Text.AlignRight
         Layout.fillWidth: true

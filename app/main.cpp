@@ -1,9 +1,12 @@
 // Terminal entry point: starts the QML UI. The console demo of the core that
 // used to live here is in git history (commit 0ab1548).
 #include <QGuiApplication>
+#include <QLibraryInfo>
+#include <QLocale>
 #include <QQmlApplicationEngine>
 #include <QQuickStyle>
 #include <QSettings>
+#include <QTranslator>
 #include <QtQml/qqmlextensionplugin.h>
 
 // The UI modules are static libraries, so their QML plugins must be imported explicitly.
@@ -34,6 +37,12 @@ int main(int argc, char* argv[]) {
     const double uiScale = applyUiScale();
 
     QGuiApplication app{argc, argv};
+
+    // The terminal speaks Ukrainian whatever the system locale, and so must Qt's own
+    // texts: standard dialog buttons ("Cancel"), text field context menus.
+    QTranslator qtTranslator;
+    if (qtTranslator.load(QLocale{QLocale::Ukrainian}, "qt", "_", QLibraryInfo::path(QLibraryInfo::TranslationsPath)))
+        QCoreApplication::installTranslator(&qtTranslator);
 
     // Our own controls style (ui/style); it must be chosen before the engine loads any QML.
     QQuickStyle::setStyle("BerryWms.Style");

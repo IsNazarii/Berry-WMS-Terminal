@@ -432,7 +432,7 @@ using Destination = std::variant<TruckId, ToWarehouse>;
 | `plate_` | номер, обов'язковий |
 | `capacity_` | `Cargo`-ліміт; 0 у вимірі = без ліміту, але хоча б один ліміт обов'язковий |
 | `details_` | `TruckDetails {make, note}` — марка і вільний текст «водій / куди їде», необов'язкові |
-| `status_` | `Loading` → `Departed` або `CarriedOver` |
+| `status_` | `Loading` → `Departed` або `CarriedOver`; конструктор приймає статус для фури, прочитаної зі сховища |
 
 ```mermaid
 stateDiagram-v2
@@ -491,6 +491,14 @@ Append-only сховище фактів. Для кожного типу — ок
 
 ---
 
+### `JournalStore` (`journal_store.h`)
+
+Інтерфейс сховища журналу між запусками: `save(Receipt | Payment | Allocation | StockShipment)` →
+`false`, якщо такий UUID уже збережено (як `Journal::add`); `load()` → `Journal`. Ядро знає лише
+інтерфейс; реалізація — `SqliteJournalStore` в `infra/` (див. [architecture.md](architecture.md)).
+
+---
+
 ## 10. Ціни
 
 ### `DayPrices` і `PriceChange` (`pricing.h`)
@@ -516,8 +524,13 @@ Append-only сховище фактів. Для кожного типу — ок
 Одна робоча сесія: відкривається ~в обід, може тривати до ранку, називається датою відкриття.
 Постачальники і борги — спільні (в журналі); **ціни, фури і відкриті чеки — належать сесії**.
 
-**Стан:** `date` (передається ззовні — ядро не знає часового поясу), `openedAt/By`,
-`closedAt/By`, `prices`, `trucks`, `openReceipts`, `amendments`.
+**Стан:** `id` (UUIDv7: сесії відкриваються офлайн, і дві можуть мати ту саму дату), `date`
+(передається ззовні — ядро не знає часового поясу), `openedAt/By`, `closedAt/By`, `prices`, `trucks`,
+`openReceipts`, `amendments`.
+
+**Відновлення зі сховища:** `WorkDay::restore(WorkDayRecord)` — сесія рівно така, якою її записали
+(правила, що до неї привели, повторно не перевіряються). `invalid_argument` лише для стану, в якому сесія
+бути не може: нульовий id, закрита наполовину (`closedAt` без `closedBy`), закрита з відкритими чеками.
 
 **Ціни й фури відкритої сесії** (після закриття — `logic_error`):
 
@@ -550,6 +563,14 @@ Append-only сховище фактів. Для кожного типу — ок
 оператора і непорожню причину, а сама зміна логується в `amendments()` як
 `AmendmentRecord {amendment, change}` (текст зміни пише `WorkDay`). Невдала зміна не логується.
 Реалізовано через приватний шаблон `amend(amendment, description, lambda)`.
+
+---
+
+### `SessionStore` (`session_store.h`)
+
+Інтерфейс сховища сесій: `save(WorkDay)` перезаписує збережений стан сесії (викликається після кожної
+зміни — перезапуск нічого не губить, навіть незакритий чек); `latest()` — остання відкрита сесія,
+відкрита чи вже закрита, або `nullopt` у новій базі. Реалізація — `SqliteSessionStore` в `infra/`.
 
 ---
 

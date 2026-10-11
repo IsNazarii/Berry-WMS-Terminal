@@ -1,77 +1,18 @@
 #include "wms/sqlite_journal_store.h"
 
+#include "rows.h"
 #include "wms/schema.h"
 
-#include <array>
-#include <chrono>
 #include <cstddef>
 #include <cstdint>
 #include <optional>
-#include <stdexcept>
-#include <string>
-#include <string_view>
 #include <utility>
+#include <variant>
 #include <vector>
 
 namespace wms {
 
-namespace {
-
-using namespace std::string_view_literals;
-
-// The text each enum value is stored as; must match the CHECKs in the schema.
-constexpr std::array kSettlements{std::pair{Settlement::OnSite, "on_site"sv},
-                                  std::pair{Settlement::HandedOver, "handed_over"sv}};
-constexpr std::array kPriceSources{std::pair{PriceSource::DayPrice, "day_price"sv},
-                                   std::pair{PriceSource::Manual, "manual"sv}};
-constexpr std::array kWeightSources{std::pair{WeightSource::Scale, "scale"sv},
-                                    std::pair{WeightSource::Manual, "manual"sv}};
-constexpr std::array kPaymentMethods{std::pair{PaymentMethod::Cash, "cash"sv},
-                                     std::pair{PaymentMethod::BankTransfer, "bank_transfer"sv}};
-constexpr std::array kSyncStatuses{std::pair{SyncStatus::Pending, "pending"sv},
-                                   std::pair{SyncStatus::Synced, "synced"sv}};
-
-template <class E, std::size_t N>
-std::string_view toText(const std::array<std::pair<E, std::string_view>, N>& names, E value) {
-    for (const auto& [v, text] : names) {
-        if (v == value) return text;
-    }
-    throw std::logic_error("Enum value has no stored name");
-}
-
-template <class E, std::size_t N>
-E fromText(const std::array<std::pair<E, std::string_view>, N>& names, const std::string& text) {
-    for (const auto& [value, t] : names) {
-        if (t == text) return value;
-    }
-    throw std::runtime_error("Unknown value in database: " + text);
-}
-
-std::int64_t toNanoseconds(TimePoint at) {
-    return std::chrono::duration_cast<std::chrono::nanoseconds>(at.time_since_epoch()).count();
-}
-
-TimePoint fromNanoseconds(std::int64_t ns) {
-    return TimePoint{std::chrono::duration_cast<Clock::duration>(std::chrono::nanoseconds{ns})};
-}
-
-Uuid uuidColumn(const sqlite::Statement& row, int column) {
-    const std::string text = row.columnText(column);
-    const std::optional<Uuid> id = Uuid::parse(text);
-    if (!id) throw std::runtime_error("Malformed UUID in database: " + text);
-    return *id;
-}
-
-// For INSERT ... ON CONFLICT DO NOTHING RETURNING: a returned row means the
-// record was new, no row means the id was already there.
-bool inserted(sqlite::Statement& insert) {
-    const bool row = insert.step();
-    while (insert.step()) {
-    }
-    return row;
-}
-
-} // namespace
+using namespace rows;
 
 SqliteJournalStore::SqliteJournalStore(sqlite::Database& db) : db_{db} { migrateSchema(db_); }
 
@@ -94,18 +35,8 @@ bool SqliteJournalStore::save(const Receipt& receipt) {
         "VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11)");
     const std::vector<Weighing>& weighings = receipt.weighings();
     for (std::size_t i = 0; i < weighings.size(); ++i) {
-        const Weighing& w = weighings[i];
-        line.bind(1, receipt.id().toString())
-            .bind(2, static_cast<std::int64_t>(i))
-            .bind(3, w.cropCode)
-            .bind(4, w.gross.raw())
-            .bind(5, std::int64_t{w.boxCount})
-            .bind(6, w.tarePerBox.raw())
-            .bind(7, w.palletTare.raw())
-            .bind(8, w.pricePerKg.raw())
-            .bind(9, toText(kPriceSources, w.priceSource))
-            .bind(10, toText(kWeightSources, w.weightSource))
-            .bind(11, std::int64_t{w.cancelled ? 1 : 0});
+        line.bind(1, receipt.id().toString()).bind(2, static_cast<std::int64_t>(i));
+        bindWeighing(line, 3, weighings[i]);
         line.step();
         line.reset();
     }
@@ -174,19 +105,7 @@ Journal SqliteJournalStore::load() const {
     while (receipts.step()) {
         std::vector<Weighing> weighings;
         lines.bind(1, receipts.columnText(0));
-        while (lines.step()) {
-            weighings.push_back({
-                .cropCode = lines.columnText(0),
-                .gross = grams(lines.columnInt(1)),
-                .boxCount = static_cast<int>(lines.columnInt(2)),
-                .tarePerBox = grams(lines.columnInt(3)),
-                .palletTare = grams(lines.columnInt(4)),
-                .pricePerKg = kopecks(lines.columnInt(5)),
-                .priceSource = fromText(kPriceSources, lines.columnText(6)),
-                .weightSource = fromText(kWeightSources, lines.columnText(7)),
-                .cancelled = lines.columnInt(8) != 0,
-            });
-        }
+        while (lines.step()) weighings.push_back(readWeighing(lines, 0));
         lines.reset();
         journal.add(Receipt{uuidColumn(receipts, 0), fromNanoseconds(receipts.columnInt(1)), receipts.columnInt(2),
                             fromText(kSettlements, receipts.columnText(3)), std::move(weighings),

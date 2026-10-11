@@ -32,10 +32,10 @@ flowchart LR
 | Шар | Каталог | Ціль CMake | Залежить від | Що містить |
 |---|---|---|---|---|
 | Ядро | `core/` | `wms_core` (статична бібліотека) | лише стандартна бібліотека C++20 | доменні класи, правила, валідація, обчислення |
-| Інфраструктура | `infra/` | `wms_infra` + `sqlite3` (амальгамація) | core; Qt — лише для пристроїв | обгортка SQLite (`sqlite::Database`/`Statement`/`ScopedTransaction`) ✅; схема з версіями (`migrateSchema`) + `SqliteJournalStore` ✅; інші сховища, COM-порт ваг, HTTP-sync, друк — далі |
+| Інфраструктура | `infra/` | `wms_infra` + `sqlite3` (амальгамація) | core; Qt — лише для пристроїв | обгортка SQLite (`sqlite::Database`/`Statement`/`ScopedTransaction`) ✅; схема з версіями (`migrateSchema`) + `SqliteJournalStore` + `SqliteSessionStore` ✅; інші сховища, COM-порт ваг, HTTP-sync, друк — далі |
 | Інтерфейс | `ui/` | `wms_ui` + `wms_uiplugin` (QML-модуль `BerryWms.Ui`) | core, Qt Quick | QML-екрани і тонкі адаптери |
 | Точка входу | `app/` | `wms_terminal` (виконуваний) | ui | `main()`: створює `QGuiApplication`, завантажує `Main.qml` |
-| Тести | `tests/` | `wms_core_tests`, `wms_infra_tests` | core / infra, GoogleTest | 171 тест ядра + 17 тестів infra на справжній SQLite |
+| Тести | `tests/` | `wms_core_tests`, `wms_infra_tests` | core / infra, GoogleTest | 176 тестів ядра + 23 тести infra на справжній SQLite |
 
 **Правило залежностей:** лише вниз (`app → ui → infra → core`). Ядро не підключає жодного
 заголовка Qt — це перевіряється тим, що `wms_core` лінкується без Qt і тестується окремо.
@@ -184,8 +184,14 @@ sequenceDiagram
     посилаються розподіли), `payment`, `allocation` (`truck_id` NULL = склад; без зовнішнього ключа на `receipt`,
     бо палета відкритого чека йде у фуру раніше, ніж чек записано), `stock_shipment`; усі з `sync_status`.
     Повторне збереження того самого UUID — `false` (`ON CONFLICT DO NOTHING RETURNING`).
-  - Далі: `OpenReceipt` зберігається після кожного зважування, щоб пережити перезапуск
-    (конструктор для відновлення вже є); сесії, довідники; підключення до `Terminal`.
+  - ✅ Сесії: інтерфейс `SessionStore` у core (`save(WorkDay)`, `latest()`), реалізація `SqliteSessionStore`
+    (міграція 2). Сесія — змінний стан, тому зберігається **знімком**: `save` у транзакції перезаписує
+    її списки (`price_change`, `truck`, `amendment`, `open_receipt` + `open_weighing`) — десятки рядків,
+    простіше й надійніше, ніж шукати різницю. Закриті сесії лишаються в базі (архів). `latest()` — остання
+    відкрита сесія (відкрита — продовжуємо; закрита — її фури для «повторити»/«перенести»).
+    Відновлення — `WorkDay::restore(WorkDayRecord)`, `Truck` зі статусом. Зважування й назви переліків
+    спільні для обох сховищ — внутрішній `infra/src/rows.h`.
+  - Далі: підключення до `Terminal` (база в теці даних програми, демо-дані лише в нову базу); довідники.
 - **Sync**: outbox незасинхронізованих записів, батчі, сервер повертає прийняті UUID
   (`Transaction::markSynced()`), retry з backoff; pull довідників за курсором `updated_since`.
 - **`SerialScaleDriver`** — реалізація `IScaleDriver` через Qt SerialPort; `ScaleMonitor`

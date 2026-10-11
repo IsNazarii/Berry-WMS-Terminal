@@ -105,7 +105,7 @@ $CM/cmake -S . -B build -G Ninja && $CM/cmake --build build && $CM/ctest --test-
 ≥3 поліморфізми (≥1 статичний, ≥1 динамічний), інкапсуляція.
 - Ієрархія A: `Transaction` → `Receipt` ✅, `Payment` ✅, `Allocation` ✅, `StockShipment` ✅
 - Ієрархія B: `IScaleDriver` → `SimulatedScaleDriver` ✅, `SerialScaleDriver` ⏳ (infra, Qt)
-- Ієрархія C: `JournalStore` → `SqliteJournalStore` ✅ (infra)
+- Ієрархія C: `JournalStore` → `SqliteJournalStore` ✅, D: `SessionStore` → `SqliteSessionStore` ✅ (infra)
 - Статичний поліморфізм: `Quantity<Tag>` (`Money`, `Weight`) ✅; `Destination` = `std::variant` + `std::visit` ✅;
   `Repository<T>` ⏳
 - Статичний поліморфізм (перевантаження): `Journal::add(Receipt|Payment|Allocation|StockShipment)` ✅;
@@ -114,7 +114,7 @@ $CM/cmake -S . -B build -G Ninja && $CM/cmake --build build && $CM/ctest --test-
   (приймають `Receipt` і `OpenReceipt`) ✅
 - Інші класи: `Uuid`, `Supplier`, `StabilityDetector`, `Weighing`, `Truck`, `Cargo`, `Journal`, `DayPrices`,
   `WorkDay`, `Operator`, `OpenReceipt` ✅
-- Стан на 26.09: 19 класів ядра, 2 ієрархії (A — 5 класів), 6+ поліморфізмів, 158 тестів (зараз 171 ядра + 17 infra) — лаба 1 закрита із запасом.
+- Стан на 26.09: 19 класів ядра, 2 ієрархії (A — 5 класів), 6+ поліморфізмів, 158 тестів (зараз 176 ядра + 23 infra) — лаба 1 закрита із запасом.
 
 Лаба 2: ≥4 екрани (Вхід, Прийом, Сесія, Розподіл, Склад, Каса, + Sync/Довідники),
 ≥20 контролів, ≥1 контейнер (ListView), ≥10 обробників, логіка відділена.

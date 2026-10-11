@@ -27,6 +27,7 @@ target_link_libraries(wms_core_tests PRIVATE wms_core GTest::gtest_main)
 add_executable(wms_infra_tests
     sqlite_test.cpp
     sqlite_journal_store_test.cpp
+    sqlite_session_store_test.cpp
 )
 target_link_libraries(wms_infra_tests PRIVATE wms_infra GTest::gtest_main)
 

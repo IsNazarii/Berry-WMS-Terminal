@@ -138,7 +138,7 @@ $CM/cmake -S . -B build -G Ninja && $CM/cmake --build build && $CM/ctest --test-
 - Git: гілка `main`, remote `origin` = git@github.com:IsNazarii/Berry-WMS-Terminal.git (SSH-ключ `~/.ssh/id_ed25519` працює — push можна робити з термінала).
 - GoogleTest у системі не встановлено — тягнеться FetchContent (потрібна мережа при першій конфігурації).
 
-## Стан і наступні кроки (оновлено 30.09.2026)
+## Стан і наступні кроки (оновлено 11.10.2026)
 Ядро (`core/`): `Receipt` = постачальник + `Settlement` (`OnSite`/`HandedOver`) + `vector<Weighing>`
 (`priceSource`: `DayPrice`/`Manual`; `cancelled` — рядок лишається, не рахується); `Payment`;
 `OpenReceipt` (чек, що зважується: `add`/`cancel`, `validateClose`/`close(settlement)` → `Receipt` з тим самим
@@ -158,7 +158,7 @@ UUID і часом відкриття; для опту ціни обнуляют
 Відновлення відкритих чеків після перезапуску — конструктор `OpenReceipt` є, метод у `WorkDay` — разом зі SQLite.
 
 UI (`ui/`, модуль `BerryWms.Ui`, статична бібліотека + `Q_IMPORT_QML_PLUGIN` у `app/main.cpp`):
-синглтон `Terminal` (демо-дані в пам'яті, міст QML → core), `SupplierListModel` (пошук),
+синглтон `Terminal` (стан у пам'яті + запис кожної зміни в SQLite, міст QML → core), `SupplierListModel` (пошук),
 `ScaleMonitor` (опитує `IScaleDriver` таймером). Екрани: Вхід оператора (список + PIN, без входу
 вкладки приховані) ✅, Сесія ✅, Прийом ✅, Розподіл ✅, Склад ✅, Каса ✅. Вікно відкривається розгорнутим
 (мін. 1024×600, цільові — ноутбуки); картки стискають текст (`elide`), щоб кнопки влазили. **Масштаб** — власний на термінал: меню у футері
@@ -171,7 +171,7 @@ UI (`ui/`, модуль `BerryWms.Ui`, статична бібліотека + `
 фури з завантаженням + «Відправити»/«Перенести», додати фуру (номер, марка, водій/куди, ліміти) або
 повторити з минулої сесії, причини з `validateClose` видно одразу, закриття з підтвердженням.
 Перенесені фури при відкритті приймаються автоматично (демо: `BI5678BB` «з учора» з палетою).
-Закрита сесія ніде не зберігається (лишаються лише її фури) — архів разом зі SQLite. Поправки в UI ще нема.
+Закриті сесії лишаються в базі (архів), `previousTrucks_` — фури `lastClosed()`. Поправки в UI ще нема.
 Культури — демо-список `kCrops` у `terminal.cpp` (каталог прийде з сервером).
 Сигнали `Terminal`: `sessionChanged` (лише відкрито/закрито) → `pricesChanged`, `trucksChanged`;
 `journalChanged` → `trucksChanged`; `receiptsChanged` (відкриті чеки/рядки/активний). Урок: `Repeater` над списком, що змінюється, перебудовує рядки й
@@ -180,7 +180,7 @@ UI (`ui/`, модуль `BerryWms.Ui`, статична бібліотека + `
 Прохід по UX ✅: переклад Qt `qt_uk` у `main.cpp` («Скасувати»); `NoSessionNotice` з «До сесії» на Прийомі/Розподілі;
 причини закриття сесії — кольором попередження; підказка `FieldCaption` зникає, коли не влазить (`truncated`);
 головна кнопка «Прийому» не обрізається (`minimumWidth: implicitWidth`, коротший текст при ширині < 520).
-Запуск без вікна: `QT_FORCE_STDERR_LOGGING=1 QT_QPA_PLATFORM=offscreen timeout 3 build/app/wms_terminal` —
+Запуск без вікна: `WMS_DATABASE=:memory: QT_FORCE_STDERR_LOGGING=1 QT_QPA_PLATFORM=offscreen timeout 3 build/app/wms_terminal` —
 без `QT_FORCE_STDERR_LOGGING` попередження йдуть у journald, а `console.log` (debug) у Fedora вимкнено.
 **Стиль:** HTML-макет «Прийому» (артефакт https://claude.ai/artifact/K3PC1SkAU28VYJijyLp9nq) → синглтон
 `ui/style/Theme.qml` (токени, світла/темна, шрифт Onest з `ui/style/fonts/` + табличні цифри). В екранах жодних літеральних кольорів/розмірів — лише `Theme.*`.
@@ -235,7 +235,12 @@ F2 → `SupplierPicker`; по центру обраний `cashSupplierId` (ок
    a) ✅ обгортка `sqlite::Database`/`Statement`/`ScopedTransaction`/`Error` (WAL, foreign_keys, без `double`);
    b) ✅ схема (`migrateSchema`, `PRAGMA user_version`, STRICT, час у нс, enum текстом) + `JournalStore` (core) →
       `SqliteJournalStore` (infra): `save(...)` → `false` для наявного UUID, `load()` → `Journal`;
-   c) відкриті чеки, сесії (архів закритих), довідники, оператор у `Payment` → підключити до `Terminal`.
+   c) ✅ `WorkDay` має `id` + `restore(WorkDayRecord)`; `SessionStore` (`save`/`current`/`lastClosed`) →
+      `SqliteSessionStore` (міграція 2, знімок сесії з відкритими чеками); `ScopedTransaction` на `SAVEPOINT`
+      (вкладається); `Terminal` пише кожну зміну (`saveSession()`, `record(x)`; закриття чека — одна зовнішня
+      транзакція). База: `~/.local/share/BerryWms/Berry WMS Terminal/terminal.db`, `WMS_DATABASE` перевизначає
+      (`:memory:` — без сліду); демо (`seedDemoData`) лише в нову базу. Після перезапуску активного чека нема.
+   d) довідники (постачальники, оператори) у базі; оператор у `Payment`; періодичний бекап.
 - Історії руху складу (прихід/відвантаження) в UI нема — `Journal` не віддає записи; за потреби — запит у ядрі.
 - Повідомлення ядра про розподіл містять код культури (`raspberry`), а не назву — назви живуть у UI (`kCrops`).
 - ❓ Захист від подвійного запису тієї самої палети (вимагати повернення ваг до нуля між зважуваннями) —

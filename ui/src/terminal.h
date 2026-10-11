@@ -5,6 +5,9 @@
 #include "wms/journal.h"
 #include "wms/operator.h"
 #include "wms/scale.h"
+#include "wms/sqlite.h"
+#include "wms/sqlite_journal_store.h"
+#include "wms/sqlite_session_store.h"
 #include "wms/supplier.h"
 #include "wms/truck.h"
 #include "wms/workday.h"
@@ -23,8 +26,9 @@
 namespace wms::ui {
 
 // The only door from QML into the core. Holds the terminal state in memory
-// until the SQLite repositories exist; screens call it and show what it
-// returns, all rules stay in core.
+// and writes every change to the local database at once, so a restart (or a
+// crash) loses nothing; screens call it and show what it returns, all rules
+// stay in core.
 class Terminal : public QObject {
     Q_OBJECT
     QML_ELEMENT
@@ -245,10 +249,23 @@ private:
     [[nodiscard]] std::variant<Destination, QString> destinationFor(const QString& destinationId) const;
     // Validates against the journal and adds; returns the errors, joined.
     QString allocate(const SourceReceipt& source, const Allocation& allocation);
+    // A journal record: stored first, then added, so the screen never shows
+    // what a restart would lose.
+    template <class Record>
+    void record(const Record& r);
+    // After every change of the open session.
+    void saveSession();
+    // A new database gets yesterday's session and some history, so every
+    // screen has something to show in the alpha.
+    void seedDemoData();
 
+    // First: everything below is loaded from it.
+    sqlite::Database db_;
+    SqliteJournalStore journalStore_;
+    SqliteSessionStore sessionStore_;
     std::vector<Operator> operators_;
     std::vector<Supplier> suppliers_;
-    // Kept while there is no open session: repeat and carry-over read them.
+    // Of the session closed last: repeat and carry-over read them.
     std::vector<Truck> previousTrucks_;
     std::optional<WorkDay> workDay_;
     Journal journal_;

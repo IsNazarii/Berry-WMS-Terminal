@@ -6,8 +6,11 @@
 #include "wms/payment.h"
 #include "wms/receipt.h"
 
+#include <QDate>
 #include <QDateTime>
+#include <QDir>
 #include <QRandomGenerator>
+#include <QStandardPaths>
 
 #include <algorithm>
 #include <chrono>
@@ -46,20 +49,34 @@ constexpr Crop kCrops[] = {
     {"blueberry", "Лохина"},
 };
 
-// Trucks of yesterday's session: one left, one was carried over half-loaded.
-std::vector<Truck> demoPreviousTrucks() {
-    std::vector<Truck> trucks{
-        Truck::create("BI1234AA", {.boxes = 1'200, .weight = kilograms(2'000)}),
-        Truck::create("BI5678BB", {.boxes = 0, .weight = kilograms(5'000)}),
-    };
-    trucks[0].depart();
-    trucks[1].carryOver();
-    return trucks;
+// The session is named by the local date; the core leaves time zones to the UI.
+std::chrono::year_month_day toDate(const QDate& date) {
+    return std::chrono::year{date.year()} / std::chrono::month{static_cast<unsigned>(date.month())} /
+           std::chrono::day{static_cast<unsigned>(date.day())};
+}
+
+// The terminal's own database in the per-user data folder; the WMS_DATABASE
+// variable points elsewhere, e.g. ":memory:" for a run that leaves no trace.
+std::string databasePath() {
+    if (qEnvironmentVariableIsSet("WMS_DATABASE")) return qEnvironmentVariable("WMS_DATABASE").toStdString();
+    const QString folder = QStandardPaths::writableLocation(QStandardPaths::AppDataLocation);
+    QDir{}.mkpath(folder);
+    return QDir{folder}.filePath("terminal.db").toStdString();
+}
+
+// Yesterday's session: one truck left, one was carried over half-loaded.
+WorkDay demoYesterday(OperatorId by) {
+    const TimePoint noon = Clock::now() - std::chrono::hours{24};
+    WorkDay day{toDate(QDate::currentDate().addDays(-1)), noon, by};
+    day.departTruck(day.addTruck("BI1234AA", {.boxes = 1'200, .weight = kilograms(2'000)}).id());
+    day.carryOverTruck(day.addTruck("BI5678BB", {.boxes = 0, .weight = kilograms(5'000)}).id());
+    day.close(noon + std::chrono::hours{8}, by);
+    return day;
 }
 
 // History from an earlier day, so the cash screen has a debt to show and the
 // carried-over truck already has a pallet in it.
-void addDemoHistory(Journal& journal, const TruckId& carriedOverTruck) {
+void addDemoHistory(JournalStore& journal, const TruckId& carriedOverTruck) {
     const Receipt receipt = Receipt::create(42, Settlement::OnSite, {{
         .cropCode = "raspberry",
         .gross = kilograms(120),
@@ -68,9 +85,9 @@ void addDemoHistory(Journal& journal, const TruckId& carriedOverTruck) {
         .palletTare = kilograms(25),
         .pricePerKg = hryvnias(85),
     }});
-    journal.add(receipt);
-    journal.add(Allocation::wholeWeighing(receipt, 0, carriedOverTruck));
-    journal.add(Payment::create(42, hryvnias(3'000), PaymentMethod::Cash));
+    journal.save(receipt);
+    journal.save(Allocation::wholeWeighing(receipt, 0, carriedOverTruck));
+    journal.save(Payment::create(42, hryvnias(3'000), PaymentMethod::Cash));
 
     // Strawberries that waited overnight in the warehouse: stock outlives the session.
     const Receipt stored = Receipt::create(45, Settlement::OnSite, {{
@@ -81,8 +98,8 @@ void addDemoHistory(Journal& journal, const TruckId& carriedOverTruck) {
         .palletTare = kilograms(20),
         .pricePerKg = hryvnias(60),
     }});
-    journal.add(stored);
-    journal.add(Allocation::wholeWeighing(stored, 0, ToWarehouse{}));
+    journal.save(stored);
+    journal.save(Allocation::wholeWeighing(stored, 0, ToWarehouse{}));
 }
 
 QString localTime(TimePoint at) {
@@ -198,13 +215,19 @@ std::vector<Weight> palletLanding(Weight target) {
 
 Terminal::Terminal(QObject* parent)
     : QObject{parent},
+      db_{databasePath()},
+      journalStore_{db_},
+      sessionStore_{db_},
       operators_{demoOperators()},
       suppliers_{demoSuppliers()},
-      previousTrucks_{demoPreviousTrucks()},
       supplierModel_{suppliers_, journal_},
       simulator_{{grams(0)}},
       scaleMonitor_{simulator_} {
-    addDemoHistory(journal_, previousTrucks_[1].id());
+    if (!sessionStore_.current() && !sessionStore_.lastClosed() && journalStore_.load().size() == 0) seedDemoData();
+    // The supplier model reads balances only when asked, so loading after it is fine.
+    journal_ = journalStore_.load();
+    workDay_ = sessionStore_.current();
+    if (const auto closed = sessionStore_.lastClosed()) previousTrucks_ = closed->trucks();
     connect(this, &Terminal::journalChanged, &supplierModel_, &SupplierListModel::refreshBalances);
     connect(this, &Terminal::journalChanged, this, &Terminal::trucksChanged);
     connect(this, &Terminal::sessionChanged, this, &Terminal::trucksChanged);
@@ -556,14 +579,11 @@ void Terminal::logout() {
 void Terminal::openSession() {
     if (!currentOperatorId_ || workDay_) return;
     // The session is named by the local date; the core leaves time zones to the UI.
-    const QDate today = QDate::currentDate();
-    workDay_.emplace(std::chrono::year_month_day{std::chrono::year{today.year()},
-                                                 std::chrono::month{static_cast<unsigned>(today.month())},
-                                                 std::chrono::day{static_cast<unsigned>(today.day())}},
-                     Clock::now(), *currentOperatorId_);
+    workDay_.emplace(toDate(QDate::currentDate()), Clock::now(), *currentOperatorId_);
     for (const Truck& truck : previousTrucks_) {
         if (truck.status() == TruckStatus::CarriedOver) workDay_->adoptTruck(truck);
     }
+    saveSession();
     emit sessionChanged();
 }
 
@@ -572,6 +592,7 @@ QString Terminal::setPrice(const QString& cropCode, const QString& price) {
     const auto money = parseMoney(price.toStdString());
     if (!money || money->isZero()) return tr("Ціна — додатне число гривень, напр. 85 або 85,50");
     workDay_->setPrice(cropCode.toStdString(), *money, Clock::now());
+    saveSession();
     emit pricesChanged();
     return {};
 }
@@ -587,6 +608,7 @@ QString Terminal::addTruck(const QString& plate, const QString& make, const QStr
     workDay_->addTruck(plate.trimmed().toUpper().toStdString(),
                        {.boxes = static_cast<int>(*boxLimit), .weight = kilograms(*weightLimit)},
                        {.make = make.trimmed().toStdString(), .note = note.trimmed().toStdString()});
+    saveSession();
     emit trucksChanged();
     return {};
 }
@@ -595,6 +617,7 @@ QString Terminal::repeatTruck(int previousIndex) {
     if (!workDay_) return tr("Сесію не відкрито");
     if (previousIndex < 0 || previousIndex >= static_cast<int>(previousTrucks_.size())) return tr("Оберіть фуру");
     workDay_->repeatTruck(previousTrucks_[static_cast<std::size_t>(previousIndex)]);
+    saveSession();
     emit trucksChanged();
     return {};
 }
@@ -603,6 +626,7 @@ void Terminal::departTruck(const QString& truckId) {
     const auto id = Uuid::parse(truckId.toStdString());
     if (!workDay_ || !id) return;
     workDay_->departTruck(*id);
+    saveSession();
     emit trucksChanged();
 }
 
@@ -610,13 +634,15 @@ void Terminal::carryOverTruck(const QString& truckId) {
     const auto id = Uuid::parse(truckId.toStdString());
     if (!workDay_ || !id) return;
     workDay_->carryOverTruck(*id);
+    saveSession();
     emit trucksChanged();
 }
 
 void Terminal::closeSession() {
     if (!workDay_ || !currentOperatorId_ || !workDay_->validateClose().empty()) return;
     workDay_->close(Clock::now(), *currentOperatorId_);
-    // The closed session itself is dropped until SQLite keeps the archive.
+    // The database keeps the closed session as the archive; here only its trucks are needed.
+    saveSession();
     previousTrucks_ = workDay_->trucks();
     workDay_.reset();
     emit sessionChanged();
@@ -626,8 +652,9 @@ QString Terminal::startReceipt(qint64 supplierId) {
     if (!workDay_) return tr("Сесію не відкрито");
     if (std::ranges::find(suppliers_, supplierId, &Supplier::id) == suppliers_.end())
         return tr("Постачальника #%1 немає").arg(supplierId);
-    const OpenReceipt& receipt = workDay_->openReceipt(supplierId);
-    setActiveReceipt(receipt.id());
+    const Uuid id = workDay_->openReceipt(supplierId).id();
+    saveSession(); // the receipt may be new
+    setActiveReceipt(id);
     return {};
 }
 
@@ -677,6 +704,7 @@ QString Terminal::recordWeighing(const QString& cropCode, const QString& boxes, 
 
     if (const auto errors = weighing.validate(); !errors.empty()) return joined(errors);
     workDay_->addWeighing(*activeReceiptId_, std::move(weighing), Clock::now());
+    saveSession();
     emit receiptsChanged();
     return {};
 }
@@ -687,6 +715,7 @@ QString Terminal::cancelWeighing(int index) {
     const auto i = static_cast<std::size_t>(index);
     if (const auto errors = journal_.validateCancel(*receipt, i); !errors.empty()) return joined(errors);
     workDay_->cancelWeighing(*activeReceiptId_, i, journal_);
+    saveSession();
     emit receiptsChanged();
     return {};
 }
@@ -702,7 +731,16 @@ QStringList Terminal::receiptCloseBlockers(bool wholesale) const {
 
 void Terminal::closeReceipt(bool wholesale) {
     if (!activeReceipt() || !receiptCloseBlockers(wholesale).isEmpty()) return;
-    journal_.add(workDay_->closeReceipt(*activeReceiptId_, wholesale ? Settlement::HandedOver : Settlement::OnSite));
+    const Settlement settlement = wholesale ? Settlement::HandedOver : Settlement::OnSite;
+    Receipt receipt = workDay_->closeReceipt(*activeReceiptId_, settlement);
+    {
+        // Into the journal and out of the open list together: never both or neither after a crash.
+        sqlite::ScopedTransaction transaction{db_};
+        journalStore_.save(receipt);
+        saveSession();
+        transaction.commit();
+    }
+    journal_.add(std::move(receipt));
     const auto& left = workDay_->openReceipts();
     setActiveReceipt(left.empty() ? std::nullopt : std::optional{left.front().id()});
     emit journalChanged();
@@ -763,7 +801,7 @@ QString Terminal::shipFromStock(const QString& cropCode, const QString& boxesTex
     const StockShipment shipment =
         journal_.shipmentOf(cropCode.toStdString(), boxes, std::get<TruckId>(std::get<Destination>(destination)));
     if (const auto errors = journal_.validateShipment(shipment); !errors.empty()) return joined(errors);
-    journal_.add(shipment);
+    record(shipment);
     emit journalChanged();
     return {};
 }
@@ -787,7 +825,7 @@ QString Terminal::pay(const QString& amount, bool bankTransfer) {
     const Payment payment = Payment::create(*cashSupplierId_, *paid,
                                             bankTransfer ? PaymentMethod::BankTransfer : PaymentMethod::Cash);
     if (const auto errors = payment.validate(); !errors.empty()) return joined(errors);
-    journal_.add(payment);
+    record(payment);
     emit journalChanged();
     emit balanceChanged();
     return {};
@@ -877,9 +915,27 @@ std::variant<Destination, QString> Terminal::destinationFor(const QString& desti
 QString Terminal::allocate(const SourceReceipt& source, const Allocation& allocation) {
     const auto errors = std::visit([&](const auto* receipt) { return check(journal_, allocation, *receipt); }, source);
     if (!errors.empty()) return joined(errors);
-    journal_.add(allocation);
+    record(allocation);
     emit journalChanged();
     return {};
+}
+
+template <class Record>
+void Terminal::record(const Record& r) {
+    journalStore_.save(r);
+    journal_.add(r);
+}
+
+void Terminal::saveSession() {
+    if (workDay_) sessionStore_.save(*workDay_);
+}
+
+void Terminal::seedDemoData() {
+    sqlite::ScopedTransaction transaction{db_};
+    const WorkDay yesterday = demoYesterday(operators_.front().id());
+    sessionStore_.save(yesterday);
+    addDemoHistory(journalStore_, yesterday.trucks()[1].id());
+    transaction.commit();
 }
 
 // Emits always: even for the same id its lines may have changed.

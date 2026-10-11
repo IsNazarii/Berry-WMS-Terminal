@@ -32,5 +32,5 @@ qt_add_qml_module(wms_ui
 
 # The generated QML type registration includes headers by bare name.
 target_include_directories(wms_ui PUBLIC src)
-target_link_libraries(wms_ui PUBLIC Qt6::Quick Qt6::QuickControls2 wms_core wms_style)
+target_link_libraries(wms_ui PUBLIC Qt6::Quick Qt6::QuickControls2 wms_core wms_infra wms_style)
 target_compile_options(wms_ui PRIVATE -Wall -Wextra -Wpedantic -Wshadow)

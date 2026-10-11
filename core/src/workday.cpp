@@ -17,9 +17,27 @@ bool isBlank(std::string_view text) {
 } // namespace
 
 WorkDay::WorkDay(std::chrono::year_month_day date, TimePoint openedAt, OperatorId openedBy)
-    : date_{date}, openedAt_{openedAt}, openedBy_{openedBy} {
+    : id_{Uuid::generateV7()}, date_{date}, openedAt_{openedAt}, openedBy_{openedBy} {
     if (!date_.ok()) throw std::invalid_argument("Work day needs a valid date");
     if (openedBy_ <= 0) throw std::invalid_argument("Work day must be opened by an operator");
+}
+
+WorkDay WorkDay::restore(WorkDayRecord record) {
+    if (record.id.isNil()) throw std::invalid_argument("Restored work day needs an id");
+    if (record.closedAt.has_value() != record.closedBy.has_value())
+        throw std::invalid_argument("Restored work day must have both closing time and operator, or neither");
+    if (record.closedAt && !record.openReceipts.empty())
+        throw std::invalid_argument("Restored closed work day cannot have open receipts");
+
+    WorkDay day{record.date, record.openedAt, record.openedBy}; // checks the date and the operator
+    day.id_ = record.id;
+    day.closedAt_ = record.closedAt;
+    day.closedBy_ = record.closedBy;
+    day.prices_ = std::move(record.prices);
+    day.trucks_ = std::move(record.trucks);
+    day.amendments_ = std::move(record.amendments);
+    day.openReceipts_ = std::move(record.openReceipts);
+    return day;
 }
 
 void WorkDay::setPrice(std::string cropCode, Money pricePerKg, TimePoint at) {

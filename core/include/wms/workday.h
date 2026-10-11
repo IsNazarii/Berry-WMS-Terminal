@@ -25,6 +25,20 @@ struct AmendmentRecord {
     std::string change; // what was changed, written by WorkDay itself
 };
 
+// Everything a session consists of, as storage keeps it; see WorkDay::restore().
+struct WorkDayRecord {
+    Uuid id;
+    std::chrono::year_month_day date;
+    TimePoint openedAt;
+    OperatorId openedBy = 0;
+    std::optional<TimePoint> closedAt;
+    std::optional<OperatorId> closedBy;
+    DayPrices prices;
+    std::vector<Truck> trucks;
+    std::vector<AmendmentRecord> amendments;
+    std::vector<OpenReceipt> openReceipts;
+};
+
 // One working session of the collection point. It opens around noon, may run
 // until the next morning and is named by the date it opened. Suppliers and
 // their debts live in the journal and span all sessions; prices and trucks
@@ -33,7 +47,17 @@ class WorkDay {
 public:
     // The date is passed in rather than derived from `openedAt`: the core does
     // not know the local time zone, the UI does.
+    // The session gets a fresh UUIDv7: sessions are opened offline, and two
+    // may share a date (closed by mistake and opened again).
     WorkDay(std::chrono::year_month_day date, TimePoint openedAt, OperatorId openedBy);
+
+    // A session read back from storage, open or closed, exactly as it was:
+    // nothing is re-checked against the rules that let it get there. Throws
+    // std::invalid_argument for a record no session could be in (closed only
+    // half-way, or closed with receipts still open).
+    [[nodiscard]] static WorkDay restore(WorkDayRecord record);
+
+    [[nodiscard]] const Uuid& id() const noexcept { return id_; }
 
     [[nodiscard]] std::chrono::year_month_day date() const noexcept { return date_; }
     [[nodiscard]] TimePoint openedAt() const noexcept { return openedAt_; }
@@ -106,6 +130,7 @@ private:
     [[nodiscard]] Truck& truck(const TruckId& id);
     [[nodiscard]] std::vector<OpenReceipt>::iterator receipt(const Uuid& id);
 
+    Uuid id_;
     std::chrono::year_month_day date_;
     TimePoint openedAt_;
     OperatorId openedBy_;

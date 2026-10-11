@@ -31,8 +31,9 @@ struct TruckDetails {
 class Truck {
 public:
     // A zero limit in `capacity` means the truck is not limited in that dimension;
-    // at least one limit must be set.
-    Truck(TruckId id, std::string plate, Cargo capacity, TruckDetails details = {});
+    // at least one limit must be set. The status is for a truck read back from storage.
+    Truck(TruckId id, std::string plate, Cargo capacity, TruckDetails details = {},
+          TruckStatus status = TruckStatus::Loading);
 
     // New truck with a fresh UUIDv7.
     [[nodiscard]] static Truck create(std::string plate, Cargo capacity, TruckDetails details = {});

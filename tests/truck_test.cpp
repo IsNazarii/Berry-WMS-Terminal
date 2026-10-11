@@ -88,3 +88,10 @@ TEST(Truck, CarriedOverTruckTakesNoMoreCargoInThisSession) {
     EXPECT_THROW(truck.depart(), std::logic_error);
     EXPECT_THROW(truck.carryOver(), std::logic_error);
 }
+
+TEST(Truck, RestoredWithItsStatus) {
+    // A truck read back from storage keeps whether it left or was carried over.
+    const Truck departed{Uuid::generateV7(), "AA1234BB", {.boxes = 10}, {}, TruckStatus::Departed};
+    EXPECT_EQ(departed.status(), TruckStatus::Departed);
+    EXPECT_FALSE(departed.acceptsCargo());
+}

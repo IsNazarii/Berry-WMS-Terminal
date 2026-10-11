@@ -278,3 +278,77 @@ TEST(WorkDay, ClosedSessionOpensNoReceipts) {
     day.close(kMidnight + 20h, kOksana);
     EXPECT_THROW((void)day.openReceipt(42), std::logic_error);
 }
+
+TEST(WorkDay, EverySessionHasItsOwnId) {
+    // Stored sessions are told apart by id: two may open on the same date.
+    EXPECT_EQ(openAtNoon().id().version(), 7);
+    EXPECT_NE(openAtNoon().id(), openAtNoon().id());
+}
+
+TEST(WorkDay, RestoredSessionGoesOnWhereItStopped) {
+    WorkDay day = dayWithRaspberryPrice();
+    const Truck& truck = day.addTruck("BI1234AA", kBigTruck, kDaf);
+    const Uuid receiptId = day.openReceipt(42).id();
+    day.addWeighing(receiptId, raspberryPallet(), kMidnight + 13h);
+
+    WorkDay restored = WorkDay::restore({
+        .id = day.id(),
+        .date = day.date(),
+        .openedAt = day.openedAt(),
+        .openedBy = day.openedBy(),
+        .closedAt = std::nullopt,
+        .closedBy = std::nullopt,
+        .prices = day.prices(),
+        .trucks = day.trucks(),
+        .amendments = {},
+        .openReceipts = day.openReceipts(),
+    });
+    EXPECT_EQ(restored.id(), day.id());
+    EXPECT_TRUE(restored.isOpen());
+    EXPECT_EQ(restored.prices().current("raspberry"), day.prices().current("raspberry"));
+    ASSERT_NE(restored.findTruck(truck.id()), nullptr);
+    ASSERT_NE(restored.findReceipt(receiptId), nullptr);
+    // The open receipt keeps taking weighings after the restart.
+    EXPECT_EQ(restored.addWeighing(receiptId, raspberryPallet(), kMidnight + 14h), 1U);
+}
+
+TEST(WorkDay, RestoredClosedSessionStaysClosed) {
+    WorkDay day = openAtNoon();
+    day.close(kMidnight + 20h, kPetro);
+    const Amendment amendment{.by = kOksana, .at = kMidnight + 30h, .reason = "забули ціну"};
+    day.setPrice("raspberry", hryvnias(80), kMidnight + 12h, amendment);
+
+    const WorkDay restored = WorkDay::restore({
+        .id = day.id(),
+        .date = day.date(),
+        .openedAt = day.openedAt(),
+        .openedBy = day.openedBy(),
+        .closedAt = day.closedAt(),
+        .closedBy = day.closedBy(),
+        .prices = day.prices(),
+        .trucks = day.trucks(),
+        .amendments = day.amendments(),
+        .openReceipts = {},
+    });
+    EXPECT_FALSE(restored.isOpen());
+    EXPECT_EQ(restored.closedBy(), kPetro);
+    ASSERT_EQ(restored.amendments().size(), 1U);
+    EXPECT_EQ(restored.amendments()[0].amendment.reason, "забули ціну");
+}
+
+TEST(WorkDay, RestoreRejectsInconsistentRecord) {
+    const WorkDayRecord base{.id = Uuid::generateV7(), .date = kDate, .openedAt = kMidnight + 12h, .openedBy = kOksana};
+    WorkDayRecord halfClosed = base;
+    halfClosed.closedAt = kMidnight + 20h; // but nobody closed it
+    EXPECT_THROW((void)WorkDay::restore(halfClosed), std::invalid_argument);
+
+    WorkDayRecord closedWithReceipt = base;
+    closedWithReceipt.closedAt = kMidnight + 20h;
+    closedWithReceipt.closedBy = kOksana;
+    closedWithReceipt.openReceipts.push_back(OpenReceipt::open(42));
+    EXPECT_THROW((void)WorkDay::restore(closedWithReceipt), std::invalid_argument);
+
+    WorkDayRecord nilId = base;
+    nilId.id = Uuid{};
+    EXPECT_THROW((void)WorkDay::restore(nilId), std::invalid_argument);
+}

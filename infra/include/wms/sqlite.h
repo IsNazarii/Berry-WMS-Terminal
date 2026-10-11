@@ -81,8 +81,11 @@ private:
     sqlite3* db_ = nullptr;
 };
 
-// BEGIN in the constructor; ROLLBACK in the destructor unless commit() was
-// called, so an exception halfway through a write leaves nothing behind.
+// Starts a transaction in the constructor and rolls it back in the destructor
+// unless commit() was called, so an exception halfway through a write leaves
+// nothing behind. Transactions nest: a store saves in its own transaction,
+// and a caller writing to two stores wraps both in an outer one, which then
+// decides whether any of it stays.
 class ScopedTransaction {
 public:
     explicit ScopedTransaction(Database& db);

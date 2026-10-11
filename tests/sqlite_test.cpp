@@ -120,3 +120,31 @@ TEST(SqliteTest, FileDatabaseUsesWriteAheadLog) {
     std::filesystem::remove(path.string() + "-wal");
     std::filesystem::remove(path.string() + "-shm");
 }
+
+TEST(SqliteTest, TransactionsNest) {
+    // A store's own transaction inside the caller's: the outer one decides.
+    Database db = memoryWithTable();
+    {
+        ScopedTransaction outer{db};
+        {
+            ScopedTransaction inner{db};
+            db.execute("INSERT INTO item (name) VALUES ('inner')");
+            inner.commit();
+        }
+        // No commit: the inner, committed part goes too.
+    }
+    {
+        ScopedTransaction outer{db};
+        db.execute("INSERT INTO item (name) VALUES ('outer')");
+        {
+            ScopedTransaction inner{db};
+            db.execute("INSERT INTO item (name) VALUES ('failed')");
+        }
+        outer.commit();
+    }
+
+    Statement select = db.prepare("SELECT name FROM item");
+    ASSERT_TRUE(select.step());
+    EXPECT_EQ(select.columnText(0), "outer");
+    EXPECT_FALSE(select.step());
+}

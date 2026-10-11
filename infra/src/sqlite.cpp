@@ -125,19 +125,24 @@ std::int64_t Database::lastInsertRowId() const noexcept { return sqlite3_last_in
 
 // --- ScopedTransaction ---
 
-ScopedTransaction::ScopedTransaction(Database& db) : db_{db} { db_.execute("BEGIN IMMEDIATE"); }
+// Savepoints rather than BEGIN/COMMIT, since only they nest. The outermost
+// one starts a deferred transaction; that is fine with a single writer (one
+// terminal process), as WAL readers never block it.
+ScopedTransaction::ScopedTransaction(Database& db) : db_{db} { db_.execute("SAVEPOINT scoped"); }
 
 ScopedTransaction::~ScopedTransaction() {
     if (done_) return;
     try {
-        db_.execute("ROLLBACK");
+        // ROLLBACK TO undoes the changes but keeps the savepoint open; RELEASE ends it.
+        db_.execute("ROLLBACK TO scoped; RELEASE scoped");
     } catch (const Error&) {
         // sqlite rolls back by itself after some errors; nothing left to undo.
     }
 }
 
 void ScopedTransaction::commit() {
-    db_.execute("COMMIT");
+    // Durable only when the outermost savepoint is released.
+    db_.execute("RELEASE scoped");
     done_ = true;
 }
 

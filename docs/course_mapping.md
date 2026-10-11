@@ -21,7 +21,7 @@
 | Класи / типи | 9 | 19 класів ядра + допоміжні структури (`Weighing`, `Cargo`, `TruckDetails`, `PriceChange`, `Amendment`, `AmendmentRecord`, `ToWarehouse`) |
 | Поля | 15 | значно більше (напр., лише `Weighing` — 9, `WorkDay` — 9, `Truck` — 5) |
 | Нетривіальні методи | 25 | значно більше (див. нижче) |
-| Ієрархії успадкування | 2, одна ≥ 3 класи | A: `Transaction` → 4 класи; B: `IScaleDriver` → `SimulatedScaleDriver` |
+| Ієрархії успадкування | 2, одна ≥ 3 класи | A: `Transaction` → 4 класи; B: `IScaleDriver` → `SimulatedScaleDriver`; C: `JournalStore` → `SqliteJournalStore` (infra) |
 | Поліморфізм | 3, ≥1 статичний, ≥1 динамічний | 6+ випадків (таблиця нижче) |
 | Інкапсуляція | доцільні рівні доступу | див. нижче |
 
@@ -29,7 +29,8 @@
 
 `Quantity<Tag>` (`Money`, `Weight`), `Uuid`, `Supplier`, `Operator`, `Transaction`, `Receipt`,
 `Payment`, `Allocation`, `StockShipment`, `OpenReceipt`, `Truck`, `Journal`, `DayPrices`, `WorkDay`,
-`IScaleDriver`, `SimulatedScaleDriver`, `StabilityDetector` + UI-класи `Terminal`, `SupplierListModel`,
+`IScaleDriver`, `SimulatedScaleDriver`, `StabilityDetector`, `JournalStore` + infra-класи
+`sqlite::Database`, `sqlite::Statement`, `sqlite::ScopedTransaction`, `sqlite::Error`, `SqliteJournalStore` + UI-класи `Terminal`, `SupplierListModel`,
 `ScaleMonitor`. Детально — [domain.md](domain.md).
 
 ### Ієрархії
@@ -42,6 +43,7 @@ classDiagram
     Transaction <|-- StockShipment
     IScaleDriver <|-- SimulatedScaleDriver
     IScaleDriver <|.. SerialScaleDriver : заплановано (infra)
+    JournalStore <|-- SqliteJournalStore
 ```
 
 ### Поліморфізм
@@ -49,7 +51,7 @@ classDiagram
 | # | Вид | Де |
 |---|---|---|
 | 1 | Динамічний (віртуальні методи) | `Transaction::kind/balanceEffect/validate/describe` у 4 нащадках; `Journal::historyOf` віддає `const Transaction*` — Каса показує чеки й виплати через `describe()`/`balanceEffect()` |
-| 2 | Динамічний (інтерфейс) | `IScaleDriver` — `ScaleMonitor` працює з будь-яким драйвером |
+| 2 | Динамічний (інтерфейс) | `IScaleDriver` — `ScaleMonitor` працює з будь-яким драйвером; `JournalStore` — ядро не знає, що журнал лежить у SQLite |
 | 3 | Статичний (шаблон з тегом) | `Quantity<Tag>`: `Money` і `Weight` — різні типи |
 | 4 | Статичний (`std::variant` + `std::visit`) | `Destination = variant<TruckId, ToWarehouse>` в `Allocation::describe`, `Journal::loadOf/stockOf` |
 | 5 | Статичний (перевантаження) | `Journal::add(Receipt / Payment / Allocation / StockShipment)`; `unallocatedOf`, `boxesOf`, `validateAllocation` для `Receipt` і `OpenReceipt`; `WorkDay::setPrice/addTruck/…` з `Amendment` і без |

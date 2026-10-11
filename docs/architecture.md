@@ -32,10 +32,10 @@ flowchart LR
 | Шар | Каталог | Ціль CMake | Залежить від | Що містить |
 |---|---|---|---|---|
 | Ядро | `core/` | `wms_core` (статична бібліотека) | лише стандартна бібліотека C++20 | доменні класи, правила, валідація, обчислення |
-| Інфраструктура | `infra/` | `wms_infra` + `sqlite3` (амальгамація) | core; Qt — лише для пристроїв | обгортка SQLite (`sqlite::Database`/`Statement`/`ScopedTransaction`) ✅; сховища, COM-порт ваг, HTTP-sync, друк — далі |
+| Інфраструктура | `infra/` | `wms_infra` + `sqlite3` (амальгамація) | core; Qt — лише для пристроїв | обгортка SQLite (`sqlite::Database`/`Statement`/`ScopedTransaction`) ✅; схема з версіями (`migrateSchema`) + `SqliteJournalStore` ✅; інші сховища, COM-порт ваг, HTTP-sync, друк — далі |
 | Інтерфейс | `ui/` | `wms_ui` + `wms_uiplugin` (QML-модуль `BerryWms.Ui`) | core, Qt Quick | QML-екрани і тонкі адаптери |
 | Точка входу | `app/` | `wms_terminal` (виконуваний) | ui | `main()`: створює `QGuiApplication`, завантажує `Main.qml` |
-| Тести | `tests/` | `wms_core_tests`, `wms_infra_tests` | core / infra, GoogleTest | 171 тест ядра + тести infra на справжній SQLite |
+| Тести | `tests/` | `wms_core_tests`, `wms_infra_tests` | core / infra, GoogleTest | 171 тест ядра + 17 тестів infra на справжній SQLite |
 
 **Правило залежностей:** лише вниз (`app → ui → infra → core`). Ядро не підключає жодного
 заголовка Qt — це перевіряється тим, що `wms_core` лінкується без Qt і тестується окремо.
@@ -174,9 +174,18 @@ sequenceDiagram
 - **`infra/` + SQLite** (`journal_mode=WAL`, періодичний бекап). Доступ — прямий C API
   `sqlite3` (амальгамація через `FetchContent`, без Qt Sql): сховища тестуються без `QCoreApplication`,
   а RAII-обгортка перетворює коди помилок на винятки `sqlite::Error`. Обгортка навмисно не вміє
-  прив'язувати `double` — гроші й вага лише цілими. Далі: таблиці для кожного типу
-  транзакції з полем `sync_status`; `OpenReceipt` зберігається після кожного зважування, щоб
-  пережити перезапуск (конструктор для відновлення вже є).
+  прив'язувати `double` — гроші й вага лише цілими.
+  - ✅ Схема: `migrateSchema` веде версію в `PRAGMA user_version` — список кроків лише доповнюється,
+    кожен крок і новий номер версії комітяться разом; база новішої версії відхиляється. Таблиці
+    `STRICT`; id — UUID текстом; час — наносекунди від епохи Unix (`createdAt` повертається точно);
+    гроші `_kop`, вага `_g`; переліки — текстом з `CHECK` (перестановка `enum` у C++ не змінить старі рядки).
+  - ✅ Журнал: інтерфейс `JournalStore` у core (`save(Receipt|Payment|Allocation|StockShipment)`, `load()`),
+    реалізація `SqliteJournalStore`: таблиці `receipt` + `weighing` (рядки з номером `line` — на нього
+    посилаються розподіли), `payment`, `allocation` (`truck_id` NULL = склад; без зовнішнього ключа на `receipt`,
+    бо палета відкритого чека йде у фуру раніше, ніж чек записано), `stock_shipment`; усі з `sync_status`.
+    Повторне збереження того самого UUID — `false` (`ON CONFLICT DO NOTHING RETURNING`).
+  - Далі: `OpenReceipt` зберігається після кожного зважування, щоб пережити перезапуск
+    (конструктор для відновлення вже є); сесії, довідники; підключення до `Terminal`.
 - **Sync**: outbox незасинхронізованих записів, батчі, сервер повертає прийняті UUID
   (`Transaction::markSynced()`), retry з backoff; pull довідників за курсором `updated_since`.
 - **`SerialScaleDriver`** — реалізація `IScaleDriver` через Qt SerialPort; `ScaleMonitor`

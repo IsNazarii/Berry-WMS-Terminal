@@ -149,7 +149,8 @@ ui/                       QML-модуль BerryWms.Ui (статична біб�
   src/                      Terminal, SupplierListModel, ScaleMonitor
   qml/Main.qml              вікно, вкладки, футер
   qml/screens/*.qml         екрани
-infra/                    інфраструктура (бібліотека wms_infra): обгортка SQLite
+infra/                    інфраструктура (бібліотека wms_infra): обгортка SQLite,
+                            схема з версіями, сховище журналу
 app/main.cpp              точка входу (виконуваний файл wms_terminal)
 tests/*_test.cpp          unit-тести ядра (wms_core_tests)
 docs/                     документація

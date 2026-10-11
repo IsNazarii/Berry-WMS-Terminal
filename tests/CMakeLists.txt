@@ -23,5 +23,12 @@ add_executable(wms_core_tests
 )
 target_link_libraries(wms_core_tests PRIVATE wms_core GTest::gtest_main)
 
+# Infrastructure tests run against real (in-memory or temporary) databases.
+add_executable(wms_infra_tests
+    sqlite_test.cpp
+)
+target_link_libraries(wms_infra_tests PRIVATE wms_infra GTest::gtest_main)
+
 include(GoogleTest)
 gtest_discover_tests(wms_core_tests)
+gtest_discover_tests(wms_infra_tests)

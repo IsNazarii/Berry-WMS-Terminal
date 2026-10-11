@@ -100,7 +100,7 @@
 ```mermaid
 flowchart TD
     UI["ui/ — QML-екрани + тонкі Qt-адаптери<br/>(Terminal, SupplierListModel, ScaleMonitor)"]
-    INFRA["infra/ — SQLite, COM-порт ваг, HTTP-sync, друк чека<br/>(ще немає)"]
+    INFRA["infra/ — SQLite ✅, COM-порт ваг, HTTP-sync, друк чека<br/>(wms_infra)"]
     CORE["core/ — доменна модель, чистий C++20 без Qt<br/>(wms_core)"]
     APP["app/ — main(): запуск QML"]
     TESTS["tests/ — GoogleTest"]
@@ -117,8 +117,8 @@ flowchart TD
 ## Збірка й запуск
 
 **Потрібно:** CMake ≥ 3.28, Ninja, компілятор з C++20 і `<format>` (GCC 13+ / Clang 17+),
-Qt ≥ 6.8 (модулі Quick, QuickControls2). GoogleTest завантажується автоматично (потрібна мережа
-при першій конфігурації).
+Qt ≥ 6.8 (модулі Quick, QuickControls2). GoogleTest і SQLite завантажуються автоматично (потрібна
+мережа при першій конфігурації).
 
 ```bash
 cmake -S . -B build -G Ninja
@@ -149,6 +149,7 @@ ui/                       QML-модуль BerryWms.Ui (статична біб�
   src/                      Terminal, SupplierListModel, ScaleMonitor
   qml/Main.qml              вікно, вкладки, футер
   qml/screens/*.qml         екрани
+infra/                    інфраструктура (бібліотека wms_infra): обгортка SQLite
 app/main.cpp              точка входу (виконуваний файл wms_terminal)
 tests/*_test.cpp          unit-тести ядра (wms_core_tests)
 docs/                     документація
@@ -194,6 +195,7 @@ docs/                     документація
 | Бібліотека | Для чого |
 |---|---|
 | [Qt 6](https://www.qt.io/) (Quick, QuickControls2) | інтерфейс термінала |
+| [SQLite 3.51](https://sqlite.org/) | локальна база термінала (офіційна амальгамація, завантажується CMake автоматично) |
 | [GoogleTest 1.17](https://github.com/google/googletest) | unit-тести (завантажується CMake автоматично) |
 
 Заплановано для лаби 3: [libharu](https://github.com/libharu/libharu) (PDF),

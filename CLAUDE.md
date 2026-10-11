@@ -78,10 +78,11 @@
 ```
 core/   чистий C++20, БЕЗ Qt — доменна модель і правила (тестується GoogleTest)
         include/wms/*.h, src/*.cpp, namespace wms, бібліотека wms_core
-infra/  (ще немає) SQLite, серійний порт, HTTP, друк чека — реалізації інтерфейсів з core
-ui/     (ще немає) QML + тонкі Qt-адаптери (QObject/моделі), без бізнес-логіки
-app/    main() — зараз консольне демо ядра, виконуваний файл wms_terminal
-tests/  unit-тести, *_test.cpp, GoogleTest v1.17 через FetchContent
+infra/  wms_infra: обгортка SQLite (C API, амальгамація 3.51.2 через FetchContent, namespace wms::sqlite);
+        далі — сховища, серійний порт, HTTP, друк чека — реалізації інтерфейсів з core
+ui/     QML-модуль BerryWms.Ui + тонкі Qt-адаптери (QObject/моделі), без бізнес-логіки
+app/    main() — запуск QML, виконуваний файл wms_terminal
+tests/  unit-тести, *_test.cpp, GoogleTest v1.17 через FetchContent; wms_core_tests + wms_infra_tests
 ```
 Залежності лише вниз: ui → infra → core. core не знає про Qt.
 
@@ -230,8 +231,10 @@ F2 → `SupplierPicker`; по центру обраний `cashSupplierId` (ок
 сума — `balanceEffect()`). Сигнал `cashChanged` ← `journalChanged`. `Payment` не знає оператора — ❓ додати разом зі SQLite.
 
 Наступні кроки (кожен — окремий коміт, ядро тест-першим):
-1. SQLite (`infra/`): сховище журналу й довідників; разом — відновлення відкритих чеків, архів закритих сесій,
-   оператор у `Payment`.
+1. SQLite (`infra/`), обрано прямий C API `sqlite3` (не Qt Sql). Кроки:
+   a) ✅ обгортка `sqlite::Database`/`Statement`/`ScopedTransaction`/`Error` (WAL, foreign_keys, без `double`);
+   b) схема + сховище журналу (`Receipt`/`Payment`/`Allocation`/`StockShipment`), інтерфейс у core;
+   c) відкриті чеки, сесії (архів закритих), довідники, оператор у `Payment` → підключити до `Terminal`.
 - Історії руху складу (прихід/відвантаження) в UI нема — `Journal` не віддає записи; за потреби — запит у ядрі.
 - Повідомлення ядра про розподіл містять код культури (`raspberry`), а не назву — назви живуть у UI (`kCrops`).
 - ❓ Захист від подвійного запису тієї самої палети (вимагати повернення ваг до нуля між зважуваннями) —

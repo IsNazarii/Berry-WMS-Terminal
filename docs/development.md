@@ -8,7 +8,8 @@
 | Компілятор | з повною підтримкою C++20 і `<format>`: GCC 13+ (перевірено на GCC 16), Clang 17+ |
 | CMake | ≥ 3.28 (у CLion — вбудований) |
 | Генератор | Ninja |
-| Qt | ≥ 6.8: Quick, QuickControls2 (далі знадобляться SerialPort, Sql) |
+| Qt | ≥ 6.8: Quick, QuickControls2 (далі знадобиться SerialPort) |
+| SQLite | 3.51.2, амальгамація через `FetchContent` (системний `sqlite-devel` не потрібен); компілюється з `-w` — чужий код |
 | GoogleTest | 1.17, завантажується через `FetchContent` — потрібна мережа при першій конфігурації |
 
 ## 2. Збірка
@@ -32,7 +33,9 @@ $CM/cmake -S . -B build -G Ninja && $CM/cmake --build build && $CM/ctest --test-
 | `wms_core` | доменне ядро (статична бібліотека) |
 | `wms_ui`, `wms_uiplugin` | QML-модуль `BerryWms.Ui` |
 | `wms_terminal` | виконуваний файл термінала |
-| `wms_core_tests` | unit-тести |
+| `wms_infra` | інфраструктура: обгортка SQLite (статична бібліотека) |
+| `sqlite3` | SQLite з амальгамації |
+| `wms_core_tests`, `wms_infra_tests` | unit-тести ядра й інфраструктури |
 | `wms_ui_qmllint` | перевірка QML-файлів `qmllint` |
 
 Опції CMake: `WMS_BUILD_TESTS` (за замовчуванням `ON`).
@@ -42,9 +45,10 @@ $CM/cmake -S . -B build -G Ninja && $CM/cmake --build build && $CM/ctest --test-
 
 ## 3. Тести
 
-- GoogleTest, файли `tests/<модуль>_test.cpp`, один виконуваний `wms_core_tests`;
+- GoogleTest, файли `tests/<модуль>_test.cpp`, виконувані `wms_core_tests` і `wms_infra_tests`
+  (останній — на справжній SQLite: `:memory:` або тимчасовий файл);
   `gtest_discover_tests` реєструє кожен тест у CTest окремо.
-- Покривається лише ядро (UI — тонкий шар без правил).
+- Покриваються ядро й infra (UI — тонкий шар без правил).
 - Детермінованість: `Uuid::generateV7(time, randA, randB)` і явні `TimePoint` замість
   `Clock::now()` там, де час важливий.
 

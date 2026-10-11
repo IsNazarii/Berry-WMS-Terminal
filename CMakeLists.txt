@@ -9,6 +9,7 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 option(WMS_BUILD_TESTS "Build unit tests" ON)
 
 add_subdirectory(core)
+add_subdirectory(infra)
 
 # Qt is used only by the UI layer and the entry point; core stays Qt-free.
 find_package(Qt6 6.8 REQUIRED COMPONENTS Quick QuickControls2)

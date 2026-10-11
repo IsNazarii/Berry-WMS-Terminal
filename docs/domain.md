@@ -327,7 +327,7 @@ cargo()  = {boxCount, net()}
 - `OpenReceipt::open(supplier)` — новий id і час. **Id остаточний з самого початку**: палети
   можуть піти у фуру ще до закриття, і їхні `Allocation` посилаються на цей id.
 - Повний конструктор `OpenReceipt(id, openedAt, supplier, weighings)` — для відновлення після
-  перезапуску (коли з'явиться SQLite).
+  перезапуску (`SqliteSessionStore` читає відкриті чеки разом із сесією).
 - `add(weighing)` → індекс рядка; кидає `invalid_argument`, якщо `weighing.validate()` не порожній.
 - `cancel(i)` — позначає рядок анульованим.
 - `total()`, `cargoOf(crop)` — без анульованих рядків.

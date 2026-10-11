@@ -35,7 +35,7 @@ flowchart LR
 | Інфраструктура | `infra/` | `wms_infra` + `sqlite3` (амальгамація) | core; Qt — лише для пристроїв | обгортка SQLite (`sqlite::Database`/`Statement`/`ScopedTransaction`) ✅; схема з версіями (`migrateSchema`) + `SqliteJournalStore` + `SqliteSessionStore` ✅; інші сховища, COM-порт ваг, HTTP-sync, друк — далі |
 | Інтерфейс | `ui/` | `wms_ui` + `wms_uiplugin` (QML-модуль `BerryWms.Ui`) | core, Qt Quick | QML-екрани і тонкі адаптери |
 | Точка входу | `app/` | `wms_terminal` (виконуваний) | ui | `main()`: створює `QGuiApplication`, завантажує `Main.qml` |
-| Тести | `tests/` | `wms_core_tests`, `wms_infra_tests` | core / infra, GoogleTest | 176 тестів ядра + 23 тести infra на справжній SQLite |
+| Тести | `tests/` | `wms_core_tests`, `wms_infra_tests` | core / infra, GoogleTest | 176 тестів ядра + 24 тести infra на справжній SQLite |
 
 **Правило залежностей:** лише вниз (`app → ui → infra → core`). Ядро не підключає жодного
 заголовка Qt — це перевіряється тим, що `wms_core` лінкується без Qt і тестується окремо.
@@ -61,17 +61,28 @@ flowchart BT
     ui[wms_ui]
     plugin[wms_uiplugin]
     term[wms_terminal]
+    infra[wms_infra]
+    sqlite[sqlite3]
+    style[wms_style]
     tests[wms_core_tests]
+    itests[wms_infra_tests]
     gtest[GTest::gtest_main]
     qt[Qt6::Quick / QuickControls2]
 
+    infra --> core
+    infra --> sqlite
     ui --> core
+    ui --> infra
+    ui --> style
     ui --> qt
+    style --> qt
     plugin --> ui
     term --> ui
     term --> plugin
     tests --> core
     tests --> gtest
+    itests --> infra
+    itests --> gtest
 ```
 
 - `wms_ui` — статична бібліотека, тому QML-плагін імпортується явно:
@@ -171,7 +182,7 @@ sequenceDiagram
 
 ## 8. Що буде далі в архітектурі
 
-- **`infra/` + SQLite** (`journal_mode=WAL`, періодичний бекап). Доступ — прямий C API
+- **`infra/` + SQLite** (`journal_mode=WAL`; періодичний бекап — далі). Доступ — прямий C API
   `sqlite3` (амальгамація через `FetchContent`, без Qt Sql): сховища тестуються без `QCoreApplication`,
   а RAII-обгортка перетворює коди помилок на винятки `sqlite::Error`. `ScopedTransaction` побудовано на
   `SAVEPOINT`, тож транзакції вкладаються: сховище пише у своїй, а запис у два сховища (закриття чека =

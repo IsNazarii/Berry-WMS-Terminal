@@ -3,7 +3,7 @@
 Спілкування з користувачем — українською. Код, ідентифікатори, коміти — англійською.
 
 ## Що це
-Термінал приймальника ягід (малина, полуниця, лохина; локація Лосятин): прийом → зважування →
+Термінал приймальника ягід (малина, полуниця, лохина): прийом → зважування →
 розподіл по фурах → розрахунок з постачальником. Offline-first. Один проєкт = особиста ідея
 автора + навчальний проєкт курсу ООП (соло, без команди).
 
@@ -114,7 +114,7 @@ $CM/cmake -S . -B build -G Ninja && $CM/cmake --build build && $CM/ctest --test-
   (приймають `Receipt` і `OpenReceipt`) ✅
 - Інші класи: `Uuid`, `Supplier`, `StabilityDetector`, `Weighing`, `Truck`, `Cargo`, `Journal`, `DayPrices`,
   `WorkDay`, `Operator`, `OpenReceipt` ✅
-- Стан на 26.09: 19 класів ядра, 2 ієрархії (A — 5 класів), 6+ поліморфізмів, 158 тестів (зараз 176 ядра + 23 infra) — лаба 1 закрита із запасом.
+- Стан на 26.09: 19 класів ядра, 2 ієрархії (A — 5 класів), 6+ поліморфізмів, 158 тестів (зараз 176 ядра + 24 infra) — лаба 1 закрита із запасом.
 
 Лаба 2: ≥4 екрани (Вхід, Прийом, Сесія, Розподіл, Склад, Каса, + Sync/Довідники),
 ≥20 контролів, ≥1 контейнер (ListView), ≥10 обробників, логіка відділена.
@@ -135,7 +135,7 @@ $CM/cmake -S . -B build -G Ninja && $CM/cmake --build build && $CM/ctest --test-
 ## Оточення
 - Fedora, CLion (cmake у PATH відсутній — використовується вбудований у CLion).
 - Qt6 6.11: встановлені Gui/Quick/Qml/SerialPort/Sql/Test (+ драйвер QSQLITE). `sqlite-devel` не встановлено.
-- Git: гілка `main`, remote `origin` = git@github.com:IsNazarii/Berry-WMS-Terminal.git (SSH-ключ `~/.ssh/id_ed25519` працює — push можна робити з термінала).
+- Git: гілка `main`, remote `origin` = git@github.com:IsNazarii/Berry-WMS-Terminal.git (push можна робити з термінала).
 - GoogleTest у системі не встановлено — тягнеться FetchContent (потрібна мережа при першій конфігурації).
 
 ## Стан і наступні кроки (оновлено 11.10.2026)
@@ -182,7 +182,7 @@ UI (`ui/`, модуль `BerryWms.Ui`, статична бібліотека + `
 головна кнопка «Прийому» не обрізається (`minimumWidth: implicitWidth`, коротший текст при ширині < 520).
 Запуск без вікна: `WMS_DATABASE=:memory: QT_FORCE_STDERR_LOGGING=1 QT_QPA_PLATFORM=offscreen timeout 3 build/app/wms_terminal` —
 без `QT_FORCE_STDERR_LOGGING` попередження йдуть у journald, а `console.log` (debug) у Fedora вимкнено.
-**Стиль:** HTML-макет «Прийому» (артефакт https://claude.ai/artifact/K3PC1SkAU28VYJijyLp9nq) → синглтон
+**Стиль:** HTML-макет «Прийому» → синглтон
 `ui/style/Theme.qml` (токени, світла/темна, шрифт Onest з `ui/style/fonts/` + табличні цифри). В екранах жодних літеральних кольорів/розмірів — лише `Theme.*`.
 Власний стиль контролів — модуль `BerryWms.Style` (`ui/style/`, шаблони `QtQuick.Templates`, запасний — Basic),
 вмикається в `main.cpp` (`QQuickStyle::setStyle`). Кнопка `highlighted` = одна головна дія панелі; `WarningButton` — ризикована дія поруч.

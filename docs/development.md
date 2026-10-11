@@ -8,7 +8,7 @@
 | Компілятор | з повною підтримкою C++20 і `<format>`: GCC 13+ (перевірено на GCC 16), Clang 17+ |
 | CMake | ≥ 3.28 (у CLion — вбудований) |
 | Генератор | Ninja |
-| Qt | ≥ 6.8: Quick, QuickControls2 (далі знадобиться SerialPort) |
+| Qt | ≥ 6.8: Quick, QuickControls2 (далі знадобиться SerialPort); переклади `qt6-qttranslations` — необов'язково, для українських стандартних кнопок |
 | SQLite | 3.51.2, амальгамація через `FetchContent` (системний `sqlite-devel` не потрібен); компілюється з `-w` — чужий код |
 | GoogleTest | 1.17, завантажується через `FetchContent` — потрібна мережа при першій конфігурації |
 
@@ -32,8 +32,9 @@ $CM/cmake -S . -B build -G Ninja && $CM/cmake --build build && $CM/ctest --test-
 |---|---|
 | `wms_core` | доменне ядро (статична бібліотека) |
 | `wms_ui`, `wms_uiplugin` | QML-модуль `BerryWms.Ui` |
+| `wms_style` | QML-модуль `BerryWms.Style`: власний стиль контролів, `Theme`, шрифт |
 | `wms_terminal` | виконуваний файл термінала |
-| `wms_infra` | інфраструктура: обгортка SQLite (статична бібліотека) |
+| `wms_infra` | інфраструктура: обгортка SQLite, схема, сховища журналу й сесій (статична бібліотека) |
 | `sqlite3` | SQLite з амальгамації |
 | `wms_core_tests`, `wms_infra_tests` | unit-тести ядра й інфраструктури |
 | `wms_ui_qmllint` | перевірка QML-файлів `qmllint` |
@@ -66,13 +67,25 @@ $CM/cmake -S . -B build -G Ninja && $CM/cmake --build build && $CM/ctest --test-
 | `shipment_test` | відвантаження зі складу |
 | `journal_test` | баланс, завантаження, склад, ідемпотентність, усі `validate…` |
 | `pricing_test` | історія цін, `priceAt` за часом |
-| `workday_test` | сесія: ціни, фури, перенесення, відкриті чеки, закриття, поправки |
+| `workday_test` | сесія: ціни, фури, перенесення, відкриті чеки, закриття, поправки, `restore` |
+| `sqlite_test` *(infra)* | обгортка: прив'язка й читання, `NULL`, помилки, зовнішні ключі, WAL, відкат і вкладені транзакції |
+| `sqlite_journal_store_test` *(infra)* | кожен тип запису туди й назад, повторний UUID, перевідкриття файлу, відмова від новішої версії схеми |
+| `sqlite_session_store_test` *(infra)* | знімок сесії (ціни, фури, відкриті чеки, поправки), перезапис, `current` / `lastClosed`, спільна база з журналом |
 
 Запустити один набір:
 
 ```bash
 ./build/tests/wms_core_tests --gtest_filter='Journal*'
+./build/tests/wms_infra_tests
 ```
+
+Запуск термінала без вікна (перевірити, що QML завантажується без попереджень):
+
+```bash
+WMS_DATABASE=:memory: QT_FORCE_STDERR_LOGGING=1 QT_QPA_PLATFORM=offscreen timeout 3 build/app/wms_terminal
+```
+
+Без `QT_FORCE_STDERR_LOGGING` попередження Qt ідуть у journald.
 
 ## 4. Стиль коду
 

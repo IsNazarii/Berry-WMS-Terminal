@@ -18,9 +18,11 @@ UI — QML-модуль `BerryWms.Ui` (статична бібліотека `wm
 | `ui/qml/screens/SessionScreen.qml` | сесія: ціни, фури, закриття |
 | `ui/qml/screens/ReceivingScreen.qml` | прийом: відкриті чеки, ваги, форма, рядки чека |
 | `ui/qml/screens/SectionCaption.qml`, `FieldCaption.qml`, `ColumnHeader.qml` | спільні підписи: капітель над групою; підпис поля з підказкою; заголовок колонки таблиці |
-| `ui/qml/screens/SupplierPicker.qml` | спливний пошук постачальника (стане в пригоді й у Касі) |
+| `ui/qml/screens/SupplierPicker.qml` | спливний пошук постачальника (Прийом і Каса) |
 | `ui/qml/screens/AllocationScreen.qml` | розподіл: чеки з нерозподіленим, палети/ящики, фури і склад |
+| `ui/qml/screens/WarehouseScreen.qml` | склад: залишок за культурами, відвантаження у фуру |
 | `ui/qml/screens/CashScreen.qml` | каса: борги, виплата, історія |
+| `ui/qml/screens/NoSessionNotice.qml` | заглушка «сесію не відкрито» з кнопкою «До сесії» (Прийом, Розподіл) |
 
 ## 2. Вікно (`Main.qml`)
 
@@ -259,7 +261,8 @@ UI — QML-модуль `BerryWms.Ui` (статична бібліотека `wm
 
 | Властивість | Сигнал | Зміст |
 |---|---|---|
-| `operators`, `loggedIn`, `operatorName` | `operatorChanged` | вхід |
+| `operators` | CONSTANT | оператори без PIN (для списку входу) |
+| `loggedIn`, `operatorName` | `operatorChanged` | вхід |
 | `sessionOpen`, `sessionTitle`, `sessionOpenedBy` | `sessionChanged` | сесія |
 | `crops` | — (CONSTANT) | `[{cropCode, name}]` — стала модель рядків |
 | `prices` | `pricesChanged` | `{cropCode: "85,00"}` — число без одиниці |
@@ -318,7 +321,7 @@ flowchart LR
 журналу, тому `trucksChanged` під'єднано до обох. Екран розподілу залежить від фур, журналу й
 відкритих чеків — `allocationChanged` іде від `trucksChanged` і `receiptsChanged`.
 
-### 4.5 Відкритий чи закритий чек: `std::visit`
+### 4.4 Відкритий чи закритий чек: `std::visit`
 
 Розподіляти можна і з відкритого чека (`OpenReceipt`, ще не в журналі), і з закритого (`Receipt`).
 `Terminal` тримає обраний як `std::variant<const OpenReceipt*, const Receipt*>`, а різницю в
@@ -327,7 +330,7 @@ flowchart LR
 `std::visit` обслуговує обидва типи, а `Allocation::wholeWeighing/boxesOf` приймають будь-який
 `WeighedReceipt`.
 
-### 4.4 Урок: стала модель рядків
+### 4.5 Урок: стала модель рядків
 
 `Repeater` над списком, що змінюється, **перебудовує всі рядки** — і стирає текст, який оператор
 саме вводить. Тому на екрані сесії рядки цін будуються зі сталого `crops`, а змінні ціни беруться
@@ -365,7 +368,7 @@ flowchart LR
 
 - оператори: **Назарій** (PIN `1111`), **Оксана** (PIN `2222`);
 - постачальники: #42 Шевченко Тарас, #43 Коваленко Олена, #44 Бондар Петро, #45 Мельник Ірина,
-  #77 ФГ «Лосятинські ягоди»;
+  #77 ФГ «Ягідний край»;
 - культури: малина, полуниця, лохина (`kCrops`);
 - «вчорашня» закрита сесія: фура `BI1234AA` відправлена, `BI5678BB` перенесена з однією палетою;
 - історія: роздрібний чек Шевченка (120 кг брутто, 40 ящ., 85 грн/кг), його палета у фурі

@@ -9,7 +9,7 @@
 
 ![C++20](https://img.shields.io/badge/C%2B%2B-20-blue)
 ![Qt](https://img.shields.io/badge/Qt-6.8%2B%20QML-green)
-![Tests](https://img.shields.io/badge/tests-164%20passing-brightgreen)
+![Tests](https://img.shields.io/badge/tests-200%20passing-brightgreen)
 ![Status](https://img.shields.io/badge/status-alpha%20in%20progress-orange)
 
 ---
@@ -91,7 +91,7 @@
 | Дата | Етап | Стан |
 |---|---|---|
 | 25.09.2026 | Лаба 1 — ООП-ядро | ✅ |
-| 23.10.2026 | Лаба 2 — GUI, альфа | 🔄 4 з 5 екранів |
+| 23.10.2026 | Лаба 2 — GUI, альфа | 🔄 усі 6 екранів, лишилися довідники в базі |
 | 13.11.2026 | Лаба 3 — зовнішня бібліотека (друк чека), реліз | ⏳ |
 
 ## Архітектура коротко
@@ -116,13 +116,14 @@ flowchart TD
 ## Збірка й запуск
 
 **Потрібно:** CMake ≥ 3.28, Ninja, компілятор з C++20 і `<format>` (GCC 13+ / Clang 17+),
-Qt ≥ 6.8 (модулі Quick, QuickControls2). GoogleTest і SQLite завантажуються автоматично (потрібна
+Qt ≥ 6.8 (модулі Quick, QuickControls2; для українських стандартних кнопок Qt — переклади
+`qt6-qttranslations`, необов'язково). GoogleTest і SQLite завантажуються автоматично (потрібна
 мережа при першій конфігурації).
 
 ```bash
 cmake -S . -B build -G Ninja
 cmake --build build
-ctest --test-dir build --output-on-failure   # 171 тест
+ctest --test-dir build --output-on-failure   # 200 тестів
 ./build/app/wms_terminal                      # термінал
 ```
 
@@ -147,13 +148,14 @@ core/                     доменне ядро (бібліотека wms_core
   include/wms/*.h           публічні заголовки
   src/*.cpp                 реалізація
 ui/                       QML-модуль BerryWms.Ui (статична бібліотека wms_ui)
-  src/                      Terminal, SupplierListModel, ScaleMonitor
+  src/                      Terminal, SupplierListModel, ScaleMonitor, display_format
   qml/Main.qml              вікно, вкладки, футер
   qml/screens/*.qml         екрани
+  style/                    модуль BerryWms.Style: власний стиль контролів, Theme.qml, шрифт Onest
 infra/                    інфраструктура (бібліотека wms_infra): обгортка SQLite,
-                            схема з версіями, сховище журналу
+                            схема з версіями, сховища журналу й сесій
 app/main.cpp              точка входу (виконуваний файл wms_terminal)
-tests/*_test.cpp          unit-тести ядра (wms_core_tests)
+tests/*_test.cpp          unit-тести ядра (wms_core_tests) та infra (wms_infra_tests)
 docs/                     документація
   source/                   первинні вимоги (автора і курсу)
 ```
@@ -184,8 +186,9 @@ docs/                     документація
 
 ## Дорожня карта
 
-1. UI: прохід по UX.
-2. `infra/`: SQLite ✅ журнал, сесії (архів), відкриті чеки переживають перезапуск; далі — довідники в базі, бекап.
+1. ✅ Усі шість екранів альфи + прохід по UX.
+2. `infra/`: SQLite ✅ журнал, сесії (архів), відкриті чеки переживають перезапуск; далі — довідники
+   (постачальники, оператори) в базі, оператор у виплаті, періодичний бекап.
 3. Друк чека: libharu (PDF) + qrcodegen (QR з UUID) або ESC/POS — лаба 3.
 4. Синхронізація з мінімальним сервером-заглушкою: outbox, батчі, retry з backoff.
 5. Драйвер реальних ваг через COM-порт (`SerialScaleDriver`).
@@ -197,6 +200,7 @@ docs/                     документація
 | Бібліотека | Для чого |
 |---|---|
 | [Qt 6](https://www.qt.io/) (Quick, QuickControls2) | інтерфейс термінала |
+| [Onest](https://fonts.google.com/specimen/Onest) (OFL 1.1) | шрифт інтерфейсу, вбудований у ресурси |
 | [SQLite 3.51](https://sqlite.org/) | локальна база термінала (офіційна амальгамація, завантажується CMake автоматично) |
 | [GoogleTest 1.17](https://github.com/google/googletest) | unit-тести (завантажується CMake автоматично) |
 

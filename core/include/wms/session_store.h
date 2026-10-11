@@ -17,9 +17,11 @@ public:
     // after every change, so a restart loses nothing, an unclosed weighing included.
     virtual void save(const WorkDay& day) = 0;
 
-    // The session opened last, open or already closed; nullopt in a new
-    // database. If it is closed, its trucks are the ones to repeat or carry over.
-    [[nodiscard]] virtual std::optional<WorkDay> latest() const = 0;
+    // The session left open, to go on with after a restart; nullopt when none is.
+    [[nodiscard]] virtual std::optional<WorkDay> current() const = 0;
+    // The session closed last: its trucks are the ones to repeat or carry over.
+    // Nullopt before the first session is closed.
+    [[nodiscard]] virtual std::optional<WorkDay> lastClosed() const = 0;
 
 protected:
     SessionStore() = default;

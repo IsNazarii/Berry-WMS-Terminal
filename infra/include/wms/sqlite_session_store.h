@@ -15,7 +15,8 @@ public:
     explicit SqliteSessionStore(sqlite::Database& db);
 
     void save(const WorkDay& day) override;
-    [[nodiscard]] std::optional<WorkDay> latest() const override;
+    [[nodiscard]] std::optional<WorkDay> current() const override;
+    [[nodiscard]] std::optional<WorkDay> lastClosed() const override;
 
 private:
     sqlite::Database& db_;

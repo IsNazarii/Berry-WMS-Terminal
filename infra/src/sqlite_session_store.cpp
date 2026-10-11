@@ -9,6 +9,7 @@
 #include <initializer_list>
 #include <optional>
 #include <stdexcept>
+#include <string_view>
 #include <string>
 #include <utility>
 #include <vector>
@@ -134,10 +135,14 @@ void SqliteSessionStore::save(const WorkDay& day) {
     transaction.commit();
 }
 
-std::optional<WorkDay> SqliteSessionStore::latest() const {
-    sqlite::Statement session =
-        db_.prepare("SELECT id, date, opened_at_ns, opened_by, closed_at_ns, closed_by FROM session "
-                    "ORDER BY opened_at_ns DESC, rowid DESC LIMIT 1");
+namespace {
+
+// `where` and `newestBy` are fixed SQL from this file, never operator input.
+std::optional<WorkDay> loadSession(sqlite::Database& db, std::string_view where, std::string_view newestBy) {
+    sqlite::Statement session = db.prepare(
+        std::format("SELECT id, date, opened_at_ns, opened_by, closed_at_ns, closed_by FROM session "
+                    "WHERE {} ORDER BY {} DESC, rowid DESC LIMIT 1",
+                    where, newestBy));
     if (!session.step()) return std::nullopt;
 
     const std::string id = session.columnText(0);
@@ -155,14 +160,14 @@ std::optional<WorkDay> SqliteSessionStore::latest() const {
         .openReceipts = {},
     };
 
-    sqlite::Statement prices = db_.prepare(
+    sqlite::Statement prices = db.prepare(
         "SELECT crop_code, price_per_kg_kop, at_ns FROM price_change WHERE session_id = ?1 ORDER BY seq");
     prices.bind(1, id);
     while (prices.step()) {
         record.prices.set(prices.columnText(0), kopecks(prices.columnInt(1)), fromNanoseconds(prices.columnInt(2)));
     }
 
-    sqlite::Statement trucks = db_.prepare(
+    sqlite::Statement trucks = db.prepare(
         "SELECT id, plate, make, note, limit_boxes, limit_g, status FROM truck WHERE session_id = ?1 ORDER BY seq");
     trucks.bind(1, id);
     while (trucks.step()) {
@@ -173,7 +178,7 @@ std::optional<WorkDay> SqliteSessionStore::latest() const {
             fromText(kTruckStatuses, trucks.columnText(6)));
     }
 
-    sqlite::Statement amendments = db_.prepare(
+    sqlite::Statement amendments = db.prepare(
         "SELECT by_operator, at_ns, reason, change FROM amendment WHERE session_id = ?1 ORDER BY seq");
     amendments.bind(1, id);
     while (amendments.step()) {
@@ -185,9 +190,9 @@ std::optional<WorkDay> SqliteSessionStore::latest() const {
         });
     }
 
-    sqlite::Statement receipts = db_.prepare(
+    sqlite::Statement receipts = db.prepare(
         "SELECT id, opened_at_ns, supplier_id FROM open_receipt WHERE session_id = ?1 ORDER BY seq");
-    sqlite::Statement lines = db_.prepare(
+    sqlite::Statement lines = db.prepare(
         "SELECT crop_code, gross_g, box_count, tare_per_box_g, pallet_tare_g, price_per_kg_kop, price_source, "
         "weight_source, cancelled FROM open_weighing WHERE receipt_id = ?1 ORDER BY line");
     receipts.bind(1, id);
@@ -201,6 +206,16 @@ std::optional<WorkDay> SqliteSessionStore::latest() const {
     }
 
     return WorkDay::restore(std::move(record));
+}
+
+} // namespace
+
+std::optional<WorkDay> SqliteSessionStore::current() const {
+    return loadSession(db_, "closed_at_ns IS NULL", "opened_at_ns");
+}
+
+std::optional<WorkDay> SqliteSessionStore::lastClosed() const {
+    return loadSession(db_, "closed_at_ns IS NOT NULL", "closed_at_ns");
 }
 
 } // namespace wms

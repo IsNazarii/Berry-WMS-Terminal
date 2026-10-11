@@ -49,7 +49,8 @@ WorkDay busyDay() {
 TEST(SqliteSessionStore, NewDatabaseHasNoSession) {
     sqlite::Database db{":memory:"};
     const SqliteSessionStore store{db};
-    EXPECT_FALSE(store.latest().has_value());
+    EXPECT_FALSE(store.current().has_value());
+    EXPECT_FALSE(store.lastClosed().has_value());
 }
 
 TEST(SqliteSessionStore, OpenSessionComesBackAsItWas) {
@@ -58,7 +59,7 @@ TEST(SqliteSessionStore, OpenSessionComesBackAsItWas) {
     const WorkDay day = busyDay();
     store.save(day);
 
-    const auto loaded = store.latest();
+    const auto loaded = store.current();
     ASSERT_TRUE(loaded.has_value());
     EXPECT_EQ(loaded->id(), day.id());
     EXPECT_EQ(loaded->date(), kDate);
@@ -105,7 +106,7 @@ TEST(SqliteSessionStore, SavingAgainReplacesTheOldState) {
     day.departTruck(day.trucks()[0].id());
     store.save(day);
 
-    const auto loaded = store.latest();
+    const auto loaded = store.current();
     ASSERT_TRUE(loaded.has_value());
     EXPECT_EQ(loaded->openReceipts().size(), 1U); // the closed one went to the journal
     EXPECT_EQ(loaded->trucks().size(), 2U);
@@ -122,7 +123,8 @@ TEST(SqliteSessionStore, ClosedSessionKeepsWhoClosedItAndAmendments) {
                  Amendment{.by = kOksana, .at = kMidnight + 30h, .reason = "забули ціну"});
     store.save(day);
 
-    const auto loaded = store.latest();
+    EXPECT_FALSE(store.current().has_value());
+    const auto loaded = store.lastClosed();
     ASSERT_TRUE(loaded.has_value());
     EXPECT_FALSE(loaded->isOpen());
     EXPECT_EQ(loaded->closedAt(), kMidnight + 24h + 3h);
@@ -135,7 +137,7 @@ TEST(SqliteSessionStore, ClosedSessionKeepsWhoClosedItAndAmendments) {
     EXPECT_EQ(record.change, day.amendments()[0].change);
 }
 
-TEST(SqliteSessionStore, LatestIsTheLastOpenedAndOldOnesStayArchived) {
+TEST(SqliteSessionStore, OpenAndClosedSessionsAreFoundApart) {
     sqlite::Database db{":memory:"};
     SqliteSessionStore store{db};
     WorkDay yesterday{kDate, kMidnight + 12h, kOksana};
@@ -149,13 +151,26 @@ TEST(SqliteSessionStore, LatestIsTheLastOpenedAndOldOnesStayArchived) {
     today.adoptTruck(yesterday.trucks()[0]);
     store.save(today);
 
-    const auto loaded = store.latest();
-    ASSERT_TRUE(loaded.has_value());
-    EXPECT_EQ(loaded->id(), today.id());
-    ASSERT_EQ(loaded->trucks().size(), 1U);
-    EXPECT_EQ(loaded->trucks()[0].id(), carried);
-    EXPECT_EQ(loaded->trucks()[0].status(), TruckStatus::Loading);
+    const auto open = store.current();
+    ASSERT_TRUE(open.has_value());
+    EXPECT_EQ(open->id(), today.id());
+    ASSERT_EQ(open->trucks().size(), 1U);
+    EXPECT_EQ(open->trucks()[0].id(), carried);
+    EXPECT_EQ(open->trucks()[0].status(), TruckStatus::Loading);
 
+    // While today is open, "repeat a truck" still needs yesterday's.
+    const auto closed = store.lastClosed();
+    ASSERT_TRUE(closed.has_value());
+    EXPECT_EQ(closed->id(), yesterday.id());
+    EXPECT_EQ(closed->trucks()[0].status(), TruckStatus::CarriedOver);
+
+    today.departTruck(carried);
+    today.close(kMidnight + 44h, kPetro);
+    store.save(today);
+    EXPECT_FALSE(store.current().has_value());
+    EXPECT_EQ(store.lastClosed()->id(), today.id());
+
+    // Closed sessions stay in the database as the archive.
     sqlite::Statement count = db.prepare("SELECT count(*) FROM session");
     ASSERT_TRUE(count.step());
     EXPECT_EQ(count.columnInt(0), 2);
@@ -167,6 +182,6 @@ TEST(SqliteSessionStore, SharesTheDatabaseWithTheJournal) {
     const SqliteJournalStore journal{db};
     SqliteSessionStore sessions{db};
     sessions.save(busyDay());
-    EXPECT_TRUE(sessions.latest().has_value());
+    EXPECT_TRUE(sessions.current().has_value());
     EXPECT_EQ(journal.load().size(), 0U);
 }

@@ -18,7 +18,7 @@ namespace {
 // in kopecks (_kop), weight in grams (_g); enums are spelled out as text, so
 // reordering an enum in C++ cannot change what old rows mean. STRICT tables
 // reject a value of the wrong type instead of quietly storing it.
-constexpr std::array<std::string_view, 2> kMigrations{
+constexpr std::array<std::string_view, 3> kMigrations{
     R"sql(
     CREATE TABLE receipt (
         id            TEXT PRIMARY KEY,
@@ -146,6 +146,22 @@ constexpr std::array<std::string_view, 2> kMigrations{
         weight_source    TEXT NOT NULL CHECK (weight_source IN ('scale', 'manual')),
         cancelled        INTEGER NOT NULL CHECK (cancelled IN (0, 1)),
         PRIMARY KEY (receipt_id, line)
+    ) STRICT;
+    )sql",
+
+    // Reference data the server owns; ids are the server's numbers, so no
+    // AUTOINCREMENT. The PIN is plain text on purpose (see Operator).
+    R"sql(
+    CREATE TABLE supplier (
+        id        INTEGER PRIMARY KEY CHECK (id > 0),
+        full_name TEXT NOT NULL CHECK (full_name <> ''),
+        phone     TEXT NOT NULL
+    ) STRICT;
+
+    CREATE TABLE operator (
+        id   INTEGER PRIMARY KEY CHECK (id > 0),
+        name TEXT NOT NULL CHECK (name <> ''),
+        pin  TEXT NOT NULL CHECK (length(pin) BETWEEN 4 AND 6)
     ) STRICT;
     )sql",
 };

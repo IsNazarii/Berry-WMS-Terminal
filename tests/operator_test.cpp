@@ -15,6 +15,11 @@ TEST(Operator, ConfirmsIdentityByPin) {
     EXPECT_FALSE(op.checkPin(""));
 }
 
+TEST(Operator, GivesThePinOnlyForStorage) {
+    const Operator op{1, "Оксана", "4821"};
+    EXPECT_EQ(op.pinForStorage(), "4821");
+}
+
 TEST(Operator, RejectsInvalidData) {
     EXPECT_THROW((Operator{0, "Оксана", "4821"}), std::invalid_argument);
     EXPECT_THROW((Operator{1, "", "4821"}), std::invalid_argument);

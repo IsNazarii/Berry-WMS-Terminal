@@ -19,6 +19,8 @@ public:
     [[nodiscard]] OperatorId id() const noexcept { return id_; }
     [[nodiscard]] const std::string& name() const noexcept { return name_; }
     [[nodiscard]] bool checkPin(std::string_view pin) const noexcept { return pin == pin_; }
+    // For the repository only; the UI asks checkPin() and never shows the PIN.
+    [[nodiscard]] const std::string& pinForStorage() const noexcept { return pin_; }
 
 private:
     OperatorId id_;

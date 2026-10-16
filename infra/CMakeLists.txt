@@ -33,6 +33,7 @@ add_library(wms_infra
     src/sqlite_journal_store.cpp
     src/sqlite_session_store.cpp
     src/sqlite_repository.cpp
+    src/backup.cpp
 )
 target_include_directories(wms_infra PUBLIC include)
 target_link_libraries(wms_infra PUBLIC wms_core PRIVATE sqlite3)

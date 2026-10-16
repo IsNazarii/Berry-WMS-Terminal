@@ -3,17 +3,20 @@
 #include "display_format.h"
 
 #include "wms/allocation.h"
+#include "wms/backup.h"
 #include "wms/payment.h"
 #include "wms/receipt.h"
 
 #include <QDate>
 #include <QDateTime>
 #include <QDir>
+#include <QtLogging>
 #include <QRandomGenerator>
 #include <QStandardPaths>
 
 #include <algorithm>
 #include <chrono>
+#include <exception>
 #include <format>
 
 namespace wms::ui {
@@ -72,6 +75,15 @@ std::string databasePath() {
     const QString folder = QStandardPaths::writableLocation(QStandardPaths::AppDataLocation);
     QDir{}.mkpath(folder);
     return QDir{folder}.filePath("terminal.db").toStdString();
+}
+
+// Copies sit next to the database. A day is one session, so 30 copies cover
+// about a month: enough to notice a mistake and go back to before it.
+constexpr std::size_t kBackupsKept = 30;
+
+std::optional<std::filesystem::path> backupFolderFor(const std::string& database) {
+    if (database == ":memory:") return std::nullopt;
+    return std::filesystem::path{database}.parent_path() / "backups";
 }
 
 // Yesterday's session: one truck left, one was carried over half-loaded.
@@ -225,7 +237,9 @@ std::vector<Weight> palletLanding(Weight target) {
 
 Terminal::Terminal(QObject* parent)
     : QObject{parent},
-      db_{databasePath()},
+      databasePath_{databasePath()},
+      backupFolder_{backupFolderFor(databasePath_)},
+      db_{databasePath_},
       journalStore_{db_},
       sessionStore_{db_},
       operatorStore_{db_},
@@ -249,6 +263,8 @@ Terminal::Terminal(QObject* parent)
     connect(this, &Terminal::trucksChanged, this, &Terminal::allocationChanged);
     connect(this, &Terminal::receiptsChanged, this, &Terminal::allocationChanged);
     connect(this, &Terminal::journalChanged, this, &Terminal::cashChanged);
+    // The state as the last run left it, before anyone changes anything.
+    backup();
 }
 
 int Terminal::journalSize() const noexcept { return static_cast<int>(journal_.size()); }
@@ -663,6 +679,8 @@ void Terminal::closeSession() {
     previousTrucks_ = workDay_->trucks();
     workDay_.reset();
     emit sessionChanged();
+    // The end of the working day: a copy with the whole day in it.
+    backup();
 }
 
 QString Terminal::startReceipt(qint64 supplierId) {
@@ -955,6 +973,17 @@ void Terminal::seedDemoData() {
     sessionStore_.save(yesterday);
     addDemoHistory(journalStore_, yesterday.trucks()[1].id(), yesterday.openedBy());
     transaction.commit();
+}
+
+void Terminal::backup() {
+    if (!backupFolder_) return;
+    try {
+        (void)backupDatabase(db_, *backupFolder_, Clock::now(), kBackupsKept);
+    } catch (const std::exception& error) {
+        // Receiving berries matters more than the copy; the next start or
+        // closed session tries again.
+        qWarning("Backup failed: %s", error.what());
+    }
 }
 
 // Emits always: even for the same id its lines may have changed.

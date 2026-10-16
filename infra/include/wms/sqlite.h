@@ -76,6 +76,11 @@ public:
     void execute(std::string_view sql);
     [[nodiscard]] Statement prepare(std::string_view sql);
     [[nodiscard]] std::int64_t lastInsertRowId() const noexcept;
+    // A consistent, compacted copy of the whole database into a new file
+    // (VACUUM INTO): safe while the terminal runs, the WAL included. Throws
+    // Error when the file already exists or cannot be written; not inside a
+    // transaction.
+    void backupTo(const std::string& path);
 
 private:
     sqlite3* db_ = nullptr;

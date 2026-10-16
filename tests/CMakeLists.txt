@@ -29,6 +29,7 @@ add_executable(wms_infra_tests
     sqlite_journal_store_test.cpp
     sqlite_session_store_test.cpp
     sqlite_repository_test.cpp
+    backup_test.cpp
 )
 target_link_libraries(wms_infra_tests PRIVATE wms_infra GTest::gtest_main)
 

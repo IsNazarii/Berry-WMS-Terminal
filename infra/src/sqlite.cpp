@@ -121,6 +121,12 @@ void Database::execute(std::string_view sql) {
 
 Statement Database::prepare(std::string_view sql) { return Statement{db_, sql}; }
 
+void Database::backupTo(const std::string& path) {
+    Statement vacuum = prepare("VACUUM INTO ?1");
+    vacuum.bind(1, path);
+    vacuum.step();
+}
+
 std::int64_t Database::lastInsertRowId() const noexcept { return sqlite3_last_insert_rowid(db_); }
 
 // --- ScopedTransaction ---

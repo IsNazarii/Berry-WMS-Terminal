@@ -20,7 +20,9 @@
 #include <QVariantMap>
 #include <QtQml/qqmlregistration.h>
 
+#include <filesystem>
 #include <optional>
+#include <string>
 #include <variant>
 #include <vector>
 
@@ -259,8 +261,13 @@ private:
     // A new database gets yesterday's session and some history, so every
     // screen has something to show in the alpha.
     void seedDemoData();
+    // A copy of the database into backupFolder_; a failure is only logged.
+    void backup();
 
-    // First: everything below is loaded from it.
+    const std::string databasePath_;
+    // Empty for an in-memory database: nothing to keep.
+    const std::optional<std::filesystem::path> backupFolder_;
+    // First of the data: everything below is loaded from it.
     sqlite::Database db_;
     SqliteJournalStore journalStore_;
     SqliteSessionStore sessionStore_;

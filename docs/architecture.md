@@ -214,7 +214,8 @@ sequenceDiagram
   - ✅ Оператор у `Payment` (`paidBy`): міграція 4 перебудовує таблицю `payment` з колонкою `paid_by NOT NULL`
     (SQLite не додає `NOT NULL`-колонку без `DEFAULT`, а `DEFAULT` мовчки підставляв би оператора в майбутні
     `INSERT`, що його забули). Старі виплати (лише тестові бази альфи) приписано оператору 1, порядок рядків збережено.
-  - Далі: періодичний бекап.
+  - ✅ Бекап: `sqlite::Database::backupTo` (`VACUUM INTO` — цілісна копія навіть у WAL) + `backupDatabase(db, folder, at, keep)`
+    (назва з часом UTC → сортування за назвою = за часом; ротація чіпає лише свої файли). `Terminal` — при запуску й закритті сесії.
 - **Sync**: outbox незасинхронізованих записів, батчі, сервер повертає прийняті UUID
   (`Transaction::markSynced()`), retry з backoff; pull довідників за курсором `updated_since`.
 - **`SerialScaleDriver`** — реалізація `IScaleDriver` через Qt SerialPort; `ScaleMonitor`

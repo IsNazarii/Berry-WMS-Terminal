@@ -164,8 +164,8 @@ TEST(Receipt, RetailDebtStaysUntilPaidInParts) {
     Money balance = journal[0]->balanceEffect();
     EXPECT_EQ(balance, hryvnias(14'620));
 
-    journal.push_back(std::make_unique<Payment>(Payment::create(42, hryvnias(10'000), PaymentMethod::Cash)));
-    journal.push_back(std::make_unique<Payment>(Payment::create(42, hryvnias(4'620), PaymentMethod::BankTransfer)));
+    journal.push_back(std::make_unique<Payment>(Payment::create(42, hryvnias(10'000), PaymentMethod::Cash, 1)));
+    journal.push_back(std::make_unique<Payment>(Payment::create(42, hryvnias(4'620), PaymentMethod::BankTransfer, 1)));
     balance = Money{};
     for (const auto& t : journal) balance += t->balanceEffect();
     EXPECT_TRUE(balance.isZero());
@@ -221,20 +221,26 @@ TEST(Receipt, DescribeMarksCancelledWeighing) {
 }
 
 TEST(Transaction, RejectsNilId) {
-    EXPECT_THROW((Payment{Uuid{}, Clock::now(), 1, hryvnias(1), PaymentMethod::Cash}), std::invalid_argument);
+    EXPECT_THROW((Payment{Uuid{}, Clock::now(), 1, hryvnias(1), PaymentMethod::Cash, 1}), std::invalid_argument);
 }
 
 TEST(Payment, ReducesBalance) {
-    const Payment p = Payment::create(42, hryvnias(500), PaymentMethod::Cash);
+    const Payment p = Payment::create(42, hryvnias(500), PaymentMethod::Cash, 1);
     EXPECT_EQ(p.balanceEffect(), -hryvnias(500));
     EXPECT_TRUE(p.isValid());
-    EXPECT_FALSE(Payment::create(42, Money{}, PaymentMethod::Cash).isValid());
+    EXPECT_FALSE(Payment::create(42, Money{}, PaymentMethod::Cash, 1).isValid());
+}
+
+// Cash leaving the till must name who handed it over.
+TEST(Payment, RemembersWhoPaid) {
+    EXPECT_EQ(Payment::create(42, hryvnias(500), PaymentMethod::Cash, 2).paidBy(), 2);
+    EXPECT_THROW((void)Payment::create(42, hryvnias(500), PaymentMethod::Cash, 0), std::invalid_argument);
 }
 
 TEST(Transaction, BalanceIsSumOfPolymorphicEffects) {
     std::vector<std::unique_ptr<Transaction>> journal;
     journal.push_back(std::make_unique<Receipt>(Receipt::create(42, Settlement::OnSite, {raspberryPallet()})));
-    journal.push_back(std::make_unique<Payment>(Payment::create(42, hryvnias(1'000), PaymentMethod::Cash)));
+    journal.push_back(std::make_unique<Payment>(Payment::create(42, hryvnias(1'000), PaymentMethod::Cash, 1)));
 
     Money balance;
     for (const auto& t : journal) balance += t->balanceEffect();

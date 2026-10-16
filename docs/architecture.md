@@ -211,7 +211,10 @@ sequenceDiagram
     таблиця й колонки: приватна спеціалізація `Table<Supplier>` / `Table<Operator>` у `.cpp`, шаблон явно
     інстанційований для цих двох типів (`template class ...`), тож інший тип не злінкується.
     Довідники належать серверу, тому `save` — upsert (`ON CONFLICT DO UPDATE`), а не append, як у журналі.
-  - Далі: оператор у `Payment`, періодичний бекап.
+  - ✅ Оператор у `Payment` (`paidBy`): міграція 4 перебудовує таблицю `payment` з колонкою `paid_by NOT NULL`
+    (SQLite не додає `NOT NULL`-колонку без `DEFAULT`, а `DEFAULT` мовчки підставляв би оператора в майбутні
+    `INSERT`, що його забули). Старі виплати (лише тестові бази альфи) приписано оператору 1, порядок рядків збережено.
+  - Далі: періодичний бекап.
 - **Sync**: outbox незасинхронізованих записів, батчі, сервер повертає прийняті UUID
   (`Transaction::markSynced()`), retry з backoff; pull довідників за курсором `updated_since`.
 - **`SerialScaleDriver`** — реалізація `IScaleDriver` через Qt SerialPort; `ScaleMonitor`

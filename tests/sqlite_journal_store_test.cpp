@@ -82,7 +82,7 @@ TEST(SqliteJournalStore, PaymentRoundTripsAndCountsInBalance) {
     SqliteJournalStore store{db};
     const Receipt receipt = sampleReceipt();
     const Payment payment{Uuid::generateV7(kAt, 2, 2), kAt + std::chrono::minutes{5}, 42, hryvnias(1000),
-                          PaymentMethod::BankTransfer, SyncStatus::Synced};
+                          PaymentMethod::BankTransfer, 2, SyncStatus::Synced};
     store.save(receipt);
     store.save(payment);
 
@@ -95,6 +95,7 @@ TEST(SqliteJournalStore, PaymentRoundTripsAndCountsInBalance) {
     EXPECT_EQ(loaded->id(), payment.id());
     EXPECT_EQ(loaded->createdAt(), payment.createdAt());
     EXPECT_EQ(loaded->method(), PaymentMethod::BankTransfer);
+    EXPECT_EQ(loaded->paidBy(), 2);
     EXPECT_EQ(loaded->syncStatus(), SyncStatus::Synced);
 }
 

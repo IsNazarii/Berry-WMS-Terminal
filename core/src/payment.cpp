@@ -1,15 +1,22 @@
 #include "wms/payment.h"
 
 #include <format>
+#include <stdexcept>
 
 namespace wms {
 
 Payment::Payment(Uuid id, TimePoint createdAt, SupplierId supplierId, Money amount, PaymentMethod method,
-                 SyncStatus syncStatus)
-    : Transaction{id, createdAt, syncStatus}, supplierId_{supplierId}, amount_{amount}, method_{method} {}
+                 OperatorId paidBy, SyncStatus syncStatus)
+    : Transaction{id, createdAt, syncStatus},
+      supplierId_{supplierId},
+      amount_{amount},
+      method_{method},
+      paidBy_{paidBy} {
+    if (paidBy_ <= 0) throw std::invalid_argument("Payment must name the operator who paid");
+}
 
-Payment Payment::create(SupplierId supplierId, Money amount, PaymentMethod method) {
-    return Payment{Uuid::generateV7(), Clock::now(), supplierId, amount, method};
+Payment Payment::create(SupplierId supplierId, Money amount, PaymentMethod method, OperatorId paidBy) {
+    return Payment{Uuid::generateV7(), Clock::now(), supplierId, amount, method, paidBy};
 }
 
 std::vector<std::string> Payment::validate() const {

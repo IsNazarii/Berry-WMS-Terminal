@@ -282,8 +282,10 @@ PIN — **підтвердження «хто»**, не захист: 4–6 ци
 
 ### 5.2 `Payment` (`payment.h`)
 
-Гроші, видані постачальнику: `supplierId`, `amount`, `method` (`Cash` / `BankTransfer`).
+Гроші, видані постачальнику: `supplierId`, `amount`, `method` (`Cash` / `BankTransfer`),
+`paidBy` — оператор, що видав гроші (коли в касі не сходиться, це перше питання).
 Зменшує борг: `balanceEffect() = −amount`. Фабрика `Payment::create(...)` видає свіжий UUIDv7.
+`paidBy <= 0` — `std::invalid_argument`: UI передає вже підтвердженого оператора, тож його відсутність — баг.
 
 ---
 

@@ -86,7 +86,7 @@ WorkDay demoYesterday(OperatorId by) {
 
 // History from an earlier day, so the cash screen has a debt to show and the
 // carried-over truck already has a pallet in it.
-void addDemoHistory(JournalStore& journal, const TruckId& carriedOverTruck) {
+void addDemoHistory(JournalStore& journal, const TruckId& carriedOverTruck, OperatorId by) {
     const Receipt receipt = Receipt::create(42, Settlement::OnSite, {{
         .cropCode = "raspberry",
         .gross = kilograms(120),
@@ -97,7 +97,7 @@ void addDemoHistory(JournalStore& journal, const TruckId& carriedOverTruck) {
     }});
     journal.save(receipt);
     journal.save(Allocation::wholeWeighing(receipt, 0, carriedOverTruck));
-    journal.save(Payment::create(42, hryvnias(3'000), PaymentMethod::Cash));
+    journal.save(Payment::create(42, hryvnias(3'000), PaymentMethod::Cash, by));
 
     // Strawberries that waited overnight in the warehouse: stock outlives the session.
     const Receipt stored = Receipt::create(45, Settlement::OnSite, {{
@@ -551,10 +551,15 @@ QVariantList Terminal::cashHistory() const {
         const QString text = QString::fromStdString(record->describe());
         const qsizetype newline = text.indexOf('\n');
         const Money effect = record->balanceEffect();
+        // A payment has no lines; its detail is who handed the money over.
+        const auto* payment = dynamic_cast<const Payment*>(record);
+        const QString detail = payment ? tr("видав(ла): %1").arg(operatorNameOf(payment->paidBy()))
+                               : newline < 0 ? QString{}
+                                             : text.mid(newline + 1);
         list.append(QVariantMap{
             {"at", localDateTime(record->createdAt())},
             {"title", text.left(newline)},
-            {"detail", newline < 0 ? QString{} : text.mid(newline + 1)},
+            {"detail", detail},
             {"effect", effect.isNegative() ? hryvniasText(effect) : "+" + hryvniasText(effect)},
             {"payment", record->kind() == TransactionKind::Payment},
         });
@@ -831,11 +836,13 @@ QString Terminal::balanceAfter(const QString& amount) const {
 }
 
 QString Terminal::pay(const QString& amount, bool bankTransfer) {
+    if (!currentOperatorId_) return tr("Увійдіть як оператор");
     if (!cashSupplierId_) return tr("Оберіть постачальника");
     const auto paid = parseMoney(amount.toStdString());
     if (!paid) return tr("Сума — число гривень, напр. 1500 або 1500,50");
     const Payment payment = Payment::create(*cashSupplierId_, *paid,
-                                            bankTransfer ? PaymentMethod::BankTransfer : PaymentMethod::Cash);
+                                            bankTransfer ? PaymentMethod::BankTransfer : PaymentMethod::Cash,
+                                            *currentOperatorId_);
     if (const auto errors = payment.validate(); !errors.empty()) return joined(errors);
     record(payment);
     emit journalChanged();
@@ -946,7 +953,7 @@ void Terminal::seedDemoData() {
     sqlite::ScopedTransaction transaction{db_};
     const WorkDay yesterday = demoYesterday(operators_.front().id());
     sessionStore_.save(yesterday);
-    addDemoHistory(journalStore_, yesterday.trucks()[1].id());
+    addDemoHistory(journalStore_, yesterday.trucks()[1].id(), yesterday.openedBy());
     transaction.commit();
 }
 

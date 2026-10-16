@@ -40,7 +40,7 @@ TEST(Journal, StartsEmpty) {
 TEST(Journal, BalanceIsReceiptsMinusPayments) {
     Journal journal;
     journal.add(Receipt::create(42, Settlement::OnSite, {pallet("raspberry", 10, kilograms(20))})); // 1700 грн
-    journal.add(Payment::create(42, hryvnias(1000), PaymentMethod::Cash));
+    journal.add(Payment::create(42, hryvnias(1000), PaymentMethod::Cash, 1));
 
     EXPECT_EQ(journal.balanceOf(42), hryvnias(700));
 }
@@ -48,7 +48,7 @@ TEST(Journal, BalanceIsReceiptsMinusPayments) {
 TEST(Journal, BalanceCountsOnlyThatSupplier) {
     Journal journal;
     journal.add(Receipt::create(42, Settlement::OnSite, {pallet("raspberry", 10, kilograms(20))}));
-    journal.add(Payment::create(7, hryvnias(500), PaymentMethod::Cash));
+    journal.add(Payment::create(7, hryvnias(500), PaymentMethod::Cash, 1));
 
     EXPECT_EQ(journal.balanceOf(42), hryvnias(1700));
     EXPECT_EQ(journal.balanceOf(7), -hryvnias(500)); // overpaid: supplier owes us
@@ -66,8 +66,8 @@ TEST(Journal, HistoryListsReceiptsAndPaymentsOfThatSupplierByTime) {
     const Receipt receipt{Uuid::generateV7(morning, 1, 1), morning, 42, Settlement::OnSite,
                           {pallet("raspberry", 10, kilograms(20))}};
     const Payment payment{Uuid::generateV7(morning, 1, 2), morning + std::chrono::hours{2}, 42, hryvnias(1000),
-                          PaymentMethod::Cash};
-    const Payment otherSupplier = Payment::create(7, hryvnias(500), PaymentMethod::Cash);
+                          PaymentMethod::Cash, 1};
+    const Payment otherSupplier = Payment::create(7, hryvnias(500), PaymentMethod::Cash, 1);
 
     Journal journal;
     journal.add(payment);
@@ -84,14 +84,14 @@ TEST(Journal, HistoryListsReceiptsAndPaymentsOfThatSupplierByTime) {
 
 TEST(Journal, SupplierWithoutRecordsHasEmptyHistory) {
     Journal journal;
-    journal.add(Payment::create(7, hryvnias(500), PaymentMethod::Cash));
+    journal.add(Payment::create(7, hryvnias(500), PaymentMethod::Cash, 1));
     EXPECT_TRUE(journal.historyOf(42).empty());
 }
 
 TEST(Journal, SameRecordIsAddedOnlyOnce) {
     // Sync may deliver a record the terminal already has; the UUID makes that harmless.
     Journal journal;
-    const Payment payment = Payment::create(42, hryvnias(100), PaymentMethod::Cash);
+    const Payment payment = Payment::create(42, hryvnias(100), PaymentMethod::Cash, 1);
 
     EXPECT_TRUE(journal.add(payment));
     EXPECT_FALSE(journal.add(payment));

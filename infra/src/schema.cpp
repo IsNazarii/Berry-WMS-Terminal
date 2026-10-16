@@ -18,7 +18,7 @@ namespace {
 // in kopecks (_kop), weight in grams (_g); enums are spelled out as text, so
 // reordering an enum in C++ cannot change what old rows mean. STRICT tables
 // reject a value of the wrong type instead of quietly storing it.
-constexpr std::array<std::string_view, 3> kMigrations{
+constexpr std::array<std::string_view, 4> kMigrations{
     R"sql(
     CREATE TABLE receipt (
         id            TEXT PRIMARY KEY,
@@ -163,6 +163,27 @@ constexpr std::array<std::string_view, 3> kMigrations{
         name TEXT NOT NULL CHECK (name <> ''),
         pin  TEXT NOT NULL CHECK (length(pin) BETWEEN 4 AND 6)
     ) STRICT;
+    )sql",
+
+    // Payments name the operator who paid. SQLite cannot add a NOT NULL
+    // column without a default, and a default would quietly fill in anyone
+    // a future INSERT forgets, so the table is rebuilt instead. Rows from
+    // before this step exist only in alpha test databases, where operator 1
+    // seeded them; they are put down to operator 1.
+    R"sql(
+    CREATE TABLE payment_new (
+        id            TEXT PRIMARY KEY,
+        created_at_ns INTEGER NOT NULL,
+        supplier_id   INTEGER NOT NULL,
+        amount_kop    INTEGER NOT NULL,
+        method        TEXT NOT NULL CHECK (method IN ('cash', 'bank_transfer')),
+        paid_by       INTEGER NOT NULL CHECK (paid_by > 0),
+        sync_status   TEXT NOT NULL CHECK (sync_status IN ('pending', 'synced'))
+    ) STRICT;
+    INSERT INTO payment_new (id, created_at_ns, supplier_id, amount_kop, method, paid_by, sync_status)
+        SELECT id, created_at_ns, supplier_id, amount_kop, method, 1, sync_status FROM payment ORDER BY rowid;
+    DROP TABLE payment;
+    ALTER TABLE payment_new RENAME TO payment;
     )sql",
 };
 

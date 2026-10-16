@@ -46,14 +46,15 @@ bool SqliteJournalStore::save(const Receipt& receipt) {
 
 bool SqliteJournalStore::save(const Payment& payment) {
     sqlite::Statement insert = db_.prepare(
-        "INSERT INTO payment (id, created_at_ns, supplier_id, amount_kop, method, sync_status) "
-        "VALUES (?1, ?2, ?3, ?4, ?5, ?6) ON CONFLICT (id) DO NOTHING RETURNING id");
+        "INSERT INTO payment (id, created_at_ns, supplier_id, amount_kop, method, paid_by, sync_status) "
+        "VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7) ON CONFLICT (id) DO NOTHING RETURNING id");
     insert.bind(1, payment.id().toString())
         .bind(2, toNanoseconds(payment.createdAt()))
         .bind(3, payment.supplierId())
         .bind(4, payment.amount().raw())
         .bind(5, toText(kPaymentMethods, payment.method()))
-        .bind(6, toText(kSyncStatuses, payment.syncStatus()));
+        .bind(6, payment.paidBy())
+        .bind(7, toText(kSyncStatuses, payment.syncStatus()));
     return inserted(insert);
 }
 
@@ -113,12 +114,12 @@ Journal SqliteJournalStore::load() const {
     }
 
     sqlite::Statement payments = db_.prepare(
-        "SELECT id, created_at_ns, supplier_id, amount_kop, method, sync_status FROM payment "
+        "SELECT id, created_at_ns, supplier_id, amount_kop, method, paid_by, sync_status FROM payment "
         "ORDER BY created_at_ns, rowid");
     while (payments.step()) {
         journal.add(Payment{uuidColumn(payments, 0), fromNanoseconds(payments.columnInt(1)), payments.columnInt(2),
                             kopecks(payments.columnInt(3)), fromText(kPaymentMethods, payments.columnText(4)),
-                            fromText(kSyncStatuses, payments.columnText(5))});
+                            payments.columnInt(5), fromText(kSyncStatuses, payments.columnText(6))});
     }
 
     sqlite::Statement allocations = db_.prepare(

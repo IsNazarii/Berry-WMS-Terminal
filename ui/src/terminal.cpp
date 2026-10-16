@@ -19,7 +19,8 @@
 namespace wms::ui {
 namespace {
 
-// Reference data the server will send later; hard-coded for the alpha.
+// Reference data the server will send later; until then an empty table gets
+// a demo list, so a terminal is usable on the first start.
 std::vector<Operator> demoOperators() {
     return {
         {1, "Назарій", "1111"},
@@ -35,6 +36,15 @@ std::vector<Supplier> demoSuppliers() {
         {45, "Мельник Ірина", "+380933334455"},
         {77, "ФГ «Ягідний край»"},
     };
+}
+
+template <class T>
+std::vector<T> loadOrSeed(sqlite::Database& db, Repository<T>& store, const std::vector<T>& demo) {
+    if (std::vector<T> records = store.all(); !records.empty()) return records;
+    sqlite::ScopedTransaction transaction{db};
+    for (const T& record : demo) store.save(record);
+    transaction.commit();
+    return store.all();
 }
 
 struct Crop {
@@ -218,8 +228,10 @@ Terminal::Terminal(QObject* parent)
       db_{databasePath()},
       journalStore_{db_},
       sessionStore_{db_},
-      operators_{demoOperators()},
-      suppliers_{demoSuppliers()},
+      operatorStore_{db_},
+      supplierStore_{db_},
+      operators_{loadOrSeed(db_, operatorStore_, demoOperators())},
+      suppliers_{loadOrSeed(db_, supplierStore_, demoSuppliers())},
       supplierModel_{suppliers_, journal_},
       simulator_{{grams(0)}},
       scaleMonitor_{simulator_} {

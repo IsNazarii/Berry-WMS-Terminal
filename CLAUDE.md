@@ -105,16 +105,17 @@ $CM/cmake -S . -B build -G Ninja && $CM/cmake --build build && $CM/ctest --test-
 ≥3 поліморфізми (≥1 статичний, ≥1 динамічний), інкапсуляція.
 - Ієрархія A: `Transaction` → `Receipt` ✅, `Payment` ✅, `Allocation` ✅, `StockShipment` ✅
 - Ієрархія B: `IScaleDriver` → `SimulatedScaleDriver` ✅, `SerialScaleDriver` ⏳ (infra, Qt)
-- Ієрархія C: `JournalStore` → `SqliteJournalStore` ✅, D: `SessionStore` → `SqliteSessionStore` ✅ (infra)
+- Ієрархія C: `JournalStore` → `SqliteJournalStore` ✅, D: `SessionStore` → `SqliteSessionStore` ✅,
+  E: `Repository<T>` → `SqliteRepository<T>` ✅ (infra)
 - Статичний поліморфізм: `Quantity<Tag>` (`Money`, `Weight`) ✅; `Destination` = `std::variant` + `std::visit` ✅;
-  `Repository<T>` ⏳
+  `Repository<T>` (шаблон класу з віртуальними методами, `Table<T>`-спеціалізації в infra) ✅
 - Статичний поліморфізм (перевантаження): `Journal::add(Receipt|Payment|Allocation|StockShipment)` ✅;
   `Journal::validateAllocation`/`unallocatedOf`/`boxesOf` для `Receipt` і `OpenReceipt` ✅
 - Статичний поліморфізм (concept): `WeighedReceipt` + шаблонні `Allocation::wholeWeighing`/`boxesOf`
   (приймають `Receipt` і `OpenReceipt`) ✅
 - Інші класи: `Uuid`, `Supplier`, `StabilityDetector`, `Weighing`, `Truck`, `Cargo`, `Journal`, `DayPrices`,
   `WorkDay`, `Operator`, `OpenReceipt` ✅
-- Стан на 26.09: 19 класів ядра, 2 ієрархії (A — 5 класів), 6+ поліморфізмів, 158 тестів (зараз 176 ядра + 24 infra) — лаба 1 закрита із запасом.
+- Стан на 26.09: 19 класів ядра, 2 ієрархії (A — 5 класів), 6+ поліморфізмів, 158 тестів (зараз 177 ядра + 29 infra) — лаба 1 закрита із запасом.
 
 Лаба 2: ≥4 екрани (Вхід, Прийом, Сесія, Розподіл, Склад, Каса, + Sync/Довідники),
 ≥20 контролів, ≥1 контейнер (ListView), ≥10 обробників, логіка відділена.
@@ -240,7 +241,10 @@ F2 → `SupplierPicker`; по центру обраний `cashSupplierId` (ок
       (вкладається); `Terminal` пише кожну зміну (`saveSession()`, `record(x)`; закриття чека — одна зовнішня
       транзакція). База: `~/.local/share/BerryWms/Berry WMS Terminal/terminal.db`, `WMS_DATABASE` перевизначає
       (`:memory:` — без сліду); демо (`seedDemoData`) лише в нову базу. Після перезапуску активного чека нема.
-   d) довідники (постачальники, оператори) у базі; оператор у `Payment`; періодичний бекап.
+   d) ✅ довідники: `Repository<T>` (core) → `SqliteRepository<T>` (міграція 3, upsert за id; явна інстанціація
+      для `Supplier`/`Operator`); `Operator::pinForStorage()`; `Terminal` читає їх з бази, порожня таблиця
+      засівається демо-набором (`loadOrSeed`) — так і стара база отримує довідники;
+   e) оператор у `Payment`; f) періодичний бекап.
 - Історії руху складу (прихід/відвантаження) в UI нема — `Journal` не віддає записи; за потреби — запит у ядрі.
 - Повідомлення ядра про розподіл містять код культури (`raspberry`), а не назву — назви живуть у UI (`kCrops`).
 - ❓ Захист від подвійного запису тієї самої палети (вимагати повернення ваг до нуля між зважуваннями) —

@@ -32,7 +32,7 @@ flowchart LR
 | Шар | Каталог | Ціль CMake | Залежить від | Що містить |
 |---|---|---|---|---|
 | Ядро | `core/` | `wms_core` (статична бібліотека) | лише стандартна бібліотека C++20 | доменні класи, правила, валідація, обчислення |
-| Інфраструктура | `infra/` | `wms_infra` + `sqlite3` (амальгамація) | core; Qt — лише для пристроїв | обгортка SQLite (`sqlite::Database`/`Statement`/`ScopedTransaction`) ✅; схема з версіями (`migrateSchema`) + `SqliteJournalStore` + `SqliteSessionStore` ✅; інші сховища, COM-порт ваг, HTTP-sync, друк — далі |
+| Інфраструктура | `infra/` | `wms_infra` + `sqlite3` (амальгамація) | core; Qt — лише для пристроїв | обгортка SQLite (`sqlite::Database`/`Statement`/`ScopedTransaction`) ✅; схема з версіями (`migrateSchema`) + `SqliteJournalStore` + `SqliteSessionStore` + `SqliteRepository<T>` ✅; інші сховища, COM-порт ваг, HTTP-sync, друк — далі |
 | Інтерфейс | `ui/` | `wms_ui` + `wms_uiplugin` (QML-модуль `BerryWms.Ui`) | core, Qt Quick | QML-екрани і тонкі адаптери |
 | Точка входу | `app/` | `wms_terminal` (виконуваний) | ui | `main()`: створює `QGuiApplication`, завантажує `Main.qml` |
 | Тести | `tests/` | `wms_core_tests`, `wms_infra_tests` | core / infra, GoogleTest | 176 тестів ядра + 24 тести infra на справжній SQLite |
@@ -206,7 +206,12 @@ sequenceDiagram
     Відновлення — `WorkDay::restore(WorkDayRecord)`, `Truck` зі статусом. Зважування й назви переліків
     спільні для обох сховищ — внутрішній `infra/src/rows.h`.
   - ✅ Підключено до `Terminal` (база в теці даних програми, `WMS_DATABASE` перевизначає; демо-дані лише в нову базу).
-  - Далі: довідники (постачальники, оператори), оператор у `Payment`, періодичний бекап.
+  - ✅ Довідники: шаблонний інтерфейс `Repository<T>` у core (`save` — додати або замінити за id, `all()` — за id),
+    реалізація `SqliteRepository<T>` (міграція 3: таблиці `supplier`, `operator`). Різниця між типами — лише
+    таблиця й колонки: приватна спеціалізація `Table<Supplier>` / `Table<Operator>` у `.cpp`, шаблон явно
+    інстанційований для цих двох типів (`template class ...`), тож інший тип не злінкується.
+    Довідники належать серверу, тому `save` — upsert (`ON CONFLICT DO UPDATE`), а не append, як у журналі.
+  - Далі: оператор у `Payment`, періодичний бекап.
 - **Sync**: outbox незасинхронізованих записів, батчі, сервер повертає прийняті UUID
   (`Transaction::markSynced()`), retry з backoff; pull довідників за курсором `updated_since`.
 - **`SerialScaleDriver`** — реалізація `IScaleDriver` через Qt SerialPort; `ScaleMonitor`

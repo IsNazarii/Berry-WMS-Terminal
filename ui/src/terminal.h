@@ -7,6 +7,7 @@
 #include "wms/scale.h"
 #include "wms/sqlite.h"
 #include "wms/sqlite_journal_store.h"
+#include "wms/sqlite_repository.h"
 #include "wms/sqlite_session_store.h"
 #include "wms/supplier.h"
 #include "wms/truck.h"
@@ -263,6 +264,8 @@ private:
     sqlite::Database db_;
     SqliteJournalStore journalStore_;
     SqliteSessionStore sessionStore_;
+    SqliteRepository<Operator> operatorStore_;
+    SqliteRepository<Supplier> supplierStore_;
     std::vector<Operator> operators_;
     std::vector<Supplier> suppliers_;
     // Of the session closed last: repeat and carry-over read them.

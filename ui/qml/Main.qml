@@ -14,7 +14,8 @@ ApplicationWindow {
     minimumWidth: 1024
     minimumHeight: 600
     // A terminal on a laptop: the whole screen; the size above is what "restore" gives.
-    visibility: Window.Maximized
+    // Full screen hides the desktop panels too, but some operators want them, so it is an option.
+    visibility: uiSettings.fullScreen ? Window.FullScreen : Window.Maximized
     title: qsTr("Berry WMS — термінал приймальника")
 
     // Our style (ui/style) draws from Theme; controls it does not override
@@ -50,6 +51,12 @@ ApplicationWindow {
         id: uiSettings
         category: "ui"
         property real scale: 1.25
+        property bool fullScreen: false
+    }
+
+    Shortcut {
+        sequence: "F11"
+        onActivated: uiSettings.fullScreen = !uiSettings.fullScreen
     }
     // The scale this run was started with (set by main.cpp), to tell the operator a restart is pending.
     required property real startScale
@@ -111,6 +118,11 @@ ApplicationWindow {
                     ScaleItem { factor: 1.5 }
                     ScaleItem { factor: 1.75 }
                 }
+            }
+            // In full screen there is no window frame, so this is the way back too.
+            ToolButton {
+                text: uiSettings.fullScreen ? qsTr("Вікно · F11") : qsTr("Повний екран · F11")
+                onClicked: uiSettings.fullScreen = !uiSettings.fullScreen
             }
             // A shed in daylight wants light, an evening shift wants dark.
             ToolButton {

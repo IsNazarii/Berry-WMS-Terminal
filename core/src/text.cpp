@@ -45,6 +45,22 @@ std::string foldCase(std::string_view utf8) {
     return out;
 }
 
+std::string squeezeSpaces(std::string_view text) {
+    std::string out;
+    out.reserve(text.size());
+    bool pendingSpace = false;
+    for (const char c : text) {
+        if (c == ' ' || c == '\t' || c == '\n' || c == '\r') {
+            pendingSpace = !out.empty();
+            continue;
+        }
+        if (pendingSpace) out.push_back(' ');
+        pendingSpace = false;
+        out.push_back(c);
+    }
+    return out;
+}
+
 bool containsIgnoreCase(std::string_view haystack, std::string_view needle) {
     return foldCase(haystack).find(foldCase(needle)) != std::string::npos;
 }

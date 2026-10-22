@@ -298,7 +298,7 @@ Page {
                                     Layout.alignment: Qt.AlignRight
                                 }
                                 Label {
-                                    text: loadCell.limit !== "" ? qsTr("з %1").arg(loadCell.limit) : qsTr("без ліміту")
+                                    text: qsTr("з %1").arg(loadCell.limit)
                                     font.pixelSize: Theme.fontSizeCaption
                                     color: Theme.textMuted
                                     Layout.alignment: Qt.AlignRight
@@ -335,9 +335,11 @@ Page {
                                     Layout.minimumWidth: truckList.boxesWidth
                                     Layout.maximumWidth: truckList.boxesWidth
                                 }
-                                LoadCell {
-                                    load: truckRow.modelData.loadKg
-                                    limit: truckRow.modelData.limitKg
+                                // Kilograms are for reference: the limit is in boxes only.
+                                Label {
+                                    text: truckRow.modelData.loadKg
+                                    color: Theme.textMuted
+                                    horizontalAlignment: Text.AlignRight
                                     Layout.preferredWidth: truckList.kgWidth
                                     Layout.minimumWidth: truckList.kgWidth
                                     Layout.maximumWidth: truckList.kgWidth
@@ -408,8 +410,8 @@ Page {
         }
     }
 
-    // A new truck (at least one limit, an empty field means "no limit"), or the
-    // same plate and limits as a truck of the previous session on a new trip.
+    // A new truck (the limit is in boxes), or the same plate and limit as a
+    // truck of the previous session on a new trip.
     Dialog {
         id: truckDialog
         anchors.centerIn: parent
@@ -420,7 +422,7 @@ Page {
 
         function add() {
             truckError.text = Terminal.addTruck(plate.text, make.text, note.text,
-                                                boxLimit.text, weightLimit.text)
+                                                boxLimit.text)
             if (truckError.text === "")
                 close()
         }
@@ -430,7 +432,6 @@ Page {
             make.clear()
             note.clear()
             boxLimit.clear()
-            weightLimit.clear()
             truckError.text = ""
             plate.forceActiveFocus()
         }
@@ -459,22 +460,15 @@ Page {
                     onAccepted: truckDialog.add()
                 }
 
-                FieldCaption { caption: qsTr("Ліміт, ящиків") }
-                FieldCaption { caption: qsTr("Ліміт, кг") }
+                FieldCaption { caption: qsTr("Ліміт, ящиків"); Layout.columnSpan: 2 }
                 TextField {
                     id: boxLimit
                     inputMethodHints: Qt.ImhDigitsOnly
-                    validator: IntValidator { bottom: 0 }
+                    validator: IntValidator { bottom: 1 }
                     Layout.fillWidth: true
                     onAccepted: truckDialog.add()
                 }
-                TextField {
-                    id: weightLimit
-                    inputMethodHints: Qt.ImhDigitsOnly
-                    validator: IntValidator { bottom: 0 }
-                    Layout.fillWidth: true
-                    onAccepted: truckDialog.add()
-                }
+                Item { Layout.fillWidth: true }
 
                 FieldCaption { caption: qsTr("Водій / куди їде"); Layout.columnSpan: 2 }
                 TextField {
@@ -483,13 +477,6 @@ Page {
                     Layout.fillWidth: true
                     onAccepted: truckDialog.add()
                 }
-            }
-            Label {
-                text: qsTr("Потрібен хоча б один ліміт; порожнє поле — без ліміту.")
-                font.pixelSize: Theme.fontSizeCaption
-                color: Theme.textMuted
-                wrapMode: Text.WordWrap
-                Layout.fillWidth: true
             }
             Button {
                 text: qsTr("Додати фуру")

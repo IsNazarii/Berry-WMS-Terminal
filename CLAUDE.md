@@ -158,7 +158,7 @@ $CM/cmake -S . -B build -G Ninja && $CM/cmake --build build && $CM/ctest --test-
 (`priceSource`: `DayPrice`/`Manual`; `cancelled` — рядок лишається, не рахується); `Payment`;
 `OpenReceipt` (чек, що зважується: `add`/`cancel`, `validateClose`/`close(settlement)` → `Receipt` з тим самим
 UUID і часом відкриття; для опту ціни обнуляються); `Allocation` (чек → `Destination` = фура | `ToWarehouse`;
-`wholeWeighing` / `boxesOf`); `StockShipment` (склад → фура); `Truck` (id = UUID, статуси
+`wholeWeighing` / `boxesOf`); `StockShipment` (склад → фура); `Truck` (id = UUID, ліміт `boxLimit` лише в ящиках, статуси
 `Loading`/`Departed`/`CarriedOver`; `TruckDetails {make, note}` — марка й вільний текст «водій / куди їде»,
 необов'язкові, `repeatTruck`/`adoptTruck` їх копіюють) + `Cargo`; `DayPrices` (історія змін, `priceAt(crop, t)`);
 `WorkDay` (сесія: дата відкриття, хто відкрив/закрив, ціни, фури, `validateClose`/`close`,
@@ -203,10 +203,10 @@ UI (`ui/`, модуль `BerryWms.Ui`, статична бібліотека + `
 вмикається в `main.cpp` (`QQuickStyle::setStyle`). Кнопка `highlighted` = одна головна дія панелі; `WarningButton` — ризикована дія поруч.
 
 Екран «Сесія» — у стилі «Прийому» ✅: ціни дня (панель зліва), фури таблицею з голими числами
-(`truckInfo`: `loadBoxes`/`loadKg`/`limitBoxes`/`limitKg`), нова фура й «повторити з минулої» — діалог
+(`truckInfo`: `loadBoxes`/`loadKg`/`limitBoxes`), нова фура й «повторити з минулої» — діалог
 «Додати фуру…». Спільні підписи — файли `SectionCaption.qml`, `FieldCaption.qml`, `ColumnHeader.qml`.
 Екран «Розподіл» — у стилі «Прийому» ✅: таблиця палет (№ · культура · ящ. · нетто · де), смуга «Куди», фури з
-`loadBoxes`/`limitBoxes`/`loadKg`/`limitKg`. `describeCargo` (рядки UI) тепер у екранному форматі (`2 000,0 кг`). Урок: колонки таблиці
+`loadBoxes`/`limitBoxes`/`loadKg`. `describeCargo` (рядки UI) тепер у екранному форматі (`2 000,0 кг`). Урок: колонки таблиці
 з кнопками — фіксувати `Layout.minimumWidth`/`maximumWidth`, інакше кнопки розтягують колонку й вона
 не збігається із заголовком. Знімок екрана без вікна: тимчасово в `main.cpp` `grabWindow().save()` за таймером.
 
@@ -266,7 +266,8 @@ F2 → `SupplierPicker`; по центру обраний `cashSupplierId` (ок
 2. UX-зміни від 22.10 (порядок): a) ✅ повноекранний режим; b) ✅ новий постачальник з «Прийому»
    (`validateNewSupplier` — дубль імені без регістру/пробілів, телефон ≥ 10 цифр; `nextSupplierId`; форма в `SupplierPicker`,
    діє й на «Касі»);
-   c) ✅ довідник культур у базі; d) ліміт фури лише в ящиках; e) авторозподіл з «Прийому» + підвішені палети;
+   c) ✅ довідник культур у базі; d) ✅ ліміт фури лише в ящиках
+   (`Truck::boxLimit`, `boxesLeft`; міграція 7 прибирає `limit_g`, кг-фури альфи → 2 кг/ящ.; кг у UI — довідково); e) авторозподіл з «Прийому» + підвішені палети;
    f) закриття чека «Оплатити»/«Видати чек» з ціною на культуру; g) розбір «примітивного» UI зі скріншотами.
 3. Ваги RS-232 (коли буде доступ), друк чека ESC/POS (лаба 3), sync.
 - Історії руху складу (прихід/відвантаження) в UI нема — `Journal` не віддає записи; за потреби — запит у ядрі.

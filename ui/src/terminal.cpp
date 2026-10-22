@@ -122,8 +122,8 @@ std::optional<std::filesystem::path> backupFolderFor(const std::string& database
 WorkDay demoYesterday(OperatorId by) {
     const TimePoint noon = Clock::now() - std::chrono::hours{24};
     WorkDay day{toDate(QDate::currentDate().addDays(-1)), noon, by};
-    day.departTruck(day.addTruck("BI1234AA", {.boxes = 1'200, .weight = kilograms(2'000)}).id());
-    day.carryOverTruck(day.addTruck("BI5678BB", {.boxes = 0, .weight = kilograms(5'000)}).id());
+    day.departTruck(day.addTruck("BI1234AA", 1'200).id());
+    day.carryOverTruck(day.addTruck("BI5678BB", 2'000).id());
     day.close(noon + std::chrono::hours{8}, by);
     return day;
 }
@@ -179,12 +179,13 @@ QString statusText(TruckStatus status) {
 }
 
 // A limit field: empty means no limit, otherwise a non-negative whole number.
-std::optional<std::int64_t> parseLimit(const QString& text) {
-    if (text.trimmed().isEmpty()) return 0;
+std::optional<int> parseBoxLimit(const QString& text) {
     bool ok = false;
-    const qint64 value = text.trimmed().toLongLong(&ok);
-    return ok && value >= 0 ? std::optional<std::int64_t>{value} : std::nullopt;
+    const int value = text.trimmed().toInt(&ok);
+    return ok && value > 0 ? std::optional<int>{value} : std::nullopt;
 }
+
+QString describeBoxLimit(const Truck& truck) { return Terminal::tr("%1 ящ.").arg(truck.boxLimit()); }
 
 // Money of the lines that count; the receipt's own amount() exists only once it is closed.
 Money amountOf(const OpenReceipt& receipt) {
@@ -362,7 +363,7 @@ QVariantList Terminal::previousTruckList() const {
             {"plate", QString::fromStdString(truck.plate())},
             {"make", QString::fromStdString(truck.details().make)},
             {"note", QString::fromStdString(truck.details().note)},
-            {"capacity", describeCargo(truck.capacity())},
+            {"capacity", describeBoxLimit(truck)},
         });
     }
     return list;
@@ -523,7 +524,6 @@ QVariantList Terminal::destinationList() const {
             {"loadBoxes", info["loadBoxes"]},
             {"loadKg", info["loadKg"]},
             {"limitBoxes", info["limitBoxes"]},
-            {"limitKg", info["limitKg"]},
             {"fillPercent", info["fillPercent"]},
             {"overloaded", info["overloaded"]},
             {"warehouse", false},
@@ -670,16 +670,12 @@ QString Terminal::setPrice(const QString& cropCode, const QString& price) {
     return {};
 }
 
-QString Terminal::addTruck(const QString& plate, const QString& make, const QString& note, const QString& boxes,
-                           const QString& kilogramsText) {
+QString Terminal::addTruck(const QString& plate, const QString& make, const QString& note, const QString& boxes) {
     if (!workDay_) return tr("Сесію не відкрито");
     if (plate.trimmed().isEmpty()) return tr("Вкажіть номер фури");
-    const auto boxLimit = parseLimit(boxes);
-    const auto weightLimit = parseLimit(kilogramsText);
-    if (!boxLimit || !weightLimit) return tr("Ліміт — ціле невід'ємне число");
-    if (*boxLimit == 0 && *weightLimit == 0) return tr("Вкажіть ліміт фури: ящики, кілограми або обидва");
-    workDay_->addTruck(plate.trimmed().toUpper().toStdString(),
-                       {.boxes = static_cast<int>(*boxLimit), .weight = kilograms(*weightLimit)},
+    const auto boxLimit = parseBoxLimit(boxes);
+    if (!boxLimit) return tr("Ліміт фури — ціле додатне число ящиків");
+    workDay_->addTruck(plate.trimmed().toUpper().toStdString(), *boxLimit,
                        {.make = make.trimmed().toStdString(), .note = note.trimmed().toStdString()});
     saveSession();
     emit trucksChanged();
@@ -1038,13 +1034,12 @@ QVariantMap Terminal::truckInfo(const Truck& truck) const {
         {"plate", QString::fromStdString(truck.plate())},
         {"make", QString::fromStdString(truck.details().make)},
         {"note", QString::fromStdString(truck.details().note)},
-        {"capacity", describeCargo(truck.capacity())},
+        {"capacity", describeBoxLimit(truck)},
         {"load", describeCargo(load)},
-        // Bare numbers for the session table; an empty limit means "no limit".
+        // Bare numbers for the session table; kilograms are for reference, with no limit.
         {"loadBoxes", QString::number(load.boxes)},
         {"loadKg", kilogramsText(load.weight)},
-        {"limitBoxes", truck.capacity().boxes != 0 ? QString::number(truck.capacity().boxes) : QString{}},
-        {"limitKg", truck.capacity().weight.isZero() ? QString{} : kilogramsText(truck.capacity().weight)},
+        {"limitBoxes", QString::number(truck.boxLimit())},
         {"fillPercent", truck.fillPercent(load)},
         {"overloaded", truck.isOverloaded(load)},
         {"status", statusText(truck.status())},

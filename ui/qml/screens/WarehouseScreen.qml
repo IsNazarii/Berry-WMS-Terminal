@@ -19,9 +19,9 @@ Page {
     // Trucks of the session still loading; the warehouse itself is not a target here.
     readonly property var trucks: Terminal.destinations.filter(d => !d.warehouse)
 
-    // "40 / 400 ящ.": the load over its limit, or the load alone when there is none.
-    function loadText(load, limit, unit) {
-        return (limit !== "" ? load + " / " + limit : load) + " " + unit
+    // "40 / 400 ящ.": the load over the truck's limit.
+    function boxesText(load, limit) {
+        return load + " / " + limit + " " + qsTr("ящ.")
     }
 
     RowLayout {
@@ -245,14 +245,14 @@ Page {
                             RowLayout {
                                 Layout.fillWidth: true
                                 Label {
-                                    text: screen.loadText(truck.modelData.loadBoxes, truck.modelData.limitBoxes, qsTr("ящ."))
+                                    text: screen.boxesText(truck.modelData.loadBoxes, truck.modelData.limitBoxes)
                                     font.pixelSize: Theme.fontSizeCaption
                                     color: Theme.textMuted
                                     elide: Text.ElideRight
                                     Layout.fillWidth: true
                                 }
                                 Label {
-                                    text: screen.loadText(truck.modelData.loadKg, truck.modelData.limitKg, qsTr("кг"))
+                                    text: truck.modelData.loadKg + " " + qsTr("кг")
                                     font.pixelSize: Theme.fontSizeCaption
                                     color: Theme.textMuted
                                     elide: Text.ElideRight

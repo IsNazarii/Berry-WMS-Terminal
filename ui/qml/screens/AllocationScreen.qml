@@ -22,9 +22,9 @@ Page {
     readonly property bool hasDestination: destinationId !== ""
     readonly property var source: Terminal.allocationSources.find(r => r.receiptId === Terminal.allocationReceiptId)
 
-    // "40 / 400 ящ.": the load over its limit, or the load alone when there is none.
-    function loadText(load, limit, unit) {
-        return (limit !== "" ? load + " / " + limit : load) + " " + unit
+    // "40 / 400 ящ.": the load over the truck's limit.
+    function boxesText(load, limit) {
+        return load + " / " + limit + " " + qsTr("ящ.")
     }
 
     // A trace of the table rows, as on the receiving screen.
@@ -399,16 +399,14 @@ Page {
                                 visible: !destination.modelData.warehouse
                                 Layout.fillWidth: true
                                 Label {
-                                    text: screen.loadText(destination.modelData.loadBoxes,
-                                                          destination.modelData.limitBoxes, qsTr("ящ."))
+                                    text: screen.boxesText(destination.modelData.loadBoxes, destination.modelData.limitBoxes)
                                     font.pixelSize: Theme.fontSizeCaption
                                     color: Theme.textMuted
                                     elide: Text.ElideRight
                                     Layout.fillWidth: true
                                 }
                                 Label {
-                                    text: screen.loadText(destination.modelData.loadKg,
-                                                          destination.modelData.limitKg, qsTr("кг"))
+                                    text: destination.modelData.loadKg + " " + qsTr("кг")
                                     font.pixelSize: Theme.fontSizeCaption
                                     color: Theme.textMuted
                                     elide: Text.ElideRight

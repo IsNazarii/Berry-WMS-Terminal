@@ -65,7 +65,7 @@ class Terminal : public QObject {
     Q_PROPERTY(QStringList cropKeys READ cropKeyList NOTIFY cropKeysChanged)
     // {cropCode: price in hryvnias, "85,00"}; a crop without a price is missing.
     Q_PROPERTY(QVariantMap prices READ priceMap NOTIFY pricesChanged)
-    // [{truckId, plate, make, note, capacity, load, loadBoxes, loadKg, limitBoxes, limitKg,
+    // [{truckId, plate, make, note, capacity, load, loadBoxes, loadKg, limitBoxes,
     //   fillPercent, overloaded, status, loading}] of the session.
     Q_PROPERTY(QVariantList trucks READ truckList NOTIFY trucksChanged)
     // [{index, plate, make, note, capacity}] of the previous session, for "repeat the truck from yesterday".
@@ -94,7 +94,7 @@ class Terminal : public QObject {
     Q_PROPERTY(QVariantList allocationLines READ allocationLines NOTIFY allocationChanged)
     // [{cropCode, name, leftBoxes, leftKg}] of the selected receipt, only crops with boxes left.
     Q_PROPERTY(QVariantList allocationCrops READ allocationCrops NOTIFY allocationChanged)
-    // [{destinationId, title, detail, loadBoxes, loadKg, limitBoxes, limitKg, fillPercent, overloaded,
+    // [{destinationId, title, detail, loadBoxes, loadKg, limitBoxes, fillPercent, overloaded,
     //   warehouse}]: trucks of the session still loading, then the warehouse (destinationId "warehouse").
     Q_PROPERTY(QVariantList destinations READ destinationList NOTIFY allocationChanged)
 
@@ -180,10 +180,9 @@ public:
     // Picked from the menu, weighed or priced: a crop from the menu takes the
     // place of the key used longest ago. Remembered per terminal.
     Q_INVOKABLE void useCrop(const QString& cropCode);
-    // Limits as typed; an empty field means no limit in that dimension.
-    // Make and note are optional.
+    // The box limit as typed; make and note are optional.
     Q_INVOKABLE QString addTruck(const QString& plate, const QString& make, const QString& note,
-                                 const QString& boxes, const QString& kilograms);
+                                 const QString& boxes);
     Q_INVOKABLE QString repeatTruck(int previousIndex);
     Q_INVOKABLE void departTruck(const QString& truckId);
     Q_INVOKABLE void carryOverTruck(const QString& truckId);

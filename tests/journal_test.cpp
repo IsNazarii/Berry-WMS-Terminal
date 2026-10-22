@@ -454,6 +454,71 @@ TEST(Journal, BoxesByCountAreNotTiedToAPallet) {
     EXPECT_EQ(journal.destinationOf(open.id(), 1), std::nullopt);
 }
 
+TEST(Journal, ReversedAllocationNoLongerCounts) {
+    Journal journal;
+    const Receipt receipt = Receipt::create(42, Settlement::OnSite, {pallet("raspberry", 10, kilograms(20)),
+                                                                     pallet("raspberry", 5, kilograms(10))});
+    journal.add(receipt);
+    const Allocation intoTruck = Allocation::wholeWeighing(receipt, 0, kTruck);
+    const Allocation intoWarehouse = Allocation::wholeWeighing(receipt, 1, ToWarehouse{});
+    journal.add(intoTruck);
+    journal.add(intoWarehouse);
+    journal.add(AllocationReversal::of(intoTruck));
+    journal.add(AllocationReversal::of(intoWarehouse));
+
+    EXPECT_EQ(journal.loadOf(kTruck), Cargo{});
+    EXPECT_EQ(journal.stockOf("raspberry"), Cargo{});
+    EXPECT_EQ(journal.unallocatedOf(receipt.id(), "raspberry"), (Cargo{.boxes = 15, .weight = kilograms(30)}));
+    EXPECT_EQ(journal.destinationOf(receipt.id(), 0), std::nullopt);
+    EXPECT_EQ(journal.allocationOf(receipt.id(), 0), nullptr);
+    // The pallet is free again: it may go somewhere else.
+    EXPECT_TRUE(journal.validateAllocation(Allocation::wholeWeighing(receipt, 0, kOtherTruck)).empty());
+}
+
+TEST(Journal, ReversalMayArriveBeforeTheAllocation) {
+    // Sync does not keep the order in which another terminal made the records.
+    Journal journal;
+    const Receipt receipt = Receipt::create(42, Settlement::OnSite, {pallet("raspberry", 10, kilograms(20))});
+    const Allocation a = Allocation::wholeWeighing(receipt, 0, kTruck);
+    journal.add(AllocationReversal::of(a));
+    journal.add(a);
+    EXPECT_EQ(journal.loadOf(kTruck), Cargo{});
+}
+
+TEST(Journal, FindsTheAllocationOfAWholePallet) {
+    Journal journal;
+    const OpenReceipt open = unloading();
+    const Allocation a = Allocation::wholeWeighing(open, 1, kTruck);
+    journal.add(a);
+    ASSERT_NE(journal.allocationOf(open.id(), 1), nullptr);
+    EXPECT_EQ(journal.allocationOf(open.id(), 1)->id(), a.id());
+    EXPECT_EQ(journal.allocationOf(open.id(), 0), nullptr);
+}
+
+TEST(Journal, ReversalIsCheckedAgainstTheJournal) {
+    Journal journal;
+    const OpenReceipt open = unloading();
+    const Allocation a = Allocation::wholeWeighing(open, 0, kTruck);
+    EXPECT_TRUE(mentions(journal.validateReversal(AllocationReversal::of(a)), "Розподіл не знайдено"));
+
+    journal.add(a);
+    const AllocationReversal reversal = AllocationReversal::of(a);
+    EXPECT_TRUE(journal.validateReversal(reversal).empty());
+    journal.add(reversal);
+    EXPECT_TRUE(mentions(journal.validateReversal(AllocationReversal::of(a)), "вже скасовано"));
+}
+
+TEST(Journal, PalletShippedOnFromTheWarehouseCannotBeTakenBack) {
+    // Its boxes are already in a truck: taking it back would leave the stock negative.
+    Journal journal;
+    const OpenReceipt open = unloading();
+    const Allocation a = Allocation::wholeWeighing(open, 0, ToWarehouse{}); // 80 boxes
+    journal.add(a);
+    journal.add(journal.shipmentOf("raspberry", 10, kTruck));
+
+    EXPECT_TRUE(mentions(journal.validateReversal(AllocationReversal::of(a)), "На складі лише 70 ящ."));
+}
+
 TEST(Journal, FindsClosedReceiptById) {
     Journal journal;
     const Receipt receipt = Receipt::create(42, Settlement::OnSite, {pallet("raspberry", 10, kilograms(20))});

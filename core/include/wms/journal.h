@@ -9,6 +9,7 @@
 
 #include <cstddef>
 #include <optional>
+#include <ranges>
 #include <set>
 #include <string>
 #include <string_view>
@@ -28,6 +29,7 @@ public:
     bool add(Receipt receipt);
     bool add(Payment payment);
     bool add(Allocation allocation);
+    bool add(AllocationReversal reversal);
     bool add(StockShipment shipment);
 
     [[nodiscard]] std::size_t size() const noexcept { return ids_.size(); }
@@ -59,6 +61,9 @@ public:
     // allocated by count are not tied to a weighing and do not show here.
     [[nodiscard]] std::optional<Destination> destinationOf(const Uuid& receiptId,
                                                            std::size_t weighingIndex) const noexcept;
+    // The allocation that took the whole weighing; nullptr while it is free.
+    // Pointer valid until the next add().
+    [[nodiscard]] const Allocation* allocationOf(const Uuid& receiptId, std::size_t weighingIndex) const noexcept;
     // Closed receipts with boxes that neither a truck nor the warehouse has
     // taken yet, oldest first: the allocation screen's to-do list. Pointers
     // are valid until the next add().
@@ -71,6 +76,10 @@ public:
                                      Destination destination) const;
     [[nodiscard]] Allocation boxesOf(const OpenReceipt& receipt, std::string_view cropCode, int boxes,
                                      Destination destination) const;
+
+    // Operator-facing check before a reversal is added: the allocation is known
+    // and not taken back yet, and warehouse stock still holds its boxes.
+    [[nodiscard]] std::vector<std::string> validateReversal(const AllocationReversal& reversal) const;
 
     // Operator-facing check before an allocation is added: its own errors plus
     // the rules that need the rest of the journal. add() does not call this on
@@ -95,6 +104,10 @@ public:
 private:
     // Remembers the id; false when it was already there.
     bool registerId(const Uuid& id);
+    // Allocations not taken back by a reversal: the only ones that move berries.
+    [[nodiscard]] auto activeAllocations() const noexcept {
+        return allocations_ | std::views::filter([this](const Allocation& a) { return !reversed_.contains(a.id()); });
+    }
     // What allocations have already taken of the crop from the receipt.
     [[nodiscard]] Cargo allocatedOf(const Uuid& receiptId, std::string_view cropCode) const noexcept;
     // The checks shared by closed and open receipts.
@@ -106,6 +119,10 @@ private:
     std::vector<Payment> payments_;
     std::vector<Allocation> allocations_;
     std::vector<StockShipment> shipments_;
+    std::vector<AllocationReversal> reversals_;
+    // Ids of the allocations reversals point at; a reversal synced in before
+    // its allocation is already counted when the allocation comes.
+    std::set<Uuid> reversed_;
 };
 
 } // namespace wms

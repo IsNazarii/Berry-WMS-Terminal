@@ -43,4 +43,20 @@ std::string Allocation::describe() const {
                        weighingIndex_ ? std::format(" (зважування {})", *weighingIndex_ + 1) : "");
 }
 
+AllocationReversal::AllocationReversal(Uuid id, TimePoint createdAt, Uuid allocationId, SyncStatus syncStatus)
+    : Transaction{id, createdAt, syncStatus}, allocationId_{allocationId} {}
+
+AllocationReversal AllocationReversal::of(const Allocation& allocation) {
+    return AllocationReversal{Uuid::generateV7(), Clock::now(), allocation.id()};
+}
+
+std::vector<std::string> AllocationReversal::validate() const {
+    if (allocationId_.isNil()) return {"Не обрано розподіл"};
+    return {};
+}
+
+std::string AllocationReversal::describe() const {
+    return std::format("Скасування розподілу {}", allocationId_.toString());
+}
+
 } // namespace wms

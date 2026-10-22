@@ -27,6 +27,13 @@ bool Journal::add(Allocation allocation) {
     return true;
 }
 
+bool Journal::add(AllocationReversal reversal) {
+    if (!registerId(reversal.id())) return false;
+    reversed_.insert(reversal.allocationId());
+    reversals_.push_back(std::move(reversal));
+    return true;
+}
+
 bool Journal::add(StockShipment shipment) {
     if (!registerId(shipment.id())) return false;
     shipments_.push_back(std::move(shipment));
@@ -60,7 +67,7 @@ std::vector<const Transaction*> Journal::historyOf(SupplierId supplierId) const 
 
 Cargo Journal::loadOf(const TruckId& truckId) const noexcept {
     Cargo load;
-    for (const auto& a : allocations_) {
+    for (const auto& a : activeAllocations()) {
         if (a.destination() == Destination{truckId}) load += a.cargo();
     }
     for (const auto& s : shipments_) {
@@ -71,7 +78,7 @@ Cargo Journal::loadOf(const TruckId& truckId) const noexcept {
 
 Cargo Journal::stockOf(std::string_view cropCode) const noexcept {
     Cargo stock;
-    for (const auto& a : allocations_) {
+    for (const auto& a : activeAllocations()) {
         if (std::holds_alternative<ToWarehouse>(a.destination()) && a.cropCode() == cropCode) stock += a.cargo();
     }
     for (const auto& s : shipments_) {
@@ -113,17 +120,22 @@ Cargo Journal::unallocatedOf(const OpenReceipt& receipt, std::string_view cropCo
 
 Cargo Journal::allocatedOf(const Uuid& receiptId, std::string_view cropCode) const noexcept {
     Cargo taken;
-    for (const auto& a : allocations_) {
+    for (const auto& a : activeAllocations()) {
         if (a.receiptId() == receiptId && a.cropCode() == cropCode) taken += a.cargo();
     }
     return taken;
 }
 
 std::optional<Destination> Journal::destinationOf(const Uuid& receiptId, std::size_t weighingIndex) const noexcept {
-    for (const auto& a : allocations_) {
-        if (a.receiptId() == receiptId && a.weighingIndex() == weighingIndex) return a.destination();
+    const Allocation* allocation = allocationOf(receiptId, weighingIndex);
+    return allocation ? std::optional{allocation->destination()} : std::nullopt;
+}
+
+const Allocation* Journal::allocationOf(const Uuid& receiptId, std::size_t weighingIndex) const noexcept {
+    for (const auto& a : activeAllocations()) {
+        if (a.receiptId() == receiptId && a.weighingIndex() == weighingIndex) return &a;
     }
-    return std::nullopt;
+    return nullptr;
 }
 
 std::vector<const Receipt*> Journal::waitingForAllocation() const {
@@ -170,11 +182,7 @@ std::vector<std::string> Journal::validateCancel(const OpenReceipt& receipt, std
     const Weighing& weighing = receipt.weighings().at(index);
     if (weighing.cancelled) return {std::format("Зважування {} вже анульовано", index + 1)};
 
-    for (const auto& a : allocations_) {
-        if (a.receiptId() == receipt.id() && a.weighingIndex() == index) {
-            return {std::format("Зважування {} вже розподілено", index + 1)};
-        }
-    }
+    if (allocationOf(receipt.id(), index) != nullptr) return {std::format("Зважування {} вже розподілено", index + 1)};
     // Allocations by box count are not tied to a pallet: whatever is left of
     // the crop after cancelling must still cover them.
     const int left = receipt.cargoOf(weighing.cropCode).boxes - weighing.boxCount;
@@ -194,11 +202,8 @@ std::vector<std::string> Journal::checkAllocation(const Allocation& allocation, 
         if (receipt.weighings().at(*index).cancelled) {
             errors.push_back(std::format("Зважування {} анульовано", *index + 1));
         }
-        for (const auto& a : allocations_) {
-            if (a.receiptId() == allocation.receiptId() && a.weighingIndex() == index) {
-                errors.push_back(std::format("Зважування {} вже розподілено", *index + 1));
-                break;
-            }
+        if (allocationOf(allocation.receiptId(), *index) != nullptr) {
+            errors.push_back(std::format("Зважування {} вже розподілено", *index + 1));
         }
     }
 
@@ -208,6 +213,27 @@ std::vector<std::string> Journal::checkAllocation(const Allocation& allocation, 
     left -= allocatedOf(allocation.receiptId(), allocation.cropCode());
     if (allocation.cargo().boxes > left.boxes) {
         errors.push_back(std::format("Залишилось лише {} ящ. культури {}", left.boxes, allocation.cropCode()));
+    }
+    return errors;
+}
+
+std::vector<std::string> Journal::validateReversal(const AllocationReversal& reversal) const {
+    std::vector<std::string> errors = reversal.validate();
+    const auto found = std::ranges::find(allocations_, reversal.allocationId(), &Allocation::id);
+    if (found == allocations_.end()) {
+        errors.emplace_back("Розподіл не знайдено в журналі");
+        return errors;
+    }
+    if (reversed_.contains(found->id())) {
+        errors.emplace_back("Розподіл вже скасовано");
+        return errors;
+    }
+    if (std::holds_alternative<ToWarehouse>(found->destination())) {
+        const Cargo stock = stockOf(found->cropCode());
+        if (stock.boxes < found->cargo().boxes) {
+            errors.push_back(std::format("На складі лише {} ящ. культури {}: решту вже відвантажено", stock.boxes,
+                                         found->cropCode()));
+        }
     }
     return errors;
 }

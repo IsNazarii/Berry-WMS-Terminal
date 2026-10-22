@@ -13,7 +13,7 @@ using Clock = std::chrono::system_clock;
 using TimePoint = Clock::time_point;
 
 enum class SyncStatus { Pending, Synced };
-enum class TransactionKind { Receipt, Payment, Allocation, Shipment };
+enum class TransactionKind { Receipt, Payment, Allocation, AllocationReversal, Shipment };
 
 // Base of every record that is written to the local offline buffer and later
 // synchronised with the server. Records are immutable facts: mistakes are

@@ -76,6 +76,26 @@ private:
     std::optional<std::size_t> weighingIndex_;
 };
 
+// Takes an allocation back: the berries are free again, as if never allocated.
+// The allocation itself stays in the journal, so the mistake can still be seen.
+// Made when a weighing that already went into a truck turns out to be wrong.
+class AllocationReversal final : public Transaction {
+public:
+    AllocationReversal(Uuid id, TimePoint createdAt, Uuid allocationId, SyncStatus syncStatus = SyncStatus::Pending);
+
+    [[nodiscard]] static AllocationReversal of(const Allocation& allocation);
+
+    [[nodiscard]] const Uuid& allocationId() const noexcept { return allocationId_; }
+
+    [[nodiscard]] TransactionKind kind() const noexcept override { return TransactionKind::AllocationReversal; }
+    [[nodiscard]] Money balanceEffect() const noexcept override { return Money{}; }
+    [[nodiscard]] std::vector<std::string> validate() const override;
+    [[nodiscard]] std::string describe() const override;
+
+private:
+    Uuid allocationId_;
+};
+
 // Templates live in the header: they are instantiated for each receipt type.
 
 template <WeighedReceipt R>

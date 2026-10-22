@@ -109,3 +109,19 @@ TEST(Allocation, TruckDestinationKeepsTheTruck) {
     const auto a = Allocation::boxesOf(sampleReceipt(), "raspberry", 10, kTruck);
     EXPECT_EQ(a.destination(), Destination{kTruck});
 }
+
+TEST(AllocationReversal, PointsAtTheAllocationItTakesBack) {
+    const auto a = Allocation::wholeWeighing(sampleReceipt(), 0, kTruck);
+    const auto r = AllocationReversal::of(a);
+    EXPECT_EQ(r.allocationId(), a.id());
+    EXPECT_NE(r.id(), a.id());
+    EXPECT_TRUE(r.isValid());
+    EXPECT_TRUE(r.balanceEffect().isZero());
+    EXPECT_EQ(r.kind(), TransactionKind::AllocationReversal);
+    EXPECT_NE(r.describe().find(a.id().toString()), std::string::npos);
+}
+
+TEST(AllocationReversal, NeedsAnAllocation) {
+    const AllocationReversal r{Uuid::generateV7(), Clock::now(), Uuid{}};
+    EXPECT_FALSE(r.isValid());
+}

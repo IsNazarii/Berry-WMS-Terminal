@@ -188,6 +188,13 @@ Page {
                         wrapMode: Text.WordWrap
                         Layout.fillWidth: true
                     }
+                    // Crops change during the season: a new berry comes in, so it is added here.
+                    Button {
+                        text: qsTr("Додати культуру…")
+                        flat: true
+                        Layout.fillWidth: true
+                        onClicked: cropDialog.open()
+                    }
                     Item { Layout.fillHeight: true }
                 }
             }
@@ -517,6 +524,55 @@ Page {
             }
 
             ErrorLabel { id: truckError }
+        }
+    }
+
+    // A crop is just a name; the same name in other letter case is refused while typing.
+    Dialog {
+        id: cropDialog
+        anchors.centerIn: parent
+        width: 360
+        modal: true
+        title: qsTr("Нова культура")
+        standardButtons: Dialog.Cancel
+
+        readonly property var errors: cropName.text.trim() === "" ? [] : Terminal.newCropErrors(cropName.text)
+
+        function add() {
+            if (cropName.text.trim() === "" || errors.length > 0)
+                return
+            cropError.text = Terminal.addCrop(cropName.text)
+            if (cropError.text === "")
+                close()
+        }
+
+        onOpened: {
+            cropName.clear()
+            cropError.text = ""
+            cropName.forceActiveFocus()
+        }
+
+        ColumnLayout {
+            anchors.fill: parent
+            spacing: Theme.spacingS
+
+            FieldCaption { caption: qsTr("Назва") }
+            TextField {
+                id: cropName
+                placeholderText: qsTr("Агрус")
+                Layout.fillWidth: true
+                onTextEdited: cropError.text = ""
+                onAccepted: cropDialog.add()
+            }
+            ErrorLabel { text: cropDialog.errors.join("\n") }
+            Button {
+                text: qsTr("Додати культуру")
+                highlighted: true
+                enabled: cropName.text.trim() !== "" && cropDialog.errors.length === 0
+                Layout.fillWidth: true
+                onClicked: cropDialog.add()
+            }
+            ErrorLabel { id: cropError }
         }
     }
 

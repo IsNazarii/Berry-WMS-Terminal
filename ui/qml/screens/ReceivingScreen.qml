@@ -181,17 +181,18 @@ Page {
                 property string cropCode: Terminal.crops.length > 0 ? Terminal.crops[0].cropCode : ""
                 readonly property string dayPrice: Terminal.prices[cropCode] ?? ""
 
-                // Up to five crops are keys, the rest wait behind "Ще": crops with a
-                // day price come first, since those are the ones received today.
-                // With six or fewer there is no point in a menu, all are keys.
+                // Five crops are keys, the rest wait behind "Ще"; which five is
+                // Terminal.cropKeys (a crop used from the menu replaces the key used
+                // longest ago). With six or fewer there is no point in a menu, all are keys.
                 readonly property var cropKeys: {
                     const all = Terminal.crops
                     if (all.length <= 6)
                         return { keys: all, more: [] }
-                    const priced = all.filter(c => Terminal.prices[c.cropCode] !== undefined)
-                    const unpriced = all.filter(c => Terminal.prices[c.cropCode] === undefined)
-                    const ordered = priced.concat(unpriced)
-                    return { keys: ordered.slice(0, 5), more: ordered.slice(5) }
+                    const keyCodes = Terminal.cropKeys
+                    return {
+                        keys: keyCodes.map(code => all.find(c => c.cropCode === code)).filter(c => c !== undefined),
+                        more: all.filter(c => !keyCodes.includes(c.cropCode))
+                    }
                 }
                 readonly property var pickedFromMore:
                     cropKeys.more.find(c => c.cropCode === cropCode) ?? null
@@ -325,6 +326,7 @@ Page {
                                         highlighted: weighingForm.cropCode === modelData.cropCode
                                         onClicked: {
                                             weighingForm.cropCode = modelData.cropCode
+                                            Terminal.useCrop(modelData.cropCode)
                                             moreCrops.close()
                                         }
                                         contentItem: RowLayout {

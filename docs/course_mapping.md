@@ -27,7 +27,7 @@
 
 ### Класи ядра
 
-`Quantity<Tag>` (`Money`, `Weight`), `Uuid`, `Supplier`, `Operator`, `Transaction`, `Receipt`,
+`Quantity<Tag>` (`Money`, `Weight`), `Uuid`, `Supplier`, `Operator`, `Crop`, `CropKeys`, `Transaction`, `Receipt`,
 `Payment`, `Allocation`, `StockShipment`, `OpenReceipt`, `Truck`, `Journal`, `DayPrices`, `WorkDay`,
 `IScaleDriver`, `SimulatedScaleDriver`, `StabilityDetector`, `JournalStore`, `SessionStore`, `Repository<T>` + infra-класи
 `sqlite::Database`, `sqlite::Statement`, `sqlite::ScopedTransaction`, `sqlite::Error`, `SqliteJournalStore`, `SqliteSessionStore`, `SqliteRepository<T>` + UI-класи `Terminal`, `SupplierListModel`,
@@ -58,7 +58,7 @@ classDiagram
 | 4 | Статичний (`std::variant` + `std::visit`) | `Destination = variant<TruckId, ToWarehouse>` в `Allocation::describe`, `Journal::loadOf/stockOf` |
 | 5 | Статичний (перевантаження) | `Journal::add(Receipt / Payment / Allocation / StockShipment)`; `unallocatedOf`, `boxesOf`, `validateAllocation` для `Receipt` і `OpenReceipt`; `WorkDay::setPrice/addTruck/…` з `Amendment` і без |
 | 6 | Статичний (concept) | `WeighedReceipt` — шаблонні `Allocation::wholeWeighing/boxesOf`, `Journal::checkAllocation` приймають `Receipt` і `OpenReceipt` |
-| 7 | Статичний (шаблон класу) + динамічний | `Repository<T>`: один інтерфейс довідника для `Supplier` і `Operator`; `SqliteRepository<T>` бере таблицю й колонки зі спеціалізації `Table<T>` |
+| 7 | Статичний (шаблон класу) + динамічний | `Repository<T>`: один інтерфейс довідника для `Supplier`, `Operator` і `Crop`; `SqliteRepository<T>` бере таблицю й колонки зі спеціалізації `Table<T>` |
 
 ### Приклади нетривіальних методів
 

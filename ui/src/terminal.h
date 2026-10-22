@@ -2,6 +2,8 @@
 
 #include "scale_monitor.h"
 #include "supplier_list_model.h"
+#include "wms/crop.h"
+#include "wms/crop_keys.h"
 #include "wms/journal.h"
 #include "wms/operator.h"
 #include "wms/scale.h"
@@ -54,9 +56,13 @@ class Terminal : public QObject {
     // "Сесія 26.09.2026", empty without an open session.
     Q_PROPERTY(QString sessionTitle READ sessionTitle NOTIFY sessionChanged)
     Q_PROPERTY(QString sessionOpenedBy READ sessionOpenedBy NOTIFY sessionChanged)
-    // [{cropCode, name}]. Kept apart from the prices: a Repeater over a list that
-    // changes rebuilds its rows and would wipe what the operator is typing.
-    Q_PROPERTY(QVariantList crops READ cropList CONSTANT)
+    // [{cropCode, name}] in the order added. Kept apart from the prices: a Repeater
+    // over a list that changes rebuilds its rows and would wipe what the operator
+    // is typing. The list itself changes only when a crop is added.
+    Q_PROPERTY(QVariantList crops READ cropList NOTIFY cropsChanged)
+    // Codes of the crops that are keys on the receiving screen, in screen order
+    // (CropKeys); the rest go to the "Ще" menu.
+    Q_PROPERTY(QStringList cropKeys READ cropKeyList NOTIFY cropKeysChanged)
     // {cropCode: price in hryvnias, "85,00"}; a crop without a price is missing.
     Q_PROPERTY(QVariantMap prices READ priceMap NOTIFY pricesChanged)
     // [{truckId, plate, make, note, capacity, load, loadBoxes, loadKg, limitBoxes, limitKg,
@@ -129,6 +135,7 @@ public:
     [[nodiscard]] QString sessionTitle() const;
     [[nodiscard]] QString sessionOpenedBy() const;
     [[nodiscard]] QVariantList cropList() const;
+    [[nodiscard]] QStringList cropKeyList() const;
     [[nodiscard]] QVariantMap priceMap() const;
     [[nodiscard]] QVariantList truckList() const;
     [[nodiscard]] QVariantList previousTruckList() const;
@@ -162,6 +169,13 @@ public:
     Q_INVOKABLE void openSession();
     // Session editing: each returns an operator-facing error, empty on success.
     Q_INVOKABLE QString setPrice(const QString& cropCode, const QString& price);
+    // A crop that came into season: why it cannot be added (shown while
+    // typing), and adding it. Returns an operator-facing error, empty on success.
+    [[nodiscard]] Q_INVOKABLE QStringList newCropErrors(const QString& name) const;
+    Q_INVOKABLE QString addCrop(const QString& name);
+    // Picked from the menu, weighed or priced: a crop from the menu takes the
+    // place of the key used longest ago. Remembered per terminal.
+    Q_INVOKABLE void useCrop(const QString& cropCode);
     // Limits as typed; an empty field means no limit in that dimension.
     // Make and note are optional.
     Q_INVOKABLE QString addTruck(const QString& plate, const QString& make, const QString& note,
@@ -229,6 +243,8 @@ signals:
     void balanceChanged();
     // Opened or closed.
     void sessionChanged();
+    void cropsChanged();
+    void cropKeysChanged();
     void pricesChanged();
     // Truck loads depend on both the session and the journal.
     void trucksChanged();
@@ -250,6 +266,8 @@ private:
     using SourceReceipt = std::variant<const OpenReceipt*, const Receipt*>;
     [[nodiscard]] std::optional<SourceReceipt> findSource(const Uuid& id) const noexcept;
     [[nodiscard]] QString supplierNameOf(SupplierId id) const;
+    // The code itself for a crop missing from the catalogue, e.g. one synced in later.
+    [[nodiscard]] QString cropName(std::string_view code) const;
     // Plate of a truck of this or the previous session.
     [[nodiscard]] QString plateOf(const TruckId& id) const;
     // Checks the operator's choice: a truck must be of this session and still loading.
@@ -277,8 +295,11 @@ private:
     SqliteSessionStore sessionStore_;
     SqliteRepository<Operator> operatorStore_;
     SqliteRepository<Supplier> supplierStore_;
+    SqliteRepository<Crop> cropStore_;
     std::vector<Operator> operators_;
     std::vector<Supplier> suppliers_;
+    std::vector<Crop> crops_;
+    CropKeys cropKeys_;
     // Of the session closed last: repeat and carry-over read them.
     std::vector<Truck> previousTrucks_;
     std::optional<WorkDay> workDay_;

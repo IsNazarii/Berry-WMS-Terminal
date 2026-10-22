@@ -13,6 +13,7 @@
 #include <QDir>
 #include <QtLogging>
 #include <QRandomGenerator>
+#include <QSettings>
 #include <QStandardPaths>
 
 #include <algorithm>
@@ -51,17 +52,44 @@ std::vector<T> loadOrSeed(sqlite::Database& db, Repository<T>& store, const std:
     return store.all();
 }
 
-struct Crop {
-    const char* code;
-    const char* name;
-};
+// Five keys and the "Ще" menu fill one row on a 1024 px screen.
+constexpr std::size_t kCropKeys = 5;
 
-// Crops of the Losiatyn point; a crop catalogue comes with the server.
-constexpr Crop kCrops[] = {
-    {"raspberry", "Малина"},
-    {"strawberry", "Полуниця"},
-    {"blueberry", "Лохина"},
-};
+QStringList toQStringList(const std::vector<std::string>& codes) {
+    QStringList list;
+    for (const std::string& code : codes) list << QString::fromStdString(code);
+    return list;
+}
+
+std::vector<std::string> toCodes(const QStringList& list) {
+    std::vector<std::string> codes;
+    for (const QString& code : list) codes.push_back(code.toStdString());
+    return codes;
+}
+
+std::vector<std::string> codesOf(const std::vector<Crop>& crops) {
+    std::vector<std::string> codes;
+    for (const Crop& crop : crops) codes.push_back(crop.code());
+    return codes;
+}
+
+// A layout of this terminal's screen, so settings rather than the database.
+CropKeys loadCropKeys(const std::vector<Crop>& crops) {
+    const QSettings settings;
+    CropKeys keys{kCropKeys, toCodes(settings.value("ui/cropKeys").toStringList()),
+                  toCodes(settings.value("ui/cropsRecent").toStringList())};
+    keys.fill(codesOf(crops));
+    return keys;
+}
+
+// The usual crops of the point; the operator adds the rest during the season.
+std::vector<Crop> demoCrops() {
+    return {
+        {"raspberry", "Малина"},
+        {"strawberry", "Полуниця"},
+        {"blueberry", "Лохина"},
+    };
+}
 
 // The session is named by the local date; the core leaves time zones to the UI.
 std::chrono::year_month_day toDate(const QDate& date) {
@@ -155,11 +183,6 @@ std::optional<std::int64_t> parseLimit(const QString& text) {
     return ok && value >= 0 ? std::optional<std::int64_t>{value} : std::nullopt;
 }
 
-QString cropName(std::string_view code) {
-    const auto found = std::ranges::find(kCrops, code, &Crop::code);
-    return found != std::end(kCrops) ? QString::fromUtf8(found->name) : QString::fromUtf8(code);
-}
-
 // Money of the lines that count; the receipt's own amount() exists only once it is closed.
 Money amountOf(const OpenReceipt& receipt) {
     Money sum;
@@ -245,8 +268,11 @@ Terminal::Terminal(QObject* parent)
       sessionStore_{db_},
       operatorStore_{db_},
       supplierStore_{db_},
+      cropStore_{db_},
       operators_{loadOrSeed(db_, operatorStore_, demoOperators())},
       suppliers_{loadOrSeed(db_, supplierStore_, demoSuppliers())},
+      crops_{loadOrSeed(db_, cropStore_, demoCrops())},
+      cropKeys_{loadCropKeys(crops_)},
       supplierModel_{suppliers_, journal_},
       simulator_{{grams(0)}},
       scaleMonitor_{simulator_} {
@@ -292,17 +318,22 @@ QString Terminal::sessionOpenedBy() const {
 
 QVariantList Terminal::cropList() const {
     QVariantList list;
-    for (const Crop& crop : kCrops)
-        list.append(QVariantMap{{"cropCode", QString::fromUtf8(crop.code)}, {"name", QString::fromUtf8(crop.name)}});
+    for (const Crop& crop : crops_)
+        list.append(QVariantMap{{"cropCode", QString::fromStdString(crop.code())},
+                                {"name", QString::fromStdString(crop.name())}});
     return list;
+}
+
+QStringList Terminal::cropKeyList() const {
+    return toQStringList(cropKeys_.keys());
 }
 
 QVariantMap Terminal::priceMap() const {
     QVariantMap map;
     if (!workDay_) return map;
-    for (const Crop& crop : kCrops) {
-        if (const auto price = workDay_->prices().current(crop.code))
-            map.insert(QString::fromUtf8(crop.code), hryvniasText(*price));
+    for (const Crop& crop : crops_) {
+        if (const auto price = workDay_->prices().current(crop.code()))
+            map.insert(QString::fromStdString(crop.code()), hryvniasText(*price));
     }
     return map;
 }
@@ -494,9 +525,9 @@ QVariantList Terminal::destinationList() const {
         });
     }
     QStringList stock;
-    for (const Crop& crop : kCrops) {
-        if (const Cargo held = journal_.stockOf(crop.code); held.boxes != 0)
-            stock << QString("%1 %2").arg(QString::fromUtf8(crop.name), describeCargo(held));
+    for (const Crop& crop : crops_) {
+        if (const Cargo held = journal_.stockOf(crop.code()); held.boxes != 0)
+            stock << QString("%1 %2").arg(QString::fromStdString(crop.name()), describeCargo(held));
     }
     list.append(QVariantMap{
         {"destinationId", QString(kWarehouseId)},
@@ -511,11 +542,11 @@ QVariantList Terminal::destinationList() const {
 
 QVariantList Terminal::stockList() const {
     QVariantList list;
-    for (const Crop& crop : kCrops) {
-        const Cargo held = journal_.stockOf(crop.code);
+    for (const Crop& crop : crops_) {
+        const Cargo held = journal_.stockOf(crop.code());
         list.append(QVariantMap{
-            {"cropCode", QString::fromUtf8(crop.code)},
-            {"name", QString::fromUtf8(crop.name)},
+            {"cropCode", QString::fromStdString(crop.code())},
+            {"name", QString::fromStdString(crop.name())},
             {"boxes", held.boxes},
             {"kg", kilogramsText(held.weight)},
             {"empty", held.boxes == 0 && held.weight.isZero()},
@@ -628,6 +659,7 @@ QString Terminal::setPrice(const QString& cropCode, const QString& price) {
     workDay_->setPrice(cropCode.toStdString(), *money, Clock::now());
     saveSession();
     emit pricesChanged();
+    useCrop(cropCode);
     return {};
 }
 
@@ -682,6 +714,35 @@ void Terminal::closeSession() {
     emit sessionChanged();
     // The end of the working day: a copy with the whole day in it.
     backup();
+}
+
+QStringList Terminal::newCropErrors(const QString& name) const {
+    QStringList list;
+    for (const std::string& error : validateNewCrop(name.toStdString(), crops_)) list << QString::fromStdString(error);
+    return list;
+}
+
+QString Terminal::addCrop(const QString& name) {
+    if (const QStringList errors = newCropErrors(name); !errors.isEmpty()) return errors.join("\n");
+    const Crop crop{cropCodeFor(name.toStdString()), squeezeSpaces(name.toStdString())};
+    cropStore_.save(crop);
+    crops_.push_back(crop);
+    cropKeys_.fill(codesOf(crops_));
+    emit cropsChanged();
+    emit cropKeysChanged();
+    // A new crop has no price yet and nothing in stock, but both lists name every crop.
+    emit pricesChanged();
+    emit journalChanged();
+    return {};
+}
+
+void Terminal::useCrop(const QString& cropCode) {
+    if (std::ranges::find(crops_, cropCode.toStdString(), &Crop::code) == crops_.end()) return;
+    cropKeys_.use(cropCode.toStdString());
+    QSettings settings;
+    settings.setValue("ui/cropKeys", toQStringList(cropKeys_.keys()));
+    settings.setValue("ui/cropsRecent", toQStringList(cropKeys_.recent()));
+    emit cropKeysChanged();
 }
 
 QString Terminal::startReceipt(qint64 supplierId) {
@@ -760,6 +821,7 @@ QString Terminal::recordWeighing(const QString& cropCode, const QString& boxes, 
     workDay_->addWeighing(*activeReceiptId_, std::move(weighing), Clock::now());
     saveSession();
     emit receiptsChanged();
+    useCrop(cropCode);
     return {};
 }
 
@@ -943,6 +1005,11 @@ std::optional<Terminal::SourceReceipt> Terminal::findSource(const Uuid& id) cons
     }
     if (const Receipt* closed = journal_.findReceipt(id)) return closed;
     return std::nullopt;
+}
+
+QString Terminal::cropName(std::string_view code) const {
+    const auto found = std::ranges::find(crops_, code, &Crop::code);
+    return QString::fromStdString(found != crops_.end() ? found->name() : std::string{code});
 }
 
 QString Terminal::supplierNameOf(SupplierId id) const {

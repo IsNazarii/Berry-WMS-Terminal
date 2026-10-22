@@ -34,7 +34,7 @@ $CM/cmake -S . -B build -G Ninja && $CM/cmake --build build && $CM/ctest --test-
 | `wms_ui`, `wms_uiplugin` | QML-модуль `BerryWms.Ui` |
 | `wms_style` | QML-модуль `BerryWms.Style`: власний стиль контролів, `Theme`, шрифт |
 | `wms_terminal` | виконуваний файл термінала |
-| `wms_infra` | інфраструктура: обгортка SQLite, схема, сховища журналу й сесій (статична бібліотека) |
+| `wms_infra` | інфраструктура: обгортка SQLite, схема, сховища журналу, сесій і довідників, бекап (статична бібліотека) |
 | `sqlite3` | SQLite з амальгамації |
 | `wms_core_tests`, `wms_infra_tests` | unit-тести ядра й інфраструктури |
 | `wms_ui_qmllint` | перевірка QML-файлів `qmllint` |
@@ -57,20 +57,24 @@ $CM/cmake -S . -B build -G Ninja && $CM/cmake --build build && $CM/ctest --test-
 |---|---|
 | `quantity_test` | арифметика, округлення, форматування, `parseMoney` / `parseWeight` |
 | `uuid_test` | структура v7, сортування за часом, `parse` / `toString` |
-| `supplier_test` | пошук за id і частиною імені (кирилиця, регістр) |
+| `supplier_test` | пошук за id і частиною імені (кирилиця, регістр), `validateNewSupplier`, `nextSupplierId` |
+| `crop_test` | `validateNewCrop` (дублі після нормалізації, назва прихованої вільна), `cropCodeFor`, `validateRemoveCrop` |
+| `crop_keys_test` | кнопки культур: заміна найдавнішої, `fill` з довідника |
 | `operator_test` | формат PIN, `checkPin` |
-| `transaction_test` | `Weighing`, `Receipt`, `Payment`: нетто, суми, валідація, анулювання, опт |
-| `open_receipt_test` | додавання, анулювання, закриття з тим самим id |
+| `transaction_test` | `Weighing`, `Receipt`, `Payment` (`paidBy`): нетто, суми, валідація, анулювання, опт |
+| `open_receipt_test` | додавання, анулювання, `crops` / `setPrice`, закриття з тим самим id |
 | `scale_test` | симулятор, детектор стабільності |
 | `truck_test` | ліміт у ящиках, заповненість, переповнення, статуси |
 | `allocation_test` | ціла палета, ящики, пропорційний поділ ваги |
 | `shipment_test` | відвантаження зі складу |
-| `journal_test` | баланс, завантаження, склад, ідемпотентність, усі `validate…` |
+| `journal_test` | баланс, завантаження, склад, ідемпотентність, сторно, `mentionsCrop`, усі `validate…` |
 | `pricing_test` | історія цін, `priceAt` за часом |
-| `workday_test` | сесія: ціни, фури, перенесення, відкриті чеки, закриття, поправки, `restore` |
+| `workday_test` | сесія: ціни, фури, перенесення, відкриті чеки, авторозподіл, «Оплатити», анулювання зі сторно, закриття, поправки, `restore` |
 | `sqlite_test` *(infra)* | обгортка: прив'язка й читання, `NULL`, помилки, зовнішні ключі, WAL, відкат і вкладені транзакції |
 | `sqlite_journal_store_test` *(infra)* | кожен тип запису туди й назад, повторний UUID, перевідкриття файлу, відмова від новішої версії схеми |
 | `sqlite_session_store_test` *(infra)* | знімок сесії (ціни, фури, відкриті чеки, поправки), перезапис, `current` / `lastClosed`, спільна база з журналом |
+| `sqlite_repository_test` *(infra)* | довідники `Supplier` / `Operator` / `Crop`: upsert, порядок, `remove`, `archived` |
+| `backup_test` *(infra)* | копія через `VACUUM INTO` відкривається, ротація лишає `keep` останніх і не чіпає чужі файли |
 
 Запустити один набір:
 

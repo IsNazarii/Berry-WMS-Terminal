@@ -33,6 +33,8 @@ UI — QML-модуль `BerryWms.Ui` (статична бібліотека `wm
   разом з діалогами, шрифти лишаються чіткими. Тому зміна діє після перезапуску (кнопка показує «— після
   перезапуску»); `QT_SCALE_FACTOR`, заданий вручну, має пріоритет. Навіщо: системний масштаб Qt враховує, але
   «великий текст» GNOME (`text-scaling-factor`) доходить лише до GTK-програм.
+- **Повноекранний режим** — опція: F11 або кнопка у футері («Повний екран · F11» / «Вікно · F11»);
+  запам'ятовується в `QSettings` (`ui/fullScreen`), тож термінал наступного разу відкривається так само.
 - **Вхід обов'язковий:** поки ніхто не увійшов, видно лише `LoginScreen`; вкладки й футер
   приховані. Після входу чи виходу вкладка скидається на «Сесія».
 - **Вкладки** йдуть у порядку робочого дня: Сесія → Прийом → Розподіл → Склад → Каса (`TabBar` +
@@ -197,6 +199,12 @@ UI — QML-модуль `BerryWms.Ui` (статична бібліотека `wm
 Спливне вікно з полем «Пошук: номер або частина прізвища» і `ListView` результатів з боргом
 кожного постачальника. Enter бере єдиний збіг; «Нікого не знайдено» при порожньому результаті.
 
+**Новий постачальник — прямо тут**, щоб новачок не чекав біля ваг: пошук без збігів пропонує «Додати «…»…»
+(текст пошуку стає ім'ям; якщо шукали номер — «Додати нового…» з порожнім ім'ям). Форма: прізвище та ім'я,
+телефон (необов'язково); причини з `validateNewSupplier` видно під час введення, «Додати й обрати · Enter»
+неактивна, поки вони є. `Terminal.addSupplier` записує постачальника в базу й повертає його id — він
+одразу обирається (на «Прийомі» відкривається чек, на «Касі» — обирається постачальник).
+
 ### 3.5 Розподіл (`AllocationScreen.qml`)
 
 Три панелі (`Frame`) у стилі «Прийому»:
@@ -256,15 +264,19 @@ UI — QML-модуль `BerryWms.Ui` (статична бібліотека `wm
 
 | Поле | Зміст |
 |---|---|
-| `db_`, `journalStore_`, `sessionStore_`, `operatorStore_`, `supplierStore_` | база термінала й сховища поверх неї; оголошені першими — з них завантажується решта |
-| `operators_`, `suppliers_` | довідники з бази (`SqliteRepository<T>::all()`); порожня таблиця заповнюється демо-набором (`loadOrSeed`) |
+| `databasePath_`, `backupFolder_` | файл бази і тека бекапів (для `:memory:` — без бекапу) |
+| `db_`, `journalStore_`, `sessionStore_`, `operatorStore_`, `supplierStore_`, `cropStore_` | база термінала й сховища поверх неї; оголошені першими — з них завантажується решта |
+| `operators_`, `suppliers_`, `crops_` | довідники з бази (`SqliteRepository<T>::all()`); порожня таблиця заповнюється демо-набором (`loadOrSeed`) |
+| `cropKeys_` | `CropKeys` — які культури кнопки на «Прийомі» (з `QSettings`) |
 | `previousTrucks_` | фури останньої закритої сесії (`SessionStore::lastClosed`) — для «повторити» і перенесення |
 | `workDay_` | `std::optional<WorkDay>` — відкрита сесія (`SessionStore::current`) |
 | `journal_` | `Journal` (`JournalStore::load`) |
 | `supplierModel_`, `simulator_`, `scaleMonitor_` | модель списку, симулятор ваг і монітор |
 | `activeReceiptId_` | UUID активного чека — **не вказівник**, бо відкриті чеки живуть у векторі, що перевиділяє пам'ять |
 | `allocationReceiptId_` | UUID чека, обраного на екрані «Розподіл» (відкритого або закритого) |
+| `cashSupplierId_` | постачальник, обраний на «Касі» |
 | `currentOperatorId_` | хто увійшов |
+| `receivingTargetId_` | ціль авторозподілу на «Прийомі» (з `QSettings`) |
 
 Порядок оголошення полів важливий: модель і монітор оголошені після даних, які читають, тож
 конструюються після них.
@@ -294,7 +306,8 @@ UI — QML-модуль `BerryWms.Ui` (статична бібліотека `wm
 | `operators` | CONSTANT | оператори без PIN (для списку входу) |
 | `loggedIn`, `operatorName` | `operatorChanged` | вхід |
 | `sessionOpen`, `sessionTitle`, `sessionOpenedBy` | `sessionChanged` | сесія |
-| `crops` | — (CONSTANT) | `[{cropCode, name}]` — стала модель рядків |
+| `crops` | `cropsChanged` | `[{cropCode, name}]` — видимі культури; модель рядків, що змінюється лише при додаванні/прибиранні культури |
+| `cropKeys` | `cropKeysChanged` | коди культур-кнопок «Прийому» (`CropKeys::keys`) |
 | `prices` | `pricesChanged` | `{cropCode: "85,00"}` — число без одиниці |
 | `trucks` | `trucksChanged` | фури сесії з завантаженням, % і статусом |
 | `previousTrucks` | `sessionChanged` | учорашні фури для «повторити» |
@@ -322,9 +335,13 @@ UI — QML-модуль `BerryWms.Ui` (статична бібліотека `wm
 | `login(id, pin)` → `bool`, `logout()` | вхід / вихід (відкриті чеки лишаються з сесією) |
 | `openSession()`, `closeSession()` | відкрити / закрити (закриття — лише без блокерів) |
 | `setPrice(crop, text)` | нова денна ціна з тексту (`parseMoney`) |
+| `newCropErrors(name)`, `addCrop(name)` | «Додати культуру…»: причини під час введення (`validateNewCrop`) / додати або повернути приховану |
+| `cropRemoval(crop)` → `{errors, keepsRecords}`, `removeCrop(crop)` | прибрати культуру: видалити або приховати |
+| `useCrop(crop)` | культуру обрано з «Ще» — піднімається на кнопку (`CropKeys::use`) |
 | `addTruck(plate, make, note, boxes)`, `repeatTruck(i)` | фури |
 | `departTruck(id)`, `carryOverTruck(id)` | рішення щодо фури |
 | `startReceipt(supplierId)`, `activateReceipt(id)` | відкрити / обрати активний чек |
+| `newSupplierErrors(name, phone)`, `addSupplier(name, phone)` → id | новий постачальник із `SupplierPicker` (0 — не додано) |
 | `recordWeighing(crop, boxes, tare, pallet, manualWeight, acceptUnstable)` | зважування в активний чек (за денною ціною) |
 | `setReceivingTarget(destinationId)` | ціль авторозподілу на «Прийомі» |
 | `cancelWeighing(i)` | анулювати рядок (палета у фурі — разом зі сторно розподілу, одна транзакція) або повернути причину |
@@ -345,6 +362,7 @@ flowchart LR
     S --> T[trucksChanged]
     S --> R[receiptsChanged]
     J[journalChanged] --> T
+    K[cropsChanged] --> N
     J --> M["SupplierListModel::refreshBalances"]
     J --> C[cashChanged]
     T --> A[allocationChanged]
@@ -373,8 +391,8 @@ flowchart LR
 ### 4.5 Урок: стала модель рядків
 
 `Repeater` над списком, що змінюється, **перебудовує всі рядки** — і стирає текст, який оператор
-саме вводить. Тому на екрані сесії рядки цін будуються зі сталого `crops`, а змінні ціни беруться
-з окремої властивості `prices` за ключем.
+саме вводить. Тому на екрані сесії рядки цін будуються з `crops` (змінюється лише при додаванні чи
+прибиранні культури — рідко й свідомо), а змінні ціни беруться з окремої властивості `prices` за ключем.
 
 ## 5. `SupplierListModel`
 
@@ -383,7 +401,8 @@ flowchart LR
 
 - ролі: `id`, `name`, `phone`, `balance` (з `Journal::balanceOf`, відформатовано);
 - `idAt(row)` — id постачальника видимого рядка;
-- `refreshBalances()` — викликається на `journalChanged`, бо баланси похідні від журналу.
+- `refreshBalances()` — викликається на `journalChanged`, бо баланси похідні від журналу;
+- `refresh()` — перефільтрувати після додавання постачальника.
 
 ## 6. `ScaleMonitor`
 

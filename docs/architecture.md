@@ -9,7 +9,7 @@
 flowchart LR
     OP(("Оператор"))
     SC["Промислові ваги<br/>(COM-порт)"]
-    PR["Принтер чеків"]
+    PR["Термопринтер 80 мм<br/>(ESC/POS)"]
     T["Berry WMS Terminal<br/>(ноутбук на пункті)"]
     DB[("SQLite<br/>локально")]
     SRV["Сервер-заглушка<br/>(sync)"]
@@ -32,10 +32,10 @@ flowchart LR
 | Шар | Каталог | Ціль CMake | Залежить від | Що містить |
 |---|---|---|---|---|
 | Ядро | `core/` | `wms_core` (статична бібліотека) | лише стандартна бібліотека C++20 | доменні класи, правила, валідація, обчислення |
-| Інфраструктура | `infra/` | `wms_infra` + `sqlite3` (амальгамація) | core; Qt — лише для пристроїв | обгортка SQLite (`sqlite::Database`/`Statement`/`ScopedTransaction`) ✅; схема з версіями (`migrateSchema`) + `SqliteJournalStore` + `SqliteSessionStore` + `SqliteRepository<T>` ✅; інші сховища, COM-порт ваг, HTTP-sync, друк — далі |
+| Інфраструктура | `infra/` | `wms_infra` + `sqlite3` (амальгамація) | core; Qt — лише для пристроїв | обгортка SQLite (`sqlite::Database`/`Statement`/`ScopedTransaction`) ✅; схема з версіями (`migrateSchema`, 8 міграцій) + `SqliteJournalStore` + `SqliteSessionStore` + `SqliteRepository<T>` + `backupDatabase` ✅; COM-порт ваг, HTTP-sync, друк — далі |
 | Інтерфейс | `ui/` | `wms_ui` + `wms_uiplugin` (QML-модуль `BerryWms.Ui`) | core, Qt Quick | QML-екрани і тонкі адаптери |
 | Точка входу | `app/` | `wms_terminal` (виконуваний) | ui | `main()`: створює `QGuiApplication`, завантажує `Main.qml` |
-| Тести | `tests/` | `wms_core_tests`, `wms_infra_tests` | core / infra, GoogleTest | 176 тестів ядра + 24 тести infra на справжній SQLite |
+| Тести | `tests/` | `wms_core_tests`, `wms_infra_tests` | core / infra, GoogleTest | 235 тестів ядра + 36 тестів infra на справжній SQLite |
 
 **Правило залежностей:** лише вниз (`app → ui → infra → core`). Ядро не підключає жодного
 заголовка Qt — це перевіряється тим, що `wms_core` лінкується без Qt і тестується окремо.
@@ -184,7 +184,7 @@ sequenceDiagram
 
 ## 8. Що буде далі в архітектурі
 
-- **`infra/` + SQLite** (`journal_mode=WAL`; періодичний бекап — далі). Доступ — прямий C API
+- **`infra/` + SQLite** (`journal_mode=WAL`, бекап — див. нижче). Етап закрито. Доступ — прямий C API
   `sqlite3` (амальгамація через `FetchContent`, без Qt Sql): сховища тестуються без `QCoreApplication`,
   а RAII-обгортка перетворює коди помилок на винятки `sqlite::Error`. `ScopedTransaction` побудовано на
   `SAVEPOINT`, тож транзакції вкладаються: сховище пише у своїй, а запис у два сховища (закриття чека =
@@ -210,8 +210,8 @@ sequenceDiagram
   - ✅ Підключено до `Terminal` (база в теці даних програми, `WMS_DATABASE` перевизначає; демо-дані лише в нову базу).
   - ✅ Довідники: шаблонний інтерфейс `Repository<T>` у core (`save` — додати або замінити за id, `all()` — за id),
     реалізація `SqliteRepository<T>` (міграція 3: таблиці `supplier`, `operator`). Різниця між типами — лише
-    таблиця й колонки: приватна спеціалізація `Table<Supplier>` / `Table<Operator>` у `.cpp`, шаблон явно
-    інстанційований для цих двох типів (`template class ...`), тож інший тип не злінкується.
+    таблиця й колонки: приватна спеціалізація `Table<Supplier>` / `Table<Operator>` / `Table<Crop>` у `.cpp`, шаблон явно
+    інстанційований для цих типів (`template class ...`), тож інший тип не злінкується.
     Довідники належать серверу, тому `save` — upsert (`ON CONFLICT DO UPDATE`), а не append, як у журналі.
   - ✅ Культури: міграція 5 — таблиця `crop` (`code TEXT PRIMARY KEY`, `name`), `Table<Crop>`; порядок — `rowid`
     (порядок додавання; upsert зберігає `rowid`, тож перейменована культура лишається на своєму місці).
@@ -230,4 +230,5 @@ sequenceDiagram
   (`Transaction::markSynced()`), retry з backoff; pull довідників за курсором `updated_since`.
 - **`SerialScaleDriver`** — реалізація `IScaleDriver` через Qt SerialPort; `ScaleMonitor`
   знає драйвер лише через інтерфейс, тож заміна симулятора не зачепить UI.
-- **Друк чека** — окрема бібліотека (не Qt) — вимога лаби 3.
+- **Друк чека** (лаба 3, без Qt-друку): термопринтер 80 мм, команди ESC/POS; QR з UUID чека — nayuki qrcodegen
+  або вбудований QR принтера. Модель принтера ще не обрана.

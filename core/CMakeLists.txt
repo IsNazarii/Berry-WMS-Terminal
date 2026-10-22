@@ -5,6 +5,7 @@ add_library(wms_core
     src/text.cpp
     src/supplier.cpp
     src/crop.cpp
+    src/crop_keys.cpp
     src/operator.cpp
     src/transaction.cpp
     src/receipt.cpp

@@ -10,6 +10,7 @@ add_executable(wms_core_tests
     quantity_test.cpp
     uuid_test.cpp
     supplier_test.cpp
+    crop_test.cpp
     transaction_test.cpp
     scale_test.cpp
     truck_test.cpp

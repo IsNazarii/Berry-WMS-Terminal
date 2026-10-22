@@ -77,11 +77,19 @@ class Terminal : public QObject {
     Q_PROPERTY(QVariantList openReceipts READ openReceiptList NOTIFY receiptsChanged)
     // The receipt new weighings go into; empty when none is open.
     Q_PROPERTY(QString activeReceiptId READ activeReceiptId NOTIFY receiptsChanged)
-    // [{index, crop, boxes, gross, tare, net, price, amount, manualPrice, manualWeight, cancelled}];
-    // weights in kg and money in hryvnias as bare numbers ("142,6", "8 823,00") for a table.
+    // [{index, crop, boxes, gross, tare, net, price, amount, manualPrice, manualWeight, cancelled, placedIn, hanging}];
+    // weights in kg and money in hryvnias as bare numbers ("142,6", "8 823,00") for a table; placedIn is
+    // a plate or "склад", hanging = a pallet left for the allocation screen.
     Q_PROPERTY(QVariantList activeLines READ activeLines NOTIFY receiptsChanged)
     // {openedAt, boxes, net, amount} of the active receipt without cancelled lines; empty when none.
     Q_PROPERTY(QVariantMap activeSummary READ activeSummary NOTIFY receiptsChanged)
+    // Where weighed pallets go unless an earlier pallet of the crop in the receipt leads
+    // (destinationId as in `destinations`); empty: none, they hang. Remembered per terminal.
+    Q_PROPERTY(QString receivingTarget READ receivingTarget NOTIFY receivingTargetChanged)
+    // Where the next pallet of each crop goes, said before it is weighed: {cropCode: {text, follows,
+    // hangs, boxesLeft}}. follows: after the last pallet of the crop rather than the target;
+    // boxesLeft is -1 for the warehouse. Empty without an active receipt.
+    Q_PROPERTY(QVariantMap nextPlacements READ nextPlacements NOTIFY placementsChanged)
 
     // Allocation. [{receiptId, supplierName, openedAt, open, leftBoxes, leftKg}]: open receipts
     // of the session, then closed ones, that still have boxes to allocate.
@@ -144,6 +152,8 @@ public:
     [[nodiscard]] QString activeReceiptId() const;
     [[nodiscard]] QVariantList activeLines() const;
     [[nodiscard]] QVariantMap activeSummary() const;
+    [[nodiscard]] QString receivingTarget() const;
+    [[nodiscard]] QVariantMap nextPlacements() const;
     [[nodiscard]] QVariantList allocationSources() const;
     [[nodiscard]] QString allocationReceiptId() const;
     [[nodiscard]] QString allocationSupplierName() const;
@@ -206,6 +216,7 @@ public:
                                        bool acceptUnstable);
     // Returns why the line cannot be cancelled, empty when it was.
     Q_INVOKABLE QString cancelWeighing(int index);
+    Q_INVOKABLE void setReceivingTarget(const QString& destinationId);
     // Why the active receipt cannot be closed as retail / wholesale yet.
     [[nodiscard]] Q_INVOKABLE QStringList receiptCloseBlockers(bool wholesale) const;
     // The receipt goes into the journal and the next open one becomes active.
@@ -257,6 +268,10 @@ signals:
     void allocationChanged();
     // The chosen supplier of the cash screen or its records.
     void cashChanged();
+    // Chosen, or its truck stopped loading.
+    void receivingTargetChanged();
+    // The active receipt, the trucks or the target changed.
+    void placementsChanged();
 
 private:
     [[nodiscard]] const Supplier* currentSupplier() const noexcept;
@@ -282,6 +297,11 @@ private:
     [[nodiscard]] QString plateOf(const TruckId& id) const;
     // Checks the operator's choice: a truck must be of this session and still loading.
     [[nodiscard]] std::variant<Destination, QString> destinationFor(const QString& destinationId) const;
+    // The receiving target when it still takes berries.
+    [[nodiscard]] std::optional<Destination> receivingDestination() const;
+    // A plate or "склад", for a table cell.
+    [[nodiscard]] QString placeName(const Destination& destination) const;
+    [[nodiscard]] QVariantMap nextPlacement(std::string_view cropCode) const;
     // Validates against the journal and adds; returns the errors, joined.
     QString allocate(const SourceReceipt& source, const Allocation& allocation);
     // A journal record: stored first, then added, so the screen never shows
@@ -323,6 +343,7 @@ private:
     std::optional<Uuid> allocationReceiptId_;
     std::optional<SupplierId> cashSupplierId_;
     std::optional<OperatorId> currentOperatorId_;
+    QString receivingTargetId_;
 };
 
 } // namespace wms::ui

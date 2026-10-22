@@ -180,6 +180,10 @@ Page {
 
                 property string cropCode: Terminal.crops.length > 0 ? Terminal.crops[0].cropCode : ""
                 readonly property string dayPrice: Terminal.prices[cropCode] ?? ""
+                readonly property var placement: Terminal.nextPlacements[cropCode] ?? {}
+                // A truck with fewer free boxes than typed: the pallet will wait on the allocation screen.
+                readonly property bool wontFit: placement.boxesLeft !== undefined && placement.boxesLeft >= 0
+                                                && parseInt(boxes.text) > placement.boxesLeft
 
                 // Five crops are keys, the rest wait behind "Ще"; which five is
                 // Terminal.cropKeys (a crop used from the menu replaces the key used
@@ -350,12 +354,13 @@ Page {
                     // every field of a row on one line.
                     GridLayout {
                         Layout.fillWidth: true
-                        columns: 2
+                        columns: 3
                         columnSpacing: Theme.spacingM
                         rowSpacing: Theme.spacingXs
 
                         FieldCaption { caption: qsTr("Ціна, грн/кг"); hint: qsTr("порожньо — денна") }
                         FieldCaption { caption: qsTr("Тара ящика, кг") }
+                        FieldCaption { caption: qsTr("Ціль"); hint: qsTr("фура або склад") }
                         TextField {
                             id: price
                             Layout.fillWidth: true
@@ -368,6 +373,17 @@ Page {
                             Layout.fillWidth: true
                             placeholderText: qsTr("напр. 0,35")
                             inputMethodHints: Qt.ImhFormattedNumbersOnly
+                        }
+                        // Where a crop's first pallet in the receipt goes; the next ones follow it.
+                        ComboBox {
+                            id: target
+                            Layout.fillWidth: true
+                            model: [{ destinationId: "", title: qsTr("Без цілі") }].concat(Terminal.destinations)
+                            textRole: "title"
+                            valueRole: "destinationId"
+                            // Naming the model makes the binding re-run when it is rebuilt.
+                            currentIndex: model.findIndex(d => d.destinationId === Terminal.receivingTarget)
+                            onActivated: Terminal.setReceivingTarget(currentValue)
                         }
                     }
                 }
@@ -413,6 +429,20 @@ Page {
                         font.pixelSize: Theme.fontSizeLarge
                         inputMethodHints: Qt.ImhFormattedNumbersOnly
                     }
+                }
+
+                // Said before the pallet is weighed: the operator must see where it goes.
+                Label {
+                    visible: screen.hasReceipt && weighingForm.cropCode !== ""
+                    readonly property bool warn: weighingForm.placement.hangs || weighingForm.wontFit
+                    text: (weighingForm.wontFit ? qsTr("Не влізе: %1 — палета чекатиме на «Розподілі»")
+                                                : qsTr("Палета піде %1"))
+                              .arg(weighingForm.placement.text ?? "")
+                          + (weighingForm.placement.follows ? qsTr(" (як попередня цієї культури в чеку)") : "")
+                    color: warn ? Theme.warn : Theme.textMuted
+                    font.weight: warn ? Font.DemiBold : Font.Normal
+                    elide: Text.ElideRight
+                    Layout.fillWidth: true
                 }
 
                 RowLayout {
@@ -549,7 +579,7 @@ Page {
                         required property var modelData
                         readonly property bool cancelled: modelData.cancelled
                         width: ListView.view.width
-                        height: 36
+                        height: 44
                         color: rowHover.hovered ? Theme.surfaceAlt : "transparent"
 
                         HoverHandler { id: rowHover }
@@ -574,11 +604,25 @@ Page {
                                 horizontalAlignment: Text.AlignLeft
                                 Layout.preferredWidth: lineList.indexWidth
                             }
-                            Cell {
-                                text: line.modelData.crop
-                                font.weight: Font.DemiBold
-                                horizontalAlignment: Text.AlignLeft
+                            // Where the pallet went, under its crop: no room for one more column.
+                            ColumnLayout {
+                                spacing: 0
                                 Layout.fillWidth: true
+                                Cell {
+                                    text: line.modelData.crop
+                                    font.weight: Font.DemiBold
+                                    horizontalAlignment: Text.AlignLeft
+                                    Layout.fillWidth: true
+                                }
+                                Cell {
+                                    visible: !line.cancelled
+                                    text: line.modelData.hanging ? qsTr("чекає розподілу") : "→ " + line.modelData.placedIn
+                                    font.pixelSize: Theme.fontSizeCaption
+                                    font.weight: line.modelData.hanging ? Font.DemiBold : Font.Normal
+                                    color: line.modelData.hanging ? Theme.warn : Theme.textMuted
+                                    horizontalAlignment: Text.AlignLeft
+                                    Layout.fillWidth: true
+                                }
                             }
                             Cell {
                                 text: line.modelData.boxes

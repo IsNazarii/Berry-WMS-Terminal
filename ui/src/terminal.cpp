@@ -279,7 +279,8 @@ Terminal::Terminal(QObject* parent)
       cropKeys_{loadCropKeys(crops_)},
       supplierModel_{suppliers_, journal_},
       simulator_{{grams(0)}},
-      scaleMonitor_{simulator_} {
+      scaleMonitor_{simulator_},
+      receivingTargetId_{QSettings{}.value("receiving/target").toString()} {
     if (!sessionStore_.current() && !sessionStore_.lastClosed() && journalStore_.load().size() == 0) seedDemoData();
     // The supplier model reads balances only when asked, so loading after it is fine.
     journal_ = journalStore_.load();
@@ -294,6 +295,10 @@ Terminal::Terminal(QObject* parent)
     connect(this, &Terminal::trucksChanged, this, &Terminal::allocationChanged);
     connect(this, &Terminal::receiptsChanged, this, &Terminal::allocationChanged);
     connect(this, &Terminal::journalChanged, this, &Terminal::cashChanged);
+    connect(this, &Terminal::trucksChanged, this, &Terminal::receivingTargetChanged);
+    connect(this, &Terminal::receivingTargetChanged, this, &Terminal::placementsChanged);
+    connect(this, &Terminal::receiptsChanged, this, &Terminal::placementsChanged);
+    connect(this, &Terminal::cropsChanged, this, &Terminal::placementsChanged);
     // The state as the last run left it, before anyone changes anything.
     backup();
 }
@@ -402,6 +407,7 @@ QVariantList Terminal::activeLines() const {
     if (!receipt) return list;
     for (std::size_t i = 0; i < receipt->weighings().size(); ++i) {
         const Weighing& w = receipt->weighings()[i];
+        const auto placed = journal_.destinationOf(receipt->id(), i);
         list.append(QVariantMap{
             {"index", static_cast<int>(i)},
             {"crop", cropName(w.cropCode)},
@@ -414,6 +420,8 @@ QVariantList Terminal::activeLines() const {
             {"manualPrice", w.priceSource == PriceSource::Manual},
             {"manualWeight", w.weightSource == WeightSource::Manual},
             {"cancelled", w.cancelled},
+            {"placedIn", placed ? placeName(*placed) : QString{}},
+            {"hanging", !w.cancelled && !placed},
         });
     }
     return list;
@@ -430,6 +438,8 @@ QVariantMap Terminal::activeSummary() const {
         {"amount", hryvniasText(amountOf(*receipt))},
     };
 }
+
+QString Terminal::receivingTarget() const { return receivingDestination() ? receivingTargetId_ : QString{}; }
 
 QVariantList Terminal::allocationSources() const {
     QVariantList list;
@@ -871,8 +881,21 @@ QString Terminal::recordWeighing(const QString& cropCode, const QString& boxes, 
     }
 
     if (const auto errors = weighing.validate(); !errors.empty()) return joined(errors);
-    workDay_->addWeighing(*activeReceiptId_, std::move(weighing), Clock::now());
-    saveSession();
+    const std::size_t index = workDay_->addWeighing(*activeReceiptId_, std::move(weighing), Clock::now());
+    auto allocation = workDay_->autoAllocation(*activeReceiptId_, index, receivingDestination(), journal_);
+    // The rule only picks the place; a pallet the journal would refuse just hangs.
+    if (allocation && !journal_.validateAllocation(*allocation, *activeReceipt()).empty()) allocation.reset();
+    {
+        // The pallet and where it went together, or neither after a crash.
+        sqlite::ScopedTransaction transaction{db_};
+        saveSession();
+        if (allocation) journalStore_.save(*allocation);
+        transaction.commit();
+    }
+    if (allocation) {
+        journal_.add(std::move(*allocation));
+        emit journalChanged();
+    }
     emit receiptsChanged();
     useCrop(cropCode);
     return {};
@@ -898,6 +921,36 @@ QString Terminal::cancelWeighing(int index) {
     }
     emit receiptsChanged();
     return {};
+}
+
+void Terminal::setReceivingTarget(const QString& destinationId) {
+    receivingTargetId_ = destinationId;
+    QSettings{}.setValue("receiving/target", destinationId);
+    emit receivingTargetChanged();
+}
+
+QVariantMap Terminal::nextPlacements() const {
+    QVariantMap map;
+    if (!workDay_ || !activeReceipt()) return map;
+    for (const Crop& crop : crops_) map.insert(QString::fromStdString(crop.code()), nextPlacement(crop.code()));
+    return map;
+}
+
+QVariantMap Terminal::nextPlacement(std::string_view cropCode) const {
+    const auto target = receivingDestination();
+    const auto next = workDay_->nextDestination(*activeReceiptId_, cropCode, target, journal_);
+    if (!next) {
+        return {{"text", tr("нікуди: без цілі палета чекатиме на «Розподілі»")},
+                {"follows", false}, {"hangs", true}, {"boxesLeft", -1}};
+    }
+    int boxesLeft = -1;
+    QString text = tr("на склад");
+    if (const auto* truckId = std::get_if<TruckId>(&*next)) {
+        const Truck* truck = workDay_->findTruck(*truckId);
+        boxesLeft = truck->boxesLeft(journal_.loadOf(*truckId));
+        text = tr("у фуру %1 · вільно %2 ящ.").arg(QString::fromStdString(truck->plate())).arg(std::max(boxesLeft, 0));
+    }
+    return {{"text", text}, {"follows", next != target}, {"hangs", false}, {"boxesLeft", boxesLeft}};
 }
 
 QStringList Terminal::receiptCloseBlockers(bool wholesale) const {
@@ -1096,6 +1149,18 @@ std::variant<Destination, QString> Terminal::destinationFor(const QString& desti
     if (!truck) return tr("Оберіть фуру або склад");
     if (!truck->acceptsCargo()) return tr("Фура %1 вже не завантажується").arg(QString::fromStdString(truck->plate()));
     return Destination{truck->id()};
+}
+
+std::optional<Destination> Terminal::receivingDestination() const {
+    if (receivingTargetId_.isEmpty()) return std::nullopt;
+    const auto destination = destinationFor(receivingTargetId_);
+    if (const auto* place = std::get_if<Destination>(&destination)) return *place;
+    return std::nullopt;
+}
+
+QString Terminal::placeName(const Destination& destination) const {
+    const auto* truckId = std::get_if<TruckId>(&destination);
+    return truckId ? plateOf(*truckId) : tr("склад");
 }
 
 QString Terminal::allocate(const SourceReceipt& source, const Allocation& allocation) {

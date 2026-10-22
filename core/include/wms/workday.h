@@ -3,6 +3,7 @@
 #include "wms/journal.h"
 #include "wms/open_receipt.h"
 #include "wms/operator.h"
+#include "wms/payment.h"
 #include "wms/pricing.h"
 #include "wms/truck.h"
 
@@ -24,6 +25,18 @@ struct Amendment {
 struct AmendmentRecord {
     Amendment amendment;
     std::string change; // what was changed, written by WorkDay itself
+};
+
+// The price per kg the operator settles a retail receipt at, for one crop.
+struct CropPrice {
+    std::string cropCode;
+    Money pricePerKg;
+};
+
+// "Pay" closes a retail receipt and pays it in full at once.
+struct PaidReceipt {
+    Receipt receipt;
+    Payment payment;
 };
 
 // Everything a session consists of, as storage keeps it; see WorkDay::restore().
@@ -130,6 +143,16 @@ public:
     // The receipt leaves the open list; the caller puts it into the journal.
     // Throws std::logic_error when OpenReceipt::validateClose() is not empty.
     [[nodiscard]] Receipt closeReceipt(const Uuid& receiptId, Settlement settlement);
+    // Retail closing: one price per crop for all its pallets in the receipt.
+    // A price equal to the day price at `at` counts as the day price, any
+    // other is manual. Operator-facing: a crop without a positive price, then
+    // OpenReceipt::validateClose(). Crops not in the receipt are ignored.
+    [[nodiscard]] std::vector<std::string> validatePay(const Uuid& receiptId, const std::vector<CropPrice>& prices,
+                                                       TimePoint at) const;
+    // The receipt leaves the open list; the caller puts both into the journal.
+    // Throws std::logic_error when validatePay() is not empty.
+    [[nodiscard]] PaidReceipt payReceipt(const Uuid& receiptId, const std::vector<CropPrice>& prices,
+                                         PaymentMethod method, OperatorId paidBy, TimePoint at);
 
     // Operator-facing: why the session cannot be closed yet; empty when it can.
     [[nodiscard]] std::vector<std::string> validateClose() const;
@@ -155,6 +178,9 @@ private:
     [[nodiscard]] Truck& truck(const TruckId& id);
     [[nodiscard]] std::vector<OpenReceipt>::iterator receipt(const Uuid& id);
     [[nodiscard]] const OpenReceipt& receipt(const Uuid& id) const;
+    // A copy of the open receipt at the operator's prices.
+    [[nodiscard]] OpenReceipt priced(const Uuid& receiptId, const std::vector<CropPrice>& prices,
+                                     TimePoint at) const;
     // A truck of this session that still loads; the warehouse always takes berries.
     [[nodiscard]] bool accepts(const Destination& destination) const noexcept;
 

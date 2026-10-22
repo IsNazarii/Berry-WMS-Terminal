@@ -151,6 +151,30 @@ Receipt WorkDay::closeReceipt(const Uuid& receiptId, Settlement settlement) {
     return closed;
 }
 
+std::vector<std::string> WorkDay::validatePay(const Uuid& receiptId, const std::vector<CropPrice>& prices,
+                                              TimePoint at) const {
+    const OpenReceipt copy = priced(receiptId, prices, at);
+    std::vector<std::string> errors;
+    for (const std::string& crop : copy.crops()) {
+        const auto price = std::ranges::find(prices, crop, &CropPrice::cropCode);
+        if (price == prices.end() || !price->pricePerKg.isPositive()) {
+            errors.push_back(std::format("Ціна за кг для {} має бути більшою за нуль", crop));
+        }
+    }
+    // The per-line price errors would only repeat the ones above.
+    if (errors.empty()) errors = copy.validateClose(Settlement::OnSite);
+    return errors;
+}
+
+PaidReceipt WorkDay::payReceipt(const Uuid& receiptId, const std::vector<CropPrice>& prices, PaymentMethod method,
+                                OperatorId paidBy, TimePoint at) {
+    if (!validatePay(receiptId, prices, at).empty()) throw std::logic_error("Receipt cannot be paid yet");
+    Receipt closed = priced(receiptId, prices, at).close(Settlement::OnSite);
+    Payment payment{Uuid::generateV7(), at, closed.supplierId(), closed.amount(), method, paidBy};
+    openReceipts_.erase(receipt(receiptId));
+    return {.receipt = std::move(closed), .payment = std::move(payment)};
+}
+
 std::vector<std::string> WorkDay::validateClose() const {
     std::vector<std::string> errors;
     for (const OpenReceipt& r : openReceipts_) {
@@ -222,6 +246,15 @@ const OpenReceipt& WorkDay::receipt(const Uuid& id) const {
     const OpenReceipt* found = findReceipt(id);
     if (found == nullptr) throw std::invalid_argument("Receipt is not open in this session");
     return *found;
+}
+
+OpenReceipt WorkDay::priced(const Uuid& receiptId, const std::vector<CropPrice>& prices, TimePoint at) const {
+    OpenReceipt copy = receipt(receiptId);
+    for (const CropPrice& p : prices) {
+        const bool dayPrice = prices_.priceAt(p.cropCode, at) == p.pricePerKg;
+        copy.setPrice(p.cropCode, p.pricePerKg, dayPrice ? PriceSource::DayPrice : PriceSource::Manual);
+    }
+    return copy;
 }
 
 bool WorkDay::accepts(const Destination& destination) const noexcept {

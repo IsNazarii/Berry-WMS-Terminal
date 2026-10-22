@@ -117,6 +117,7 @@ classDiagram
         -vector~Weighing~ weighings_
         +add(Weighing) size_t
         +cancel(i)
+        +setPrice(crop, price, source)
         +validateClose(Settlement)
         +close(Settlement) Receipt
     }
@@ -150,6 +151,7 @@ classDiagram
         +openReceipt(supplier)
         +addWeighing(id, w, at)
         +closeReceipt(id, settlement) Receipt
+        +payReceipt(id, prices, method, by, at) PaidReceipt
         +validateClose()
         +close(at, by)
     }
@@ -339,7 +341,7 @@ PIN — **підтвердження «хто»**, не захист: 4–6 ци
 | `boxCount`, `tarePerBox` | кількість ящиків і вага порожнього ящика |
 | `palletTare` | вага палети; оператор вводить щоразу, 0 — без палети |
 | `pricePerKg` | **знімок** ціни на момент прийому; 0 для опту |
-| `priceSource` | `DayPrice` або `Manual` (разова надбавка; на чеку не видно) |
+| `priceSource` | `DayPrice` або `Manual` (при «Оплатити» задано ціну, відмінну від денної; на чеку не видно) |
 | `weightSource` | `Scale` або `Manual` (ручне введення маркується) |
 | `cancelled` | анульовано: рядок лишається, але ніде не рахується |
 
@@ -372,6 +374,9 @@ cargo()  = {boxCount, net()}
 - `add(weighing)` → індекс рядка; кидає `invalid_argument`, якщо `weighing.validate()` не порожній.
 - `cancel(i)` — позначає рядок анульованим.
 - `total()`, `cargoOf(crop)` — без анульованих рядків.
+- `crops()` — культури врахованих рядків у порядку першого зважування (рядки діалогу «Оплатити»).
+- `setPrice(crop, price, source)` — одна ціна на всі враховані рядки культури; анульовані зберігають
+  свою (слід помилки).
 - `validateClose(settlement)` — причини, чому не можна закрити (українською).
 - `close(settlement)` → незмінний `Receipt` з **тим самим id і часом відкриття**.
   Для опту ціни в рядках обнуляються (зважування брали денну ціну, але опт оцінюється поза
@@ -381,7 +386,7 @@ cargo()  = {boxCount, net()}
 stateDiagram-v2
     [*] --> Відкритий: WorkDay::openReceipt(supplier)
     Відкритий --> Відкритий: addWeighing / cancelWeighing / Allocation з відкритого
-    Відкритий --> Закритий: closeReceipt(OnSite | HandedOver)\n(лише якщо validateClose порожній)
+    Відкритий --> Закритий: payReceipt (роздріб + виплата) | closeReceipt(HandedOver)\n(лише якщо validatePay / validateClose порожній)
     Закритий --> [*]: Journal::add(Receipt)
 ```
 
@@ -606,7 +611,9 @@ Append-only сховище фактів. Для кожного типу — ок
 | `cancelWeighing(id, i, journal)` | анулює рядок і повертає `optional<AllocationReversal>` — сторно її розподілу; викликач кладе його в журнал разом зі збереженням сесії (`[[nodiscard]]`, щоб не загубити) |
 | `nextDestination(id, crop, target, journal)` | куди піде наступна палета культури: туди, куди пішла остання *розподілена* палета цієї культури **в цьому чеку**; якщо її фура вже не завантажується — в `target`; `nullopt`, якщо нікуди |
 | `autoAllocation(id, i, target, journal)` | розподіл щойно зваженої палети в `nextDestination`; `nullopt` — палета «підвішена»: нікуди, або у фурі не вистачає місця на всі її ящики (у іншу фуру не перекидається — це вирішує оператор на «Розподілі») |
-| `closeReceipt(id, settlement)` | повертає `Receipt` і прибирає чек зі списку; у журнал кладе викликач |
+| `closeReceipt(id, settlement)` | повертає `Receipt` і прибирає чек зі списку; у журнал кладе викликач («Видати чек» — `HandedOver`) |
+| `validatePay(id, prices, at)` | «Оплатити»: культура чека без додатної ціни в `prices` (`CropPrice {cropCode, pricePerKg}`), далі `validateClose(OnSite)` |
+| `payReceipt(id, prices, method, by, at)` | одна ціна на культуру (дорівнює денній на `at` → `DayPrice`, інакше `Manual`), закриває як роздріб і повертає `PaidReceipt {receipt, payment}` — виплата всієї суми одразу; обидва в журнал кладе викликач |
 
 **Закриття сесії:**
 
@@ -684,9 +691,11 @@ day.addWeighing(id, {.cropCode = "raspberry", .gross = kilograms(12), .boxCount 
 // нетто = 12 000 − 4×350 = 10 600 г; сума = 10.6 × 85 = 901.00 грн
 
 Journal journal;
-journal.add(day.closeReceipt(id, Settlement::OnSite));   // борг +901.00
-journal.add(Payment::create(42, hryvnias(901), PaymentMethod::Cash));
-journal.balanceOf(42);                                    // 0
+PaidReceipt paid = day.payReceipt(id, {{.cropCode = "raspberry", .pricePerKg = hryvnias(85)}},
+                                  PaymentMethod::Cash, /*operator*/ 1, now);
+journal.add(std::move(paid.receipt));   // борг +901.00
+journal.add(std::move(paid.payment));   // виплата −901.00
+journal.balanceOf(42);                  // 0
 ```
 
 ### 14.2 Великий постачальник: палета у фуру ще під час розвантаження

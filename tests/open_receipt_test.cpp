@@ -125,3 +125,34 @@ TEST(OpenReceipt, CannotCloseWithoutWeighings) {
     EXPECT_TRUE(mentions(r.validateClose(Settlement::OnSite), "жодного зважування"));
     EXPECT_THROW((void)r.close(Settlement::OnSite), std::logic_error);
 }
+
+TEST(OpenReceipt, CropsAreListedOnceInWeighingOrder) {
+    OpenReceipt r = OpenReceipt::open(42);
+    r.add(pallet("strawberry", 40, kilograms(80)));
+    r.add(pallet("raspberry", 80, kilograms(160)));
+    r.add(pallet("strawberry", 40, kilograms(80)));
+    r.add(pallet("blueberry", 10, kilograms(20)));
+    r.cancel(3);
+
+    EXPECT_EQ(r.crops(), (std::vector<std::string>{"strawberry", "raspberry"}));
+}
+
+TEST(OpenReceipt, SetPriceRepricesEveryCountedLineOfTheCrop) {
+    OpenReceipt r = OpenReceipt::open(42);
+    r.add(pallet("raspberry", 80, kilograms(160)));
+    r.add(pallet("strawberry", 40, kilograms(80)));
+    r.add(pallet("raspberry", 80, kilograms(160)));
+    r.add(pallet("raspberry", 80, kilograms(160)));
+    r.cancel(3);
+
+    r.setPrice("raspberry", hryvnias(90), PriceSource::Manual);
+
+    const auto& lines = r.weighings();
+    EXPECT_EQ(lines[0].pricePerKg, hryvnias(90));
+    EXPECT_EQ(lines[2].pricePerKg, hryvnias(90));
+    EXPECT_EQ(lines[2].priceSource, PriceSource::Manual);
+    EXPECT_EQ(lines[1].pricePerKg, hryvnias(85));
+    // The cancelled line keeps what it was weighed with: it is a trace of the mistake.
+    EXPECT_EQ(lines[3].pricePerKg, hryvnias(85));
+    EXPECT_EQ(lines[3].priceSource, PriceSource::DayPrice);
+}

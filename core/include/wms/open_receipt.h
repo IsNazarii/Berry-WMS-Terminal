@@ -33,12 +33,17 @@ public:
     // Without cancelled lines.
     [[nodiscard]] Cargo total() const noexcept;
     [[nodiscard]] Cargo cargoOf(std::string_view cropCode) const noexcept;
+    // Crops of the counted lines, in the order they were first weighed.
+    [[nodiscard]] std::vector<std::string> crops() const;
 
     // Returns the index of the new line. Throws std::invalid_argument when
     // Weighing::validate() is not empty: the UI shows those errors first.
     std::size_t add(Weighing weighing);
     // Throws std::out_of_range for an index outside the receipt.
     void cancel(std::size_t index);
+    // A retail receipt is paid at one price per crop: every counted line of the
+    // crop gets it. Cancelled lines keep theirs, as a trace of the mistake.
+    void setPrice(std::string_view cropCode, Money pricePerKg, PriceSource source) noexcept;
 
     // Operator-facing: why it cannot be closed with this settlement yet.
     [[nodiscard]] std::vector<std::string> validateClose(Settlement settlement) const;

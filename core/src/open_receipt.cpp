@@ -1,5 +1,6 @@
 #include "wms/open_receipt.h"
 
+#include <algorithm>
 #include <stdexcept>
 #include <utility>
 
@@ -31,6 +32,14 @@ Cargo OpenReceipt::cargoOf(std::string_view cropCode) const noexcept {
     return sum;
 }
 
+std::vector<std::string> OpenReceipt::crops() const {
+    std::vector<std::string> codes;
+    for (const auto& w : weighings_) {
+        if (!w.cancelled && std::ranges::find(codes, w.cropCode) == codes.end()) codes.push_back(w.cropCode);
+    }
+    return codes;
+}
+
 std::size_t OpenReceipt::add(Weighing weighing) {
     if (!weighing.validate().empty()) throw std::invalid_argument("Weighing is not valid");
     weighings_.push_back(std::move(weighing));
@@ -38,6 +47,14 @@ std::size_t OpenReceipt::add(Weighing weighing) {
 }
 
 void OpenReceipt::cancel(std::size_t index) { weighings_.at(index).cancelled = true; }
+
+void OpenReceipt::setPrice(std::string_view cropCode, Money pricePerKg, PriceSource source) noexcept {
+    for (auto& w : weighings_) {
+        if (w.cancelled || w.cropCode != cropCode) continue;
+        w.pricePerKg = pricePerKg;
+        w.priceSource = source;
+    }
+}
 
 std::vector<std::string> OpenReceipt::validateClose(Settlement settlement) const {
     return toReceipt(settlement).validate();

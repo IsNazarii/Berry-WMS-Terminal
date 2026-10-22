@@ -286,6 +286,83 @@ TEST(WorkDay, UnknownReceiptIsProgrammerError) {
     EXPECT_THROW(day.addWeighing(Uuid::generateV7(), raspberryPallet(), kMidnight + 13h), std::invalid_argument);
 }
 
+TEST(WorkDay, PaidReceiptHasOnePricePerCropAndIsPaidInFull) {
+    // The day price rose while the supplier was unloading: the receipt is paid at the new one.
+    WorkDay day = dayWithRaspberryPrice();
+    day.setPrice("raspberry", hryvnias(95), kMidnight + 15h);
+    const Uuid id = day.openReceipt(42).id();
+    day.addWeighing(id, raspberryPallet(), kMidnight + 14h);
+    day.addWeighing(id, raspberryPallet(), kMidnight + 16h);
+    const std::vector<CropPrice> prices{{.cropCode = "raspberry", .pricePerKg = hryvnias(95)}};
+
+    EXPECT_TRUE(day.validatePay(id, prices, kMidnight + 17h).empty());
+    const PaidReceipt paid = day.payReceipt(id, prices, PaymentMethod::Cash, kPetro, kMidnight + 17h);
+
+    EXPECT_EQ(paid.receipt.id(), id);
+    EXPECT_EQ(paid.receipt.settlement(), Settlement::OnSite);
+    for (const Weighing& w : paid.receipt.weighings()) {
+        EXPECT_EQ(w.pricePerKg, hryvnias(95));
+        EXPECT_EQ(w.priceSource, PriceSource::DayPrice);
+    }
+    EXPECT_EQ(paid.receipt.amount(), hryvnias(95 * 320));
+    EXPECT_EQ(paid.payment.amount(), paid.receipt.amount());
+    EXPECT_EQ(paid.payment.supplierId(), 42);
+    EXPECT_EQ(paid.payment.paidBy(), kPetro);
+    EXPECT_EQ(paid.payment.method(), PaymentMethod::Cash);
+    EXPECT_EQ(paid.payment.createdAt(), kMidnight + 17h);
+    EXPECT_NE(paid.payment.id(), id);
+    EXPECT_EQ(day.findReceipt(id), nullptr);
+}
+
+TEST(WorkDay, PaidPriceOtherThanTheDayPriceIsManual) {
+    WorkDay day = dayWithRaspberryPrice();
+    const Uuid id = day.openReceipt(42).id();
+    day.addWeighing(id, raspberryPallet(), kMidnight + 13h);
+
+    const PaidReceipt paid = day.payReceipt(id, {{.cropCode = "raspberry", .pricePerKg = hryvnias(90)}},
+                                            PaymentMethod::BankTransfer, kOksana, kMidnight + 14h);
+    EXPECT_EQ(paid.receipt.weighings()[0].pricePerKg, hryvnias(90));
+    EXPECT_EQ(paid.receipt.weighings()[0].priceSource, PriceSource::Manual);
+}
+
+TEST(WorkDay, PaidPriceWithoutDayPriceIsManual) {
+    WorkDay day = openAtNoon();
+    const Uuid id = day.openReceipt(42).id();
+    day.addWeighing(id, raspberryPallet(), kMidnight + 13h);
+
+    const PaidReceipt paid = day.payReceipt(id, {{.cropCode = "raspberry", .pricePerKg = hryvnias(80)}},
+                                            PaymentMethod::Cash, kOksana, kMidnight + 14h);
+    EXPECT_EQ(paid.receipt.weighings()[0].priceSource, PriceSource::Manual);
+    EXPECT_EQ(paid.payment.amount(), hryvnias(80 * 160));
+}
+
+TEST(WorkDay, CannotPayWithoutAPriceForEveryCrop) {
+    WorkDay day = dayWithRaspberryPrice();
+    const Uuid id = day.openReceipt(42).id();
+    day.addWeighing(id, raspberryPallet(), kMidnight + 13h);
+    auto strawberry = raspberryPallet();
+    strawberry.cropCode = "strawberry";
+    day.addWeighing(id, strawberry, kMidnight + 13h);
+    const std::vector<CropPrice> prices{{.cropCode = "raspberry", .pricePerKg = hryvnias(85)},
+                                        {.cropCode = "blueberry", .pricePerKg = Money{}}};
+
+    const auto errors = day.validatePay(id, prices, kMidnight + 14h);
+    ASSERT_EQ(errors.size(), 1U);
+    EXPECT_NE(errors[0].find("strawberry"), std::string::npos);
+    EXPECT_THROW((void)day.payReceipt(id, prices, PaymentMethod::Cash, kOksana, kMidnight + 14h), std::logic_error);
+    EXPECT_NE(day.findReceipt(id), nullptr);
+}
+
+TEST(WorkDay, CannotPayAtAZeroPrice) {
+    WorkDay day = dayWithRaspberryPrice();
+    const Uuid id = day.openReceipt(42).id();
+    day.addWeighing(id, raspberryPallet(), kMidnight + 13h);
+
+    const auto errors = day.validatePay(id, {{.cropCode = "raspberry", .pricePerKg = Money{}}}, kMidnight + 14h);
+    ASSERT_EQ(errors.size(), 1U);
+    EXPECT_NE(errors[0].find("raspberry"), std::string::npos);
+}
+
 TEST(WorkDay, CannotCloseWithOpenReceipts) {
     WorkDay day = dayWithRaspberryPrice();
     (void)day.openReceipt(42);

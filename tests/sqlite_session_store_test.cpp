@@ -33,8 +33,8 @@ WorkDay busyDay() {
     WorkDay day{kDate, kMidnight + 12h, kOksana};
     day.setPrice("raspberry", hryvnias(85), kMidnight + 12h);
     day.setPrice("raspberry", kopecks(9050), kMidnight + 15h);
-    day.addTruck("BI1234AA", {.boxes = 1'200, .weight = kilograms(2'000)}, {.make = "DAF XF", .note = "Іван, на Київ"});
-    const TruckId leaving = day.addTruck("BI5678BB", {.boxes = 0, .weight = kilograms(5'000)}).id();
+    day.addTruck("BI1234AA", 1'200, {.make = "DAF XF", .note = "Іван, на Київ"});
+    const TruckId leaving = day.addTruck("BI5678BB", 300).id();
     day.departTruck(leaving);
     const Uuid receipt = day.openReceipt(42).id();
     day.addWeighing(receipt, raspberryPallet(), kMidnight + 13h);
@@ -76,7 +76,7 @@ TEST(SqliteSessionStore, OpenSessionComesBackAsItWas) {
     const Truck& first = loaded->trucks()[0];
     EXPECT_EQ(first.id(), day.trucks()[0].id());
     EXPECT_EQ(first.plate(), "BI1234AA");
-    EXPECT_EQ(first.capacity(), day.trucks()[0].capacity());
+    EXPECT_EQ(first.boxLimit(), 1'200);
     EXPECT_EQ(first.details(), day.trucks()[0].details());
     EXPECT_EQ(first.status(), TruckStatus::Loading);
     EXPECT_EQ(loaded->trucks()[1].status(), TruckStatus::Departed);
@@ -141,7 +141,7 @@ TEST(SqliteSessionStore, OpenAndClosedSessionsAreFoundApart) {
     sqlite::Database db{":memory:"};
     SqliteSessionStore store{db};
     WorkDay yesterday{kDate, kMidnight + 12h, kOksana};
-    const TruckId carried = yesterday.addTruck("BI5678BB", {.boxes = 100}).id();
+    const TruckId carried = yesterday.addTruck("BI5678BB", 100).id();
     yesterday.carryOverTruck(carried);
     yesterday.close(kMidnight + 20h, kOksana);
     store.save(yesterday);

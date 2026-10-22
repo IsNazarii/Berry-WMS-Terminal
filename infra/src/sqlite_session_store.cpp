@@ -74,8 +74,8 @@ void SqliteSessionStore::save(const WorkDay& day) {
     }
 
     sqlite::Statement truck = db_.prepare(
-        "INSERT INTO truck (session_id, seq, id, plate, make, note, limit_boxes, limit_g, status) "
-        "VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)");
+        "INSERT INTO truck (session_id, seq, id, plate, make, note, limit_boxes, status) "
+        "VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)");
     const auto& trucks = day.trucks();
     for (std::size_t i = 0; i < trucks.size(); ++i) {
         const Truck& t = trucks[i];
@@ -85,9 +85,8 @@ void SqliteSessionStore::save(const WorkDay& day) {
             .bind(4, t.plate())
             .bind(5, t.details().make)
             .bind(6, t.details().note)
-            .bind(7, std::int64_t{t.capacity().boxes})
-            .bind(8, t.capacity().weight.raw())
-            .bind(9, toText(kTruckStatuses, t.status()))
+            .bind(7, std::int64_t{t.boxLimit()})
+            .bind(8, toText(kTruckStatuses, t.status()))
             .step();
         truck.reset();
     }
@@ -168,14 +167,14 @@ std::optional<WorkDay> loadSession(sqlite::Database& db, std::string_view where,
     }
 
     sqlite::Statement trucks = db.prepare(
-        "SELECT id, plate, make, note, limit_boxes, limit_g, status FROM truck WHERE session_id = ?1 ORDER BY seq");
+        "SELECT id, plate, make, note, limit_boxes, status FROM truck WHERE session_id = ?1 ORDER BY seq");
     trucks.bind(1, id);
     while (trucks.step()) {
         record.trucks.emplace_back(
             uuidColumn(trucks, 0), trucks.columnText(1),
-            Cargo{.boxes = static_cast<int>(trucks.columnInt(4)), .weight = grams(trucks.columnInt(5))},
+            static_cast<int>(trucks.columnInt(4)),
             TruckDetails{.make = trucks.columnText(2), .note = trucks.columnText(3)},
-            fromText(kTruckStatuses, trucks.columnText(6)));
+            fromText(kTruckStatuses, trucks.columnText(5)));
     }
 
     sqlite::Statement amendments = db.prepare(

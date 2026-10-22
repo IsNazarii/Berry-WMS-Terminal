@@ -18,7 +18,7 @@ namespace {
 // in kopecks (_kop), weight in grams (_g); enums are spelled out as text, so
 // reordering an enum in C++ cannot change what old rows mean. STRICT tables
 // reject a value of the wrong type instead of quietly storing it.
-constexpr std::array<std::string_view, 6> kMigrations{
+constexpr std::array<std::string_view, 7> kMigrations{
     R"sql(
     CREATE TABLE receipt (
         id            TEXT PRIMARY KEY,
@@ -199,6 +199,30 @@ constexpr std::array<std::string_view, 6> kMigrations{
     // the default is the right value for every row, past and future.
     R"sql(
     ALTER TABLE crop ADD COLUMN archived INTEGER NOT NULL DEFAULT 0 CHECK (archived IN (0, 1));
+    )sql",
+
+    // A truck is limited in boxes only. Rebuilt rather than ALTER ... DROP
+    // COLUMN to add the CHECK. Weight-only trucks exist only in alpha test
+    // databases; they get a rough 2 kg per box, which the operator sees in
+    // the session table.
+    R"sql(
+    CREATE TABLE truck_new (
+        session_id  TEXT NOT NULL REFERENCES session (id),
+        seq         INTEGER NOT NULL,
+        id          TEXT NOT NULL,
+        plate       TEXT NOT NULL,
+        make        TEXT NOT NULL,
+        note        TEXT NOT NULL,
+        limit_boxes INTEGER NOT NULL CHECK (limit_boxes > 0),
+        status      TEXT NOT NULL CHECK (status IN ('loading', 'departed', 'carried_over')),
+        PRIMARY KEY (session_id, id)
+    ) STRICT;
+    INSERT INTO truck_new (session_id, seq, id, plate, make, note, limit_boxes, status)
+        SELECT session_id, seq, id, plate, make, note,
+               CASE WHEN limit_boxes > 0 THEN limit_boxes ELSE max(1, limit_g / 2000) END, status
+        FROM truck;
+    DROP TABLE truck;
+    ALTER TABLE truck_new RENAME TO truck;
     )sql",
 };
 

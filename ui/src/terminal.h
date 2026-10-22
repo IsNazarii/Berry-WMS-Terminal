@@ -175,6 +175,10 @@ public:
     // Receiving. The supplier's open receipt, or a new one, becomes active;
     // returns an operator-facing error, empty on success.
     Q_INVOKABLE QString startReceipt(qint64 supplierId);
+    // A new supplier typed at the scale: why it cannot be added (shown while
+    // typing), and adding it. addSupplier returns the new id, 0 when refused.
+    [[nodiscard]] Q_INVOKABLE QStringList newSupplierErrors(const QString& fullName, const QString& phone) const;
+    Q_INVOKABLE qint64 addSupplier(const QString& fullName, const QString& phone);
     Q_INVOKABLE void activateReceipt(const QString& receiptId);
     // A weighing into the active receipt. Weights in kilograms as typed. An
     // empty price takes the day price, a typed one is a manual price. A typed

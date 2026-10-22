@@ -6,7 +6,8 @@ import QtQuick.Layouts
 import BerryWms.Ui
 
 // Finds a supplier by number or part of the name. Built for the keyboard:
-// type, Enter picks the only match.
+// type, Enter picks the only match. A search without matches offers to add
+// the supplier right here, so a newcomer never waits at the scale.
 Dialog {
     id: picker
     modal: true
@@ -19,12 +20,31 @@ Dialog {
 
     readonly property SupplierListModel suppliers: Terminal.suppliers
 
+    // Adding a new supplier instead of searching.
+    property bool adding: false
+    // Re-read on every keystroke: the reasons show while typing.
+    readonly property var addErrors: Terminal.newSupplierErrors(newName.text, newPhone.text)
+
     function pick(supplierId) {
         picker.picked(supplierId)
         picker.close()
     }
 
+    function startAdding() {
+        // A number in the search is an id, not a name worth keeping.
+        newName.text = /^\d+$/.test(search.text.trim()) ? "" : search.text
+        newPhone.clear()
+        picker.adding = true
+        newName.forceActiveFocus()
+    }
+
+    function add() {
+        const id = Terminal.addSupplier(newName.text, newPhone.text)
+        if (id !== 0) picker.pick(id)
+    }
+
     onOpened: {
+        picker.adding = false
         search.clear()
         search.forceActiveFocus()
     }
@@ -32,6 +52,7 @@ Dialog {
     ColumnLayout {
         anchors.fill: parent
         spacing: 8
+        visible: !picker.adding
 
         TextField {
             id: search
@@ -68,10 +89,79 @@ Dialog {
                 }
             }
 
-            Label {
+            ColumnLayout {
                 anchors.centerIn: parent
+                width: parent.width - 2 * Theme.spacingXl
                 visible: list.count === 0
-                text: qsTr("Нікого не знайдено")
+                spacing: Theme.spacingM
+
+                Label {
+                    text: qsTr("Нікого не знайдено")
+                    Layout.alignment: Qt.AlignHCenter
+                }
+                Button {
+                    visible: search.text.trim() !== ""
+                    text: /^\d+$/.test(search.text.trim()) ? qsTr("Додати нового…")
+                                                            : qsTr("Додати «%1»…").arg(search.text.trim())
+                    highlighted: true
+                    Layout.alignment: Qt.AlignHCenter
+                    Layout.maximumWidth: parent.width
+                    onClicked: picker.startAdding()
+                }
+            }
+        }
+    }
+
+    ColumnLayout {
+        anchors.fill: parent
+        spacing: Theme.spacingS
+        visible: picker.adding
+
+        FieldCaption { caption: qsTr("Прізвище та ім'я") }
+        TextField {
+            id: newName
+            Layout.fillWidth: true
+            onAccepted: newPhone.forceActiveFocus()
+        }
+
+        FieldCaption { caption: qsTr("Телефон"); hint: qsTr("необов'язково") }
+        TextField {
+            id: newPhone
+            Layout.fillWidth: true
+            placeholderText: "+38 067 111 22 33"
+            inputMethodHints: Qt.ImhDialableCharactersOnly
+            onAccepted: picker.add()
+        }
+
+        Repeater {
+            model: picker.addErrors
+            delegate: Label {
+                required property string modelData
+                text: modelData
+                color: Theme.warn
+                wrapMode: Text.WordWrap
+                Layout.fillWidth: true
+            }
+        }
+
+        Item { Layout.fillHeight: true }
+
+        RowLayout {
+            spacing: Theme.spacingS
+            Layout.fillWidth: true
+            Button {
+                text: qsTr("← До пошуку")
+                onClicked: {
+                    picker.adding = false
+                    search.forceActiveFocus()
+                }
+            }
+            Item { Layout.fillWidth: true }
+            Button {
+                text: qsTr("Додати й обрати · Enter")
+                highlighted: true
+                enabled: picker.addErrors.length === 0
+                onClicked: picker.add()
             }
         }
     }

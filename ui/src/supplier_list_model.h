@@ -38,6 +38,8 @@ public:
 
     // Balances are derived from the journal, so rows must be redrawn after it changes.
     void refreshBalances();
+    // The supplier list itself changed (one was added).
+    void refresh() { applyFilter(); }
 
 signals:
     void queryChanged();

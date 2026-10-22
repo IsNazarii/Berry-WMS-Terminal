@@ -6,6 +6,7 @@
 #include "wms/backup.h"
 #include "wms/payment.h"
 #include "wms/receipt.h"
+#include "wms/text.h"
 
 #include <QDate>
 #include <QDateTime>
@@ -691,6 +692,24 @@ QString Terminal::startReceipt(qint64 supplierId) {
     saveSession(); // the receipt may be new
     setActiveReceipt(id);
     return {};
+}
+
+QStringList Terminal::newSupplierErrors(const QString& fullName, const QString& phone) const {
+    QStringList list;
+    for (const std::string& error :
+         validateNewSupplier(fullName.toStdString(), squeezeSpaces(phone.toStdString()), suppliers_))
+        list << QString::fromStdString(error);
+    return list;
+}
+
+qint64 Terminal::addSupplier(const QString& fullName, const QString& phone) {
+    if (!newSupplierErrors(fullName, phone).isEmpty()) return 0;
+    const Supplier supplier{nextSupplierId(suppliers_), squeezeSpaces(fullName.toStdString()),
+                            squeezeSpaces(phone.toStdString())};
+    supplierStore_.save(supplier);
+    suppliers_.push_back(supplier);
+    supplierModel_.refresh();
+    return supplier.id();
 }
 
 void Terminal::activateReceipt(const QString& receiptId) {

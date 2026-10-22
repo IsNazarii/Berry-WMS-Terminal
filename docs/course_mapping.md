@@ -65,9 +65,9 @@ classDiagram
 
 `Weighing::net/amount/validate`, `Receipt::total/cargoOf/amount/validate/describe`,
 `OpenReceipt::add/cancel/validateClose/close`, `Allocation::wholeWeighing/boxesOf`,
-`Journal::balanceOf/historyOf/loadOf/stockOf/unallocatedOf/destinationOf/waitingForAllocation/validateAllocation/validateCancel/validateShipment/shipmentOf`,
+`Journal::balanceOf/historyOf/loadOf/stockOf/unallocatedOf/destinationOf/allocationOf/reversalOf/waitingForAllocation/validateAllocation/validateCancel/validateReversal/validateShipment/shipmentOf`,
 `Truck::depart/carryOver/remaining/isOverloaded/fillPercent`, `DayPrices::priceAt`,
-`WorkDay::openReceipt/addWeighing/cancelWeighing/closeReceipt/validateClose/close/repeatTruck/adoptTruck/trucksForNextSession`,
+`WorkDay::openReceipt/addWeighing/validateCancel/cancelWeighing/nextDestination/autoAllocation/closeReceipt/validateClose/close/repeatTruck/adoptTruck/trucksForNextSession`,
 `Uuid::generateV7/parse/toString/timestamp`, `StabilityDetector::push/isStable/stableWeight`,
 `Supplier::matches`, `parseMoney/parseWeight`, `foldCase`.
 

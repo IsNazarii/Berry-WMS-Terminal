@@ -401,14 +401,44 @@ TEST(Journal, PalletNotYetAllocatedCanBeCancelled) {
     EXPECT_TRUE(journal.validateCancel(unloading(), 1).empty());
 }
 
-TEST(Journal, PalletInTruckCannotBeCancelled) {
+TEST(Journal, PalletInTruckIsCancelledTogetherWithItsAllocation) {
+    // Auto-allocation puts every pallet somewhere at once: a wrong one must
+    // still be cancellable, its allocation taken back by a reversal.
+    Journal journal;
+    const OpenReceipt open = unloading();
+    const Allocation a = Allocation::wholeWeighing(open, 0, kTruck);
+    journal.add(a);
+
+    EXPECT_TRUE(journal.validateCancel(open, 0).empty());
+    const auto reversal = journal.reversalOf(open.id(), 0);
+    ASSERT_TRUE(reversal.has_value());
+    EXPECT_EQ(reversal->allocationId(), a.id());
+}
+
+TEST(Journal, FreePalletNeedsNoReversal) {
+    const Journal journal;
+    EXPECT_EQ(journal.reversalOf(unloading().id(), 0), std::nullopt);
+}
+
+TEST(Journal, PalletShippedOnFromTheWarehouseCannotBeCancelled) {
+    Journal journal;
+    const OpenReceipt open = unloading();
+    journal.add(Allocation::wholeWeighing(open, 0, ToWarehouse{})); // 80 boxes
+    journal.add(journal.shipmentOf("raspberry", 10, kTruck));
+
+    EXPECT_TRUE(mentions(journal.validateCancel(open, 0), "На складі лише 70 ящ."));
+}
+
+TEST(Journal, CancelWithReversalStillLeavesBoxesAllocatedByCount) {
+    // The 80-box pallet goes back with its reversal; the 20 boxes taken by
+    // count still need 20 boxes left, and the 20-box pallet covers them.
     Journal journal;
     const OpenReceipt open = unloading();
     journal.add(Allocation::wholeWeighing(open, 0, kTruck));
+    journal.add(journal.boxesOf(open, "raspberry", 20, kOtherTruck));
 
-    const auto errors = journal.validateCancel(open, 0);
-    ASSERT_EQ(errors.size(), 1U);
-    EXPECT_TRUE(mentions(errors, "Зважування 1 вже розподілено"));
+    EXPECT_TRUE(journal.validateCancel(open, 0).empty());
+    EXPECT_TRUE(mentions(journal.validateCancel(open, 1), "розподілено вже 100"));
 }
 
 TEST(Journal, CancelMustLeaveTheBoxesAlreadyAllocated) {

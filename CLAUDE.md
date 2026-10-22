@@ -164,12 +164,14 @@ UUID і часом відкриття; для опту ціни обнуляют
 `WorkDay` (сесія: дата відкриття, хто відкрив/закрив, ціни, фури, `validateClose`/`close`,
 `repeatTruck`/`adoptTruck`; поправки в закритій сесії — перевантаження з `Amendment`, журнал `amendments()`;
 відкриті чеки: `openReceipt(supplier)` — один на постачальника, `addWeighing(id, w, at)` сам бере денну ціну
-на момент `at` (ручну не чіпає), `cancelWeighing(id, i, journal)`, `closeReceipt` → `Receipt`;
+на момент `at` (ручну не чіпає), `validateCancel`/`cancelWeighing(id, i, journal)` (повертає сторно розподілу палети — `AllocationReversal`), `closeReceipt` → `Receipt`;
+авторозподіл: `nextDestination(id, crop, target, journal)` (як остання розподілена палета культури в чеку, інакше ціль)
+і `autoAllocation` (`nullopt` = підвішена: нікуди або немає місця в ящиках);
 `validateClose` не пускає з відкритими чеками);
 `Operator` (id, ім'я, PIN 4–6 цифр, лише `checkPin`); `parseMoney("85,50")` — ціна з вводу оператора (крапка або кома);
 симулятор ваг + `StabilityDetector`; `Journal` — append-only: `balanceOf`, `loadOf` (з чеків і складу),
 `stockOf`, `unallocatedOf`, `boxesOf`/`shipmentOf`, `validateAllocation`/`validateShipment` (для закритого чека
-і для відкритого — палета йде у фуру ще під час розвантаження), `validateCancel` (розподілене не анулюється).
+і для відкритого — палета йде у фуру ще під час розвантаження), `validateCancel` (палета у фурі анулюється разом зі сторно, якщо сторно можливе), `reversalOf`, `validateReversal`.
 Відновлення відкритих чеків після перезапуску — конструктор `OpenReceipt` є, метод у `WorkDay` — разом зі SQLite.
 
 UI (`ui/`, модуль `BerryWms.Ui`, статична бібліотека + `Q_IMPORT_QML_PLUGIN` у `app/main.cpp`):

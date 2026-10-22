@@ -39,7 +39,7 @@ WorkDay busyDay() {
     const Uuid receipt = day.openReceipt(42).id();
     day.addWeighing(receipt, raspberryPallet(), kMidnight + 13h);
     day.addWeighing(receipt, raspberryPallet(), kMidnight + 16h);
-    day.cancelWeighing(receipt, 0, Journal{});
+    (void)day.cancelWeighing(receipt, 0, Journal{});
     (void)day.openReceipt(43); // still empty
     return day;
 }

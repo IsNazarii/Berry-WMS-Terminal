@@ -9,6 +9,7 @@
 #include <chrono>
 #include <optional>
 #include <string>
+#include <string_view>
 #include <vector>
 
 namespace wms {
@@ -103,8 +104,29 @@ public:
     // wholesale, a retail receipt will not close. Returns the line index.
     // All of these throw std::invalid_argument for a receipt that is not open.
     std::size_t addWeighing(const Uuid& receiptId, Weighing weighing, TimePoint at);
-    // Throws std::logic_error when Journal::validateCancel() is not empty.
-    void cancelWeighing(const Uuid& receiptId, std::size_t index, const Journal& journal);
+    // Operator-facing: Journal::validateCancel() plus the truck: berries that
+    // left with it cannot be taken back.
+    [[nodiscard]] std::vector<std::string> validateCancel(const Uuid& receiptId, std::size_t index,
+                                                          const Journal& journal) const;
+    // Returns the reversal of the pallet's allocation, if it had one: the
+    // caller puts it into the journal together with saving the session.
+    // Throws std::logic_error when validateCancel() is not empty.
+    [[nodiscard]] std::optional<AllocationReversal> cancelWeighing(const Uuid& receiptId, std::size_t index,
+                                                                   const Journal& journal);
+
+    // Auto-allocation from the receiving screen. A pallet goes where the last
+    // allocated pallet of its crop in this receipt went, so one supplier's
+    // berries stay together; otherwise to `target`, the operator's choice.
+    // A truck that left no longer leads. nullopt when there is nowhere to go.
+    [[nodiscard]] std::optional<Destination> nextDestination(const Uuid& receiptId, std::string_view cropCode,
+                                                             std::optional<Destination> target,
+                                                             const Journal& journal) const;
+    // The allocation for the pallet just weighed; nullopt leaves it hanging for
+    // the allocation screen: nowhere to go, or the truck has no room for all
+    // its boxes. Never spills into another truck: the operator decides that.
+    [[nodiscard]] std::optional<Allocation> autoAllocation(const Uuid& receiptId, std::size_t index,
+                                                           std::optional<Destination> target,
+                                                           const Journal& journal) const;
     // The receipt leaves the open list; the caller puts it into the journal.
     // Throws std::logic_error when OpenReceipt::validateClose() is not empty.
     [[nodiscard]] Receipt closeReceipt(const Uuid& receiptId, Settlement settlement);
@@ -132,6 +154,9 @@ private:
     void amend(const Amendment& amendment, std::string description, Change change);
     [[nodiscard]] Truck& truck(const TruckId& id);
     [[nodiscard]] std::vector<OpenReceipt>::iterator receipt(const Uuid& id);
+    [[nodiscard]] const OpenReceipt& receipt(const Uuid& id) const;
+    // A truck of this session that still loads; the warehouse always takes berries.
+    [[nodiscard]] bool accepts(const Destination& destination) const noexcept;
 
     Uuid id_;
     std::chrono::year_month_day date_;

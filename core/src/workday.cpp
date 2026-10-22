@@ -96,10 +96,52 @@ std::size_t WorkDay::addWeighing(const Uuid& receiptId, Weighing weighing, TimeP
     return target->add(std::move(weighing));
 }
 
-void WorkDay::cancelWeighing(const Uuid& receiptId, std::size_t index, const Journal& journal) {
-    const auto target = receipt(receiptId);
-    if (!journal.validateCancel(*target, index).empty()) throw std::logic_error("Weighing cannot be cancelled");
-    target->cancel(index);
+std::vector<std::string> WorkDay::validateCancel(const Uuid& receiptId, std::size_t index,
+                                                 const Journal& journal) const {
+    const OpenReceipt& open = receipt(receiptId);
+    std::vector<std::string> errors = journal.validateCancel(open, index);
+    const auto destination = journal.destinationOf(receiptId, index);
+    if (errors.empty() && destination && !accepts(*destination)) {
+        const Truck* gone = findTruck(std::get<TruckId>(*destination));
+        errors.push_back(std::format("Палета вже у фурі {}, яка не завантажується", gone ? gone->plate() : "?"));
+    }
+    return errors;
+}
+
+std::optional<AllocationReversal> WorkDay::cancelWeighing(const Uuid& receiptId, std::size_t index,
+                                                          const Journal& journal) {
+    if (!validateCancel(receiptId, index, journal).empty()) throw std::logic_error("Weighing cannot be cancelled");
+    receipt(receiptId)->cancel(index);
+    return journal.reversalOf(receiptId, index);
+}
+
+std::optional<Destination> WorkDay::nextDestination(const Uuid& receiptId, std::string_view cropCode,
+                                                    std::optional<Destination> target,
+                                                    const Journal& journal) const {
+    const std::vector<Weighing>& lines = receipt(receiptId).weighings();
+    for (std::size_t i = lines.size(); i-- > 0;) {
+        if (lines[i].cropCode != cropCode) continue;
+        // Cancelled pallets have no allocation: a mistake does not lead.
+        const auto went = journal.destinationOf(receiptId, i);
+        if (went && accepts(*went)) return went;
+        if (went) break; // its truck left: the crop starts over at the target
+    }
+    if (target && accepts(*target)) return target;
+    return std::nullopt;
+}
+
+std::optional<Allocation> WorkDay::autoAllocation(const Uuid& receiptId, std::size_t index,
+                                                  std::optional<Destination> target, const Journal& journal) const {
+    const OpenReceipt& open = receipt(receiptId);
+    const Weighing& pallet = open.weighings().at(index);
+    if (pallet.cancelled || journal.allocationOf(receiptId, index) != nullptr) return std::nullopt;
+
+    const auto destination = nextDestination(receiptId, pallet.cropCode, target, journal);
+    if (!destination) return std::nullopt;
+    if (const auto* truckId = std::get_if<TruckId>(&*destination)) {
+        if (findTruck(*truckId)->boxesLeft(journal.loadOf(*truckId)) < pallet.boxCount) return std::nullopt;
+    }
+    return Allocation::wholeWeighing(open, index, *destination);
 }
 
 Receipt WorkDay::closeReceipt(const Uuid& receiptId, Settlement settlement) {
@@ -174,6 +216,19 @@ std::vector<OpenReceipt>::iterator WorkDay::receipt(const Uuid& id) {
     const auto found = std::ranges::find(openReceipts_, id, &OpenReceipt::id);
     if (found == openReceipts_.end()) throw std::invalid_argument("Receipt is not open in this session");
     return found;
+}
+
+const OpenReceipt& WorkDay::receipt(const Uuid& id) const {
+    const OpenReceipt* found = findReceipt(id);
+    if (found == nullptr) throw std::invalid_argument("Receipt is not open in this session");
+    return *found;
+}
+
+bool WorkDay::accepts(const Destination& destination) const noexcept {
+    const auto* truckId = std::get_if<TruckId>(&destination);
+    if (truckId == nullptr) return true;
+    const Truck* found = findTruck(*truckId);
+    return found != nullptr && found->acceptsCargo();
 }
 
 void WorkDay::requireOpen() const {

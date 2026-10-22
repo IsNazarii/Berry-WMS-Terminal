@@ -91,9 +91,13 @@ public:
                                                               const OpenReceipt& receipt) const;
 
     // Operator-facing: why a weighing of an open receipt cannot be cancelled.
-    // Berries already put into a truck or the warehouse must stay counted.
+    // A pallet allocated as a whole is cancelled together with its allocation
+    // (see reversalOf), so its reversal must be possible; boxes allocated by
+    // count must stay covered. Whether the truck still loads is WorkDay's.
     // Throws std::out_of_range for an index outside the receipt.
     [[nodiscard]] std::vector<std::string> validateCancel(const OpenReceipt& receipt, std::size_t index) const;
+    // What frees a whole pallet again; nullopt while it is not allocated.
+    [[nodiscard]] std::optional<AllocationReversal> reversalOf(const Uuid& receiptId, std::size_t weighingIndex) const;
 
     // Preferred way to ship from the warehouse: the weight is split from the
     // stock, so shipping the last boxes takes exactly the remaining weight.

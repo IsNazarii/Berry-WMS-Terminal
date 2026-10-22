@@ -182,16 +182,25 @@ std::vector<std::string> Journal::validateCancel(const OpenReceipt& receipt, std
     const Weighing& weighing = receipt.weighings().at(index);
     if (weighing.cancelled) return {std::format("Зважування {} вже анульовано", index + 1)};
 
-    if (allocationOf(receipt.id(), index) != nullptr) return {std::format("Зважування {} вже розподілено", index + 1)};
+    // The pallet's own allocation goes back with it.
+    int allocated = allocatedOf(receipt.id(), weighing.cropCode).boxes;
+    if (const Allocation* own = allocationOf(receipt.id(), index)) {
+        if (auto errors = validateReversal(AllocationReversal::of(*own)); !errors.empty()) return errors;
+        allocated -= own->cargo().boxes;
+    }
     // Allocations by box count are not tied to a pallet: whatever is left of
     // the crop after cancelling must still cover them.
     const int left = receipt.cargoOf(weighing.cropCode).boxes - weighing.boxCount;
-    const int allocated = allocatedOf(receipt.id(), weighing.cropCode).boxes;
     if (left < allocated) {
         return {std::format("Без зважування {} лишиться {} ящ. культури {}, а розподілено вже {}", index + 1, left,
                             weighing.cropCode, allocated)};
     }
     return {};
+}
+
+std::optional<AllocationReversal> Journal::reversalOf(const Uuid& receiptId, std::size_t weighingIndex) const {
+    const Allocation* allocation = allocationOf(receiptId, weighingIndex);
+    return allocation ? std::optional{AllocationReversal::of(*allocation)} : std::nullopt;
 }
 
 // Defined here and only used here, so the header does not need it.

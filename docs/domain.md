@@ -521,6 +521,7 @@ Append-only сховище фактів. Для кожного типу — ок
 | `unallocatedOf(receiptId, crop)` | скільки культури з закритого чека ще не розподілено |
 | `unallocatedOf(openReceipt, crop)` | те саме для відкритого чека |
 | `allocationOf(receiptId, i)` | розподіл цілої палети `i` або `nullptr`; `destinationOf` — його місце |
+| `reversalOf(receiptId, i)` | сторно, що звільняє цілу палету; `nullopt`, якщо вона вільна |
 | `size()` | кількість записів |
 
 Усі запити рахують лише **несторновані** розподіли (приватний `activeAllocations()` —
@@ -535,7 +536,7 @@ Append-only сховище фактів. Для кожного типу — ок
 |---|---|
 | `validateAllocation(a)` | власний `a.validate()`; чек є в журналі; палета не анульована і ще не розподілена; ящиків не більше, ніж лишилось |
 | `validateAllocation(a, openReceipt)` | те саме для відкритого чека (кидає, якщо `a` від іншого чека) |
-| `validateCancel(openReceipt, i)` | не анульовано вже; палету не розподілено цілою; після анулювання ящиків культури лишиться не менше, ніж уже розподілено поштучно |
+| `validateCancel(openReceipt, i)` | не анульовано вже; палету, розподілену цілою, можна сторнувати (`validateReversal`); після анулювання ящиків культури лишиться не менше, ніж розподілено поштучно |
 | `validateShipment(s)` | власний `s.validate()`; на складі достатньо ящиків |
 | `validateReversal(r)` | власний `r.validate()`; розподіл є в журналі й ще не сторнований; для складу — залишок ще тримає його ящики (інакше став би від'ємним) |
 
@@ -601,7 +602,10 @@ Append-only сховище фактів. Для кожного типу — ок
 |---|---|
 | `openReceipt(supplier)` | повертає відкритий чек постачальника або створює новий — у постачальника не більше одного |
 | `addWeighing(id, w, at)` | якщо ціна `DayPrice` — підставляє `prices.priceAt(crop, at)`; ручну не чіпає; без денної ціни рядок лишається без ціни (для опту норм, роздрібний не закриється) |
-| `cancelWeighing(id, i, journal)` | лише якщо `journal.validateCancel` порожній |
+| `validateCancel(id, i, journal)` | `journal.validateCancel` + фура, куди пішла палета, ще завантажується (поїхала — ягоду не повернеш) |
+| `cancelWeighing(id, i, journal)` | анулює рядок і повертає `optional<AllocationReversal>` — сторно її розподілу; викликач кладе його в журнал разом зі збереженням сесії (`[[nodiscard]]`, щоб не загубити) |
+| `nextDestination(id, crop, target, journal)` | куди піде наступна палета культури: туди, куди пішла остання *розподілена* палета цієї культури **в цьому чеку**; якщо її фура вже не завантажується — в `target`; `nullopt`, якщо нікуди |
+| `autoAllocation(id, i, target, journal)` | розподіл щойно зваженої палети в `nextDestination`; `nullopt` — палета «підвішена»: нікуди, або у фурі не вистачає місця на всі її ящики (у іншу фуру не перекидається — це вирішує оператор на «Розподілі») |
 | `closeReceipt(id, settlement)` | повертає `Receipt` і прибирає чек зі списку; у журнал кладе викликач |
 
 **Закриття сесії:**
@@ -688,7 +692,7 @@ journal.balanceOf(42);                                    // 0
 ### 14.2 Великий постачальник: палета у фуру ще під час розвантаження
 
 ```cpp
-const Truck& truck = day.addTruck("BI1234AA", {.boxes = 1200});
+const Truck& truck = day.addTruck("BI1234AA", 1200);
 const Uuid big = day.openReceipt(77).id();
 day.addWeighing(big, pallet, now);                        // рядок 0
 
@@ -697,7 +701,8 @@ Allocation a = Allocation::wholeWeighing(open, 0, truck.id());
 if (journal.validateAllocation(a, open).empty()) journal.add(a);
 journal.loadOf(truck.id());                               // уже містить палету
 
-// Цей рядок тепер не можна анулювати: validateCancel поверне «вже розподілено».
+// Анулювати рядок можна, поки фура завантажується: cancelWeighing повертає сторно.
+if (auto reversal = day.cancelWeighing(big, 0, journal)) journal.add(*reversal);
 ```
 
 ### 14.3 Кінець сесії

@@ -882,9 +882,20 @@ QString Terminal::cancelWeighing(int index) {
     const OpenReceipt* receipt = activeReceipt();
     if (!receipt || index < 0 || index >= static_cast<int>(receipt->weighings().size())) return tr("Немає такого рядка");
     const auto i = static_cast<std::size_t>(index);
-    if (const auto errors = journal_.validateCancel(*receipt, i); !errors.empty()) return joined(errors);
-    workDay_->cancelWeighing(*activeReceiptId_, i, journal_);
-    saveSession();
+    if (const auto errors = workDay_->validateCancel(*activeReceiptId_, i, journal_); !errors.empty())
+        return joined(errors);
+    const auto reversal = workDay_->cancelWeighing(*activeReceiptId_, i, journal_);
+    {
+        // The cancelled line and its freed allocation together, or neither after a crash.
+        sqlite::ScopedTransaction transaction{db_};
+        if (reversal) journalStore_.save(*reversal);
+        saveSession();
+        transaction.commit();
+    }
+    if (reversal) {
+        journal_.add(*reversal);
+        emit journalChanged();
+    }
     emit receiptsChanged();
     return {};
 }

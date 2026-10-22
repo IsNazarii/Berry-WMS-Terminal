@@ -4,6 +4,7 @@
 #include <gtest/gtest.h>
 
 #include <chrono>
+#include <optional>
 #include <stdexcept>
 
 using namespace wms;
@@ -226,18 +227,38 @@ TEST(WorkDay, CancelWeighingKeepsTheLine) {
     WorkDay day = dayWithRaspberryPrice();
     const Uuid id = day.openReceipt(42).id();
     day.addWeighing(id, raspberryPallet(), kMidnight + 13h);
-    day.cancelWeighing(id, 0, Journal{});
+    EXPECT_EQ(day.cancelWeighing(id, 0, Journal{}), std::nullopt); // nothing to take back
     EXPECT_TRUE(day.findReceipt(id)->weighings()[0].cancelled);
 }
 
-TEST(WorkDay, PalletInTruckCannotBeCancelled) {
+TEST(WorkDay, CancelledPalletInTruckComesBackWithAReversal) {
     WorkDay day = dayWithRaspberryPrice();
+    const Truck& truck = day.addTruck("BI1234AA", kBigTruck);
     const Uuid id = day.openReceipt(42).id();
     day.addWeighing(id, raspberryPallet(), kMidnight + 13h);
     Journal journal;
-    journal.add(Allocation::wholeWeighing(*day.findReceipt(id), 0, Uuid::generateV7()));
+    const Allocation a = Allocation::wholeWeighing(*day.findReceipt(id), 0, truck.id());
+    journal.add(a);
 
-    EXPECT_THROW(day.cancelWeighing(id, 0, journal), std::logic_error);
+    const auto reversal = day.cancelWeighing(id, 0, journal);
+    ASSERT_TRUE(reversal.has_value());
+    EXPECT_EQ(reversal->allocationId(), a.id());
+    EXPECT_TRUE(day.findReceipt(id)->weighings()[0].cancelled);
+}
+
+TEST(WorkDay, PalletInADepartedTruckCannotBeCancelled) {
+    WorkDay day = dayWithRaspberryPrice();
+    const TruckId truck = day.addTruck("BI1234AA", kBigTruck).id();
+    const Uuid id = day.openReceipt(42).id();
+    day.addWeighing(id, raspberryPallet(), kMidnight + 13h);
+    Journal journal;
+    journal.add(Allocation::wholeWeighing(*day.findReceipt(id), 0, truck));
+    day.departTruck(truck);
+
+    const auto errors = day.validateCancel(id, 0, journal);
+    ASSERT_EQ(errors.size(), 1U);
+    EXPECT_NE(errors[0].find("BI1234AA"), std::string::npos);
+    EXPECT_THROW((void)day.cancelWeighing(id, 0, journal), std::logic_error);
     EXPECT_FALSE(day.findReceipt(id)->weighings()[0].cancelled);
 }
 
@@ -365,6 +386,139 @@ TEST(WorkDay, MentionsACropOfAnOpenReceipt) {
                      .tarePerBox = grams(100),
                      .pricePerKg = hryvnias(85)},
                     kMidnight + 13h);
-    day.cancelWeighing(id, 0, Journal{});
+    (void)day.cancelWeighing(id, 0, Journal{});
     EXPECT_TRUE(day.mentionsCrop("raspberry"));
+}
+
+namespace {
+
+Weighing strawberryPallet(int boxes = 60) {
+    return {
+        .cropCode = "strawberry",
+        .gross = kilograms(150),
+        .boxCount = boxes,
+        .tarePerBox = grams(300),
+    };
+}
+
+// A session with two trucks and a supplier unloading; pallets are added by the tests.
+struct Unloading {
+    WorkDay day = dayWithRaspberryPrice();
+    TruckId first = day.addTruck("BI1111AA", 200).id();
+    TruckId second = day.addTruck("BI2222BB", 200).id();
+    Uuid receipt = day.openReceipt(42).id();
+    Journal journal;
+
+    // Weighs the pallet and allocates it the way the receiving screen does.
+    std::optional<Destination> weigh(const Weighing& pallet, std::optional<Destination> target) {
+        const std::size_t index = day.addWeighing(receipt, pallet, kMidnight + 13h);
+        const auto allocation = day.autoAllocation(receipt, index, target, journal);
+        if (!allocation) return std::nullopt;
+        journal.add(*allocation);
+        return allocation->destination();
+    }
+};
+
+} // namespace
+
+TEST(WorkDay, PalletGoesToTheChosenTarget) {
+    Unloading u;
+    EXPECT_EQ(u.weigh(raspberryPallet(), u.first), Destination{u.first});
+    EXPECT_EQ(u.journal.loadOf(u.first).boxes, 80);
+}
+
+TEST(WorkDay, PalletCanGoToTheWarehouse) {
+    Unloading u;
+    EXPECT_EQ(u.weigh(raspberryPallet(), ToWarehouse{}), Destination{ToWarehouse{}});
+}
+
+TEST(WorkDay, WithoutATargetThePalletHangs) {
+    Unloading u;
+    EXPECT_EQ(u.weigh(raspberryPallet(), std::nullopt), std::nullopt);
+}
+
+TEST(WorkDay, NextPalletOfTheCropFollowsTheLastOne) {
+    // The operator switched the target for strawberries; raspberries of this
+    // receipt keep going where they went.
+    Unloading u;
+    (void)u.weigh(raspberryPallet(), u.first);
+    EXPECT_EQ(u.weigh(strawberryPallet(), u.second), Destination{u.second});
+    EXPECT_EQ(u.weigh(raspberryPallet(), u.second), Destination{u.first});
+}
+
+TEST(WorkDay, LastPalletOfAnotherReceiptDoesNotCount) {
+    Unloading u;
+    (void)u.weigh(raspberryPallet(), u.first);
+    u.receipt = u.day.openReceipt(43).id();
+    EXPECT_EQ(u.weigh(raspberryPallet(), u.second), Destination{u.second});
+}
+
+TEST(WorkDay, PalletWithoutRoomInTheTruckHangs) {
+    // 80 + 80 fit into 200 boxes, the third pallet does not: it waits for the
+    // operator instead of spilling into another truck.
+    Unloading u;
+    (void)u.weigh(raspberryPallet(), u.first);
+    (void)u.weigh(raspberryPallet(), u.first);
+    EXPECT_EQ(u.weigh(raspberryPallet(), u.first), std::nullopt);
+    EXPECT_EQ(u.journal.loadOf(u.first).boxes, 160);
+    EXPECT_EQ(u.journal.unallocatedOf(*u.day.findReceipt(u.receipt), "raspberry").boxes, 80);
+}
+
+TEST(WorkDay, PalletThatJustFitsGoesIn) {
+    Unloading u;
+    (void)u.weigh(strawberryPallet(140), u.first);
+    EXPECT_EQ(u.weigh(strawberryPallet(60), u.first), Destination{u.first});
+}
+
+TEST(WorkDay, AfterTheTruckLeftTheCropGoesToTheTarget) {
+    Unloading u;
+    (void)u.weigh(raspberryPallet(), u.first);
+    u.day.departTruck(u.first);
+    EXPECT_EQ(u.weigh(raspberryPallet(), u.second), Destination{u.second});
+}
+
+TEST(WorkDay, TargetTruckThatLeftTakesNothing) {
+    Unloading u;
+    u.day.departTruck(u.first);
+    EXPECT_EQ(u.weigh(raspberryPallet(), u.first), std::nullopt);
+    EXPECT_EQ(u.weigh(raspberryPallet(), Uuid::generateV7()), std::nullopt); // not a truck of the session
+}
+
+TEST(WorkDay, HangingPalletDoesNotChangeWhereTheCropGoes) {
+    // The last pallet that went somewhere decides, not the last one weighed.
+    Unloading u;
+    (void)u.weigh(raspberryPallet(), u.first);
+    (void)u.weigh(raspberryPallet(), std::nullopt);
+    EXPECT_EQ(u.day.nextDestination(u.receipt, "raspberry", u.second, u.journal), Destination{u.first});
+}
+
+TEST(WorkDay, CancelledOrAllocatedPalletIsNotAllocatedAgain) {
+    Unloading u;
+    (void)u.weigh(raspberryPallet(), u.first);
+    EXPECT_EQ(u.day.autoAllocation(u.receipt, 0, u.first, u.journal), std::nullopt);
+
+    const std::size_t wrong = u.day.addWeighing(u.receipt, raspberryPallet(), kMidnight + 14h);
+    (void)u.day.cancelWeighing(u.receipt, wrong, u.journal);
+    EXPECT_EQ(u.day.autoAllocation(u.receipt, wrong, u.first, u.journal), std::nullopt);
+}
+
+TEST(WorkDay, ShowsWhereTheNextPalletWillGo) {
+    // The receiving screen says it before the pallet is weighed.
+    Unloading u;
+    EXPECT_EQ(u.day.nextDestination(u.receipt, "raspberry", std::nullopt, u.journal), std::nullopt);
+    EXPECT_EQ(u.day.nextDestination(u.receipt, "raspberry", u.second, u.journal), Destination{u.second});
+    (void)u.weigh(raspberryPallet(), u.first);
+    EXPECT_EQ(u.day.nextDestination(u.receipt, "raspberry", u.second, u.journal), Destination{u.first});
+}
+
+TEST(WorkDay, CancelledPalletNoLongerLeadsTheCrop) {
+    // A pallet put into the wrong truck by mistake is cancelled: the crop
+    // goes to the target again, not after the mistake.
+    Unloading u;
+    (void)u.weigh(raspberryPallet(), u.first);
+    const auto reversal = u.day.cancelWeighing(u.receipt, 0, u.journal);
+    ASSERT_TRUE(reversal.has_value());
+    u.journal.add(*reversal);
+    EXPECT_EQ(u.journal.loadOf(u.first), Cargo{});
+    EXPECT_EQ(u.day.nextDestination(u.receipt, "raspberry", u.second, u.journal), Destination{u.second});
 }

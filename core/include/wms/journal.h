@@ -45,6 +45,8 @@ public:
     // What the warehouse holds of the crop across all sessions: put in minus shipped out.
     // Negative after an offline conflict (two terminals shipped the same boxes).
     [[nodiscard]] Cargo stockOf(std::string_view cropCode) const noexcept;
+    // Whether any record names the crop, cancelled receipt lines included.
+    [[nodiscard]] bool mentionsCrop(std::string_view cropCode) const noexcept;
 
     // Part of the crop in the receipt that no truck has taken yet.
     // Throws std::invalid_argument when the receipt is not in the journal.

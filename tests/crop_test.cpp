@@ -1,4 +1,5 @@
 #include "wms/crop.h"
+#include "wms/journal.h"
 
 #include <gtest/gtest.h>
 
@@ -40,4 +41,37 @@ TEST(NewCrop, RejectsANameThatFoldsToAnExistingCode) {
 
 TEST(NewCrop, CodeIsTheNormalisedName) {
     EXPECT_EQ(cropCodeFor("  Чорна   Смородина "), "чорна смородина");
+}
+
+TEST(Crop, IsVisibleUnlessArchived) {
+    EXPECT_FALSE((Crop{"raspberry", "Малина"}).archived());
+    EXPECT_TRUE((Crop{"raspberry", "Малина", true}).archived());
+}
+
+// Adding the name of an archived crop brings that crop back, not a second one.
+TEST(NewCrop, TheNameOfAnArchivedCropIsFree) {
+    const std::vector<Crop> existing{{"raspberry", "Малина", true}};
+    EXPECT_TRUE(validateNewCrop("малина", existing).empty());
+    ASSERT_NE(findCropNamed("малина", existing), nullptr);
+    EXPECT_EQ(findCropNamed("малина", existing)->code(), "raspberry");
+    EXPECT_EQ(findCropNamed("Агрус", existing), nullptr);
+}
+
+TEST(RemoveCrop, AllowedWithAnEmptyWarehouse) {
+    EXPECT_TRUE(validateRemoveCrop("raspberry", Journal{}).empty());
+}
+
+// The warehouse lists visible crops only: the boxes would vanish from the screen.
+TEST(RemoveCrop, RefusedWhileTheCropIsInTheWarehouse) {
+    Journal journal;
+    const Receipt receipt = Receipt::create(42, Settlement::OnSite, {{
+        .cropCode = "raspberry",
+        .gross = kilograms(31),
+        .boxCount = 10,
+        .tarePerBox = grams(100),
+        .pricePerKg = hryvnias(85),
+    }});
+    journal.add(receipt);
+    journal.add(Allocation::wholeWeighing(receipt, 0, ToWarehouse{}));
+    EXPECT_EQ(validateRemoveCrop("raspberry", journal).size(), 1u);
 }

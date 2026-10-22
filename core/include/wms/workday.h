@@ -90,6 +90,9 @@ public:
     // session: it cannot be closed while any of them is open.
     [[nodiscard]] const std::vector<OpenReceipt>& openReceipts() const noexcept { return openReceipts_; }
     [[nodiscard]] const OpenReceipt* findReceipt(const Uuid& id) const noexcept;
+    // Whether an open receipt names the crop, cancelled lines included; closed
+    // receipts are the journal's (Journal::mentionsCrop).
+    [[nodiscard]] bool mentionsCrop(std::string_view cropCode) const noexcept;
 
     // The supplier's open receipt, or a new one: a supplier never has two.
     // The reference is valid until the next change of open receipts.

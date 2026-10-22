@@ -77,3 +77,33 @@ TEST(SqliteRepository, CropsComeBackInTheOrderAdded) {
     EXPECT_EQ(loaded[1].code(), "strawberry");
     EXPECT_EQ(loaded[2].code(), "агрус");
 }
+
+TEST(SqliteRepository, CropKeepsTheArchivedMark) {
+    sqlite::Database db{":memory:"};
+    SqliteRepository<Crop> crops{db};
+    crops.save({"raspberry", "Малина", true});
+    crops.save({"strawberry", "Полуниця"});
+
+    const auto loaded = crops.all();
+    ASSERT_EQ(loaded.size(), 2U);
+    EXPECT_TRUE(loaded[0].archived());
+    EXPECT_FALSE(loaded[1].archived());
+}
+
+// A crop added by mistake and never used leaves no trace.
+TEST(SqliteRepository, RemoveDeletesTheRecord) {
+    sqlite::Database db{":memory:"};
+    SqliteRepository<Crop> crops{db};
+    crops.save({"raspberry", "Малина"});
+    crops.save({"малинаа", "Малинаа"});
+    crops.remove({"малинаа", "Малинаа"});
+
+    const auto loaded = crops.all();
+    ASSERT_EQ(loaded.size(), 1U);
+    EXPECT_EQ(loaded[0].code(), "raspberry");
+
+    SqliteRepository<Supplier> suppliers{db};
+    suppliers.save({42, "Шевченко Тарас"});
+    suppliers.remove({42, "Шевченко Тарас"});
+    EXPECT_TRUE(suppliers.all().empty());
+}

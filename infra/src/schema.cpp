@@ -18,7 +18,7 @@ namespace {
 // in kopecks (_kop), weight in grams (_g); enums are spelled out as text, so
 // reordering an enum in C++ cannot change what old rows mean. STRICT tables
 // reject a value of the wrong type instead of quietly storing it.
-constexpr std::array<std::string_view, 5> kMigrations{
+constexpr std::array<std::string_view, 6> kMigrations{
     R"sql(
     CREATE TABLE receipt (
         id            TEXT PRIMARY KEY,
@@ -193,6 +193,12 @@ constexpr std::array<std::string_view, 5> kMigrations{
         code TEXT PRIMARY KEY CHECK (code <> ''),
         name TEXT NOT NULL CHECK (name <> '')
     ) STRICT;
+    )sql",
+
+    // A crop with records is archived instead of deleted. Unlike paid_by,
+    // the default is the right value for every row, past and future.
+    R"sql(
+    ALTER TABLE crop ADD COLUMN archived INTEGER NOT NULL DEFAULT 0 CHECK (archived IN (0, 1));
     )sql",
 };
 

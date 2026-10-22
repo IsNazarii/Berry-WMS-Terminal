@@ -352,3 +352,19 @@ TEST(WorkDay, RestoreRejectsInconsistentRecord) {
     nilId.id = Uuid{};
     EXPECT_THROW((void)WorkDay::restore(nilId), std::invalid_argument);
 }
+
+// A receipt still being weighed is a record too, even its cancelled lines.
+TEST(WorkDay, MentionsACropOfAnOpenReceipt) {
+    WorkDay day = openAtNoon();
+    const Uuid id = day.openReceipt(42).id();
+    EXPECT_FALSE(day.mentionsCrop("raspberry"));
+    day.addWeighing(id,
+                    {.cropCode = "raspberry",
+                     .gross = kilograms(31),
+                     .boxCount = 10,
+                     .tarePerBox = grams(100),
+                     .pricePerKg = hryvnias(85)},
+                    kMidnight + 13h);
+    day.cancelWeighing(id, 0, Journal{});
+    EXPECT_TRUE(day.mentionsCrop("raspberry"));
+}

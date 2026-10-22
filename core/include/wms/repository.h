@@ -16,6 +16,8 @@ public:
 
     // Adds the record, or replaces the stored one with the same id.
     virtual void save(const T& record) = 0;
+    // Deletes the record with the same id; nothing happens when there is none.
+    virtual void remove(const T& record) = 0;
     // Every record: in id order; crops, which have no number, in the order added.
     [[nodiscard]] virtual std::vector<T> all() const = 0;
 

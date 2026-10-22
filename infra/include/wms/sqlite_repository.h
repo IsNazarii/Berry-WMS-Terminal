@@ -22,6 +22,7 @@ public:
     explicit SqliteRepository(sqlite::Database& db);
 
     void save(const T& record) override;
+    void remove(const T& record) override;
     [[nodiscard]] std::vector<T> all() const override;
 
 private:

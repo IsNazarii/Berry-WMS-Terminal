@@ -80,6 +80,16 @@ Cargo Journal::stockOf(std::string_view cropCode) const noexcept {
     return stock;
 }
 
+bool Journal::mentionsCrop(std::string_view cropCode) const noexcept {
+    // Allocations and shipments come from receipts, but a sync may bring them first.
+    const auto inReceipt = [cropCode](const Receipt& r) {
+        return std::ranges::any_of(r.weighings(), [cropCode](const Weighing& w) { return w.cropCode == cropCode; });
+    };
+    return std::ranges::any_of(receipts_, inReceipt) ||
+           std::ranges::any_of(allocations_, [cropCode](const Allocation& a) { return a.cropCode() == cropCode; }) ||
+           std::ranges::any_of(shipments_, [cropCode](const StockShipment& s) { return s.cropCode() == cropCode; });
+}
+
 const Receipt* Journal::findReceipt(const Uuid& id) const noexcept {
     for (const auto& r : receipts_) {
         if (r.id() == id) return &r;

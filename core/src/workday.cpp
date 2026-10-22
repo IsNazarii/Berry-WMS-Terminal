@@ -186,4 +186,10 @@ Truck& WorkDay::truck(const TruckId& id) {
     return *found;
 }
 
+bool WorkDay::mentionsCrop(std::string_view cropCode) const noexcept {
+    return std::ranges::any_of(openReceipts_, [cropCode](const OpenReceipt& r) {
+        return std::ranges::any_of(r.weighings(), [cropCode](const Weighing& w) { return w.cropCode == cropCode; });
+    });
+}
+
 } // namespace wms

@@ -488,3 +488,12 @@ TEST(Journal, CancelledLinesDoNotWaitForAllocation) {
 
     EXPECT_TRUE(journal.waitingForAllocation().empty());
 }
+
+// A crop with records cannot leave the database: old receipts still name it.
+TEST(Journal, MentionsACropOfAnyReceiptLine) {
+    Journal journal;
+    Receipt receipt = Receipt::create(42, Settlement::OnSite, {pallet("raspberry", 10, kilograms(30))});
+    journal.add(receipt);
+    EXPECT_TRUE(journal.mentionsCrop("raspberry"));
+    EXPECT_FALSE(journal.mentionsCrop("strawberry"));
+}

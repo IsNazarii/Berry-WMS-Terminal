@@ -213,6 +213,8 @@ sequenceDiagram
     Довідники належать серверу, тому `save` — upsert (`ON CONFLICT DO UPDATE`), а не append, як у журналі.
   - ✅ Культури: міграція 5 — таблиця `crop` (`code TEXT PRIMARY KEY`, `name`), `Table<Crop>`; порядок — `rowid`
     (порядок додавання; upsert зберігає `rowid`, тож перейменована культура лишається на своєму місці).
+    Міграція 6 — `archived` (`DEFAULT 0`: на відміну від `paid_by`, нуль правильний для всіх рядків);
+    `Repository<T>::remove` — `DELETE` за ключем (`Table<T>::deleteOne`).
   - ✅ Оператор у `Payment` (`paidBy`): міграція 4 перебудовує таблицю `payment` з колонкою `paid_by NOT NULL`
     (SQLite не додає `NOT NULL`-колонку без `DEFAULT`, а `DEFAULT` мовчки підставляв би оператора в майбутні
     `INSERT`, що його забули). Старі виплати (лише тестові бази альфи) приписано оператору 1, порядок рядків збережено.

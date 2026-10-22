@@ -173,6 +173,10 @@ public:
     // typing), and adding it. Returns an operator-facing error, empty on success.
     [[nodiscard]] Q_INVOKABLE QStringList newCropErrors(const QString& name) const;
     Q_INVOKABLE QString addCrop(const QString& name);
+    // Removing a crop: deleted when nothing names it (a typo), archived when
+    // records do. cropRemoval says beforehand: {errors, keepsRecords}.
+    [[nodiscard]] Q_INVOKABLE QVariantMap cropRemoval(const QString& cropCode) const;
+    Q_INVOKABLE QString removeCrop(const QString& cropCode);
     // Picked from the menu, weighed or priced: a crop from the menu takes the
     // place of the key used longest ago. Remembered per terminal.
     Q_INVOKABLE void useCrop(const QString& cropCode);
@@ -267,7 +271,14 @@ private:
     [[nodiscard]] std::optional<SourceReceipt> findSource(const Uuid& id) const noexcept;
     [[nodiscard]] QString supplierNameOf(SupplierId id) const;
     // The code itself for a crop missing from the catalogue, e.g. one synced in later.
+    // Archived crops keep their names here.
     [[nodiscard]] QString cropName(std::string_view code) const;
+    [[nodiscard]] bool isActiveCrop(std::string_view code) const noexcept;
+    // In the journal or in a receipt still being weighed.
+    [[nodiscard]] bool hasCropRecords(std::string_view code) const noexcept;
+    void saveCropKeys() const;
+    // After a crop is added, brought back or removed.
+    void cropsUpdated();
     // Plate of a truck of this or the previous session.
     [[nodiscard]] QString plateOf(const TruckId& id) const;
     // Checks the operator's choice: a truck must be of this session and still loading.

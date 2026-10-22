@@ -67,9 +67,12 @@ std::vector<std::string> toCodes(const QStringList& list) {
     return codes;
 }
 
-std::vector<std::string> codesOf(const std::vector<Crop>& crops) {
+// Archived crops stay in the list for their names, but the operator no longer picks them.
+std::vector<std::string> activeCodesOf(const std::vector<Crop>& crops) {
     std::vector<std::string> codes;
-    for (const Crop& crop : crops) codes.push_back(crop.code());
+    for (const Crop& crop : crops) {
+        if (!crop.archived()) codes.push_back(crop.code());
+    }
     return codes;
 }
 
@@ -78,7 +81,7 @@ CropKeys loadCropKeys(const std::vector<Crop>& crops) {
     const QSettings settings;
     CropKeys keys{kCropKeys, toCodes(settings.value("ui/cropKeys").toStringList()),
                   toCodes(settings.value("ui/cropsRecent").toStringList())};
-    keys.fill(codesOf(crops));
+    keys.fill(activeCodesOf(crops));
     return keys;
 }
 
@@ -318,9 +321,11 @@ QString Terminal::sessionOpenedBy() const {
 
 QVariantList Terminal::cropList() const {
     QVariantList list;
-    for (const Crop& crop : crops_)
+    for (const Crop& crop : crops_) {
+        if (crop.archived()) continue;
         list.append(QVariantMap{{"cropCode", QString::fromStdString(crop.code())},
                                 {"name", QString::fromStdString(crop.name())}});
+    }
     return list;
 }
 
@@ -544,6 +549,8 @@ QVariantList Terminal::stockList() const {
     QVariantList list;
     for (const Crop& crop : crops_) {
         const Cargo held = journal_.stockOf(crop.code());
+        // Archiving waits for an empty warehouse, but a sync may still bring boxes in: those are shown.
+        if (crop.archived() && held.boxes == 0 && held.weight.isZero()) continue;
         list.append(QVariantMap{
             {"cropCode", QString::fromStdString(crop.code())},
             {"name", QString::fromStdString(crop.name())},
@@ -724,25 +731,74 @@ QStringList Terminal::newCropErrors(const QString& name) const {
 
 QString Terminal::addCrop(const QString& name) {
     if (const QStringList errors = newCropErrors(name); !errors.isEmpty()) return errors.join("\n");
-    const Crop crop{cropCodeFor(name.toStdString()), squeezeSpaces(name.toStdString())};
-    cropStore_.save(crop);
-    crops_.push_back(crop);
-    cropKeys_.fill(codesOf(crops_));
-    emit cropsChanged();
-    emit cropKeysChanged();
-    // A new crop has no price yet and nothing in stock, but both lists name every crop.
-    emit pricesChanged();
-    emit journalChanged();
+    const std::string typed = squeezeSpaces(name.toStdString());
+    // Validation lets through only an archived match: that crop comes back, code and place kept.
+    if (const Crop* archived = findCropNamed(typed, crops_)) {
+        const Crop restored{archived->code(), typed};
+        cropStore_.save(restored);
+        *std::ranges::find(crops_, restored.code(), &Crop::code) = restored;
+    } else {
+        const Crop crop{cropCodeFor(typed), typed};
+        cropStore_.save(crop);
+        crops_.push_back(crop);
+    }
+    cropsUpdated();
+    return {};
+}
+
+QVariantMap Terminal::cropRemoval(const QString& cropCode) const {
+    const std::string code = cropCode.toStdString();
+    QStringList errors;
+    for (const std::string& error : validateRemoveCrop(code, journal_)) errors << QString::fromStdString(error);
+    return {{"errors", errors}, {"keepsRecords", hasCropRecords(code)}};
+}
+
+QString Terminal::removeCrop(const QString& cropCode) {
+    const std::string code = cropCode.toStdString();
+    const auto crop = std::ranges::find(crops_, code, &Crop::code);
+    if (crop == crops_.end() || crop->archived()) return tr("Немає такої культури");
+    if (const auto errors = validateRemoveCrop(code, journal_); !errors.empty()) return joined(errors);
+    if (hasCropRecords(code)) {
+        *crop = Crop{crop->code(), crop->name(), true};
+        cropStore_.save(*crop);
+    } else {
+        cropStore_.remove(*crop);
+        crops_.erase(crop);
+    }
+    cropsUpdated();
     return {};
 }
 
 void Terminal::useCrop(const QString& cropCode) {
-    if (std::ranges::find(crops_, cropCode.toStdString(), &Crop::code) == crops_.end()) return;
+    if (!isActiveCrop(cropCode.toStdString())) return;
     cropKeys_.use(cropCode.toStdString());
+    saveCropKeys();
+    emit cropKeysChanged();
+}
+
+bool Terminal::isActiveCrop(std::string_view code) const noexcept {
+    const auto crop = std::ranges::find(crops_, code, &Crop::code);
+    return crop != crops_.end() && !crop->archived();
+}
+
+bool Terminal::hasCropRecords(std::string_view code) const noexcept {
+    return journal_.mentionsCrop(code) || (workDay_ && workDay_->mentionsCrop(code));
+}
+
+void Terminal::saveCropKeys() const {
     QSettings settings;
     settings.setValue("ui/cropKeys", toQStringList(cropKeys_.keys()));
     settings.setValue("ui/cropsRecent", toQStringList(cropKeys_.recent()));
+}
+
+void Terminal::cropsUpdated() {
+    cropKeys_.fill(activeCodesOf(crops_));
+    saveCropKeys();
+    emit cropsChanged();
     emit cropKeysChanged();
+    // Prices and stock list crops too.
+    emit pricesChanged();
+    emit journalChanged();
 }
 
 QString Terminal::startReceipt(qint64 supplierId) {
@@ -783,6 +839,7 @@ QString Terminal::recordWeighing(const QString& cropCode, const QString& boxes, 
                                  bool acceptUnstable) {
     if (!workDay_ || !activeReceipt()) return tr("Спершу відкрийте чек постачальника");
 
+    if (!isActiveCrop(cropCode.toStdString())) return tr("Оберіть культуру");
     Weighing weighing;
     weighing.cropCode = cropCode.toStdString();
     bool ok = false;

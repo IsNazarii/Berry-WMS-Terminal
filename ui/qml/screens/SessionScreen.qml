@@ -153,6 +153,14 @@ Page {
                                     elide: Text.ElideRight
                                     Layout.fillWidth: true
                                 }
+                                ToolButton {
+                                    text: "✕"
+                                    opacity: hovered || activeFocus ? 1 : 0.5
+                                    ToolTip.visible: hovered
+                                    ToolTip.text: qsTr("Прибрати культуру")
+                                    onClicked: removeCropDialog.ask(priceRow.modelData.cropCode,
+                                                                    priceRow.modelData.name)
+                                }
                                 // The current price, big: this is what goes into the next weighing.
                                 Label {
                                     text: priceRow.price !== "" ? priceRow.price : qsTr("не задано")
@@ -573,6 +581,65 @@ Page {
                 onClicked: cropDialog.add()
             }
             ErrorLabel { id: cropError }
+        }
+    }
+
+    // Says beforehand what removing does: a crop nothing names is deleted
+    // (a typo), one with records is only hidden and can be added back.
+    Dialog {
+        id: removeCropDialog
+        anchors.centerIn: parent
+        width: 380
+        modal: true
+        title: qsTr("Прибрати «%1»?").arg(removedName)
+
+        property string removedCode
+        property string removedName
+        property var removal: ({ errors: [], keepsRecords: false })
+
+        function ask(code, name) {
+            removedCode = code
+            removedName = name
+            removal = Terminal.cropRemoval(code)
+            removeCropError.text = ""
+            open()
+        }
+
+        ColumnLayout {
+            anchors.fill: parent
+            spacing: Theme.spacingS
+
+            Label {
+                visible: removeCropDialog.removal.errors.length === 0
+                text: removeCropDialog.removal.keepsRecords
+                      ? qsTr("На цій культурі вже є записи, тому її буде приховано, а не видалено: старі чеки "
+                             + "й надалі показуватимуть назву. Повернути — «Додати культуру…» з тією ж назвою.")
+                      : qsTr("Записів на цій культурі нема — її буде видалено.")
+                wrapMode: Text.WordWrap
+                Layout.fillWidth: true
+            }
+            ErrorLabel { text: removeCropDialog.removal.errors.join("\n") }
+            ErrorLabel { id: removeCropError }
+        }
+
+        footer: DialogButtonBox {
+            Button {
+                text: removeCropDialog.removal.keepsRecords ? qsTr("Приховати") : qsTr("Видалити")
+                enabled: removeCropDialog.removal.errors.length === 0
+                highlighted: true
+                DialogButtonBox.buttonRole: DialogButtonBox.AcceptRole
+            }
+            Button {
+                text: qsTr("Скасувати")
+                DialogButtonBox.buttonRole: DialogButtonBox.RejectRole
+            }
+        }
+        onAccepted: {
+            const error = Terminal.removeCrop(removedCode)
+            if (error !== "") {
+                removeCropError.text = error
+                open()
+            }
         }
     }
 

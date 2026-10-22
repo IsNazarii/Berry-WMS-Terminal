@@ -1,23 +1,19 @@
 #include "wms/truck.h"
 
-#include <algorithm>
 #include <stdexcept>
 #include <utility>
 
 namespace wms {
 
-Truck::Truck(TruckId id, std::string plate, Cargo capacity, TruckDetails details, TruckStatus status)
-    : id_{id}, plate_{std::move(plate)}, capacity_{capacity}, details_{std::move(details)}, status_{status} {
+Truck::Truck(TruckId id, std::string plate, int boxLimit, TruckDetails details, TruckStatus status)
+    : id_{id}, plate_{std::move(plate)}, boxLimit_{boxLimit}, details_{std::move(details)}, status_{status} {
     if (id_.isNil()) throw std::invalid_argument("Truck id must not be nil");
     if (plate_.empty()) throw std::invalid_argument("Truck plate must not be empty");
-    if (capacity_.boxes < 0 || capacity_.weight.isNegative())
-        throw std::invalid_argument("Truck capacity must not be negative");
-    if (capacity_.boxes == 0 && capacity_.weight.isZero())
-        throw std::invalid_argument("Truck must be limited by boxes, weight or both");
+    if (boxLimit_ <= 0) throw std::invalid_argument("Truck box limit must be positive");
 }
 
-Truck Truck::create(std::string plate, Cargo capacity, TruckDetails details) {
-    return Truck{Uuid::generateV7(), std::move(plate), capacity, std::move(details)};
+Truck Truck::create(std::string plate, int boxLimit, TruckDetails details) {
+    return Truck{Uuid::generateV7(), std::move(plate), boxLimit, std::move(details)};
 }
 
 void Truck::depart() {
@@ -30,25 +26,12 @@ void Truck::carryOver() {
     status_ = TruckStatus::CarriedOver;
 }
 
-Cargo Truck::remaining(const Cargo& loaded) const noexcept {
-    return {.boxes = capacity_.boxes - loaded.boxes, .weight = capacity_.weight - loaded.weight};
-}
+int Truck::boxesLeft(const Cargo& loaded) const noexcept { return boxLimit_ - loaded.boxes; }
 
-bool Truck::isOverloaded(const Cargo& loaded) const noexcept {
-    const bool tooManyBoxes = capacity_.boxes > 0 && loaded.boxes > capacity_.boxes;
-    const bool tooHeavy = capacity_.weight.isPositive() && loaded.weight > capacity_.weight;
-    return tooManyBoxes || tooHeavy;
-}
+bool Truck::isOverloaded(const Cargo& loaded) const noexcept { return loaded.boxes > boxLimit_; }
 
 int Truck::fillPercent(const Cargo& loaded) const noexcept {
-    std::int64_t percent = 0;
-    if (capacity_.boxes > 0) {
-        percent = std::max(percent, divideRounded(std::int64_t{loaded.boxes} * 100, capacity_.boxes));
-    }
-    if (capacity_.weight.isPositive()) {
-        percent = std::max(percent, divideRounded(loaded.weight.raw() * 100, capacity_.weight.raw()));
-    }
-    return static_cast<int>(percent);
+    return static_cast<int>(divideRounded(std::int64_t{loaded.boxes} * 100, boxLimit_));
 }
 
 } // namespace wms

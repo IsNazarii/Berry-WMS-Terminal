@@ -40,7 +40,7 @@ public:
     // from. Pointers are valid until the next add().
     [[nodiscard]] std::vector<const Transaction*> historyOf(SupplierId supplierId) const;
     // Everything put into the truck, from receipts and from the warehouse;
-    // compare with Truck::capacity() to spot overload.
+    // compare with Truck::boxLimit() to spot overload.
     [[nodiscard]] Cargo loadOf(const TruckId& truckId) const noexcept;
     // What the warehouse holds of the crop across all sessions: put in minus shipped out.
     // Negative after an offline conflict (two terminals shipped the same boxes).

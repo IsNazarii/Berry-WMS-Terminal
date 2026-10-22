@@ -14,7 +14,7 @@ namespace {
 
 constexpr year_month_day kDate = September / 26 / 2026;
 const TimePoint kMidnight = TimePoint{sys_days{kDate}};
-const Cargo kBigTruck{.boxes = 1'200, .weight = kilograms(2'000)};
+constexpr int kBigTruck = 1'200;
 const TruckDetails kDaf{.make = "DAF XF", .note = "Іван, на Київ"};
 constexpr OperatorId kOksana = 1;
 constexpr OperatorId kPetro = 2;
@@ -39,14 +39,14 @@ TEST(WorkDay, HasItsOwnPrices) {
     EXPECT_EQ(day.prices().current("raspberry"), hryvnias(85));
 }
 
-TEST(WorkDay, RepeatedTruckKeepsPlateAndLimitsButGetsANewId) {
+TEST(WorkDay, RepeatedTruckKeepsPlateAndLimitButGetsANewId) {
     WorkDay yesterday{September / 25 / 2026, kMidnight - 12h, kOksana};
     const Truck original = yesterday.addTruck("BI1234AA", kBigTruck, kDaf);
 
     WorkDay today = openAtNoon();
     const Truck& repeated = today.repeatTruck(original);
     EXPECT_EQ(repeated.plate(), "BI1234AA");
-    EXPECT_EQ(repeated.capacity(), kBigTruck);
+    EXPECT_EQ(repeated.boxLimit(), kBigTruck);
     EXPECT_EQ(repeated.details(), kDaf); // usually the same driver on the same route
     EXPECT_NE(repeated.id(), original.id()); // a new trip starts empty
     EXPECT_EQ(today.trucks().size(), 1u);

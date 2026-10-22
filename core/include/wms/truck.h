@@ -30,17 +30,18 @@ struct TruckDetails {
 // so two offline terminals never overwrite each other's counters.
 class Truck {
 public:
-    // A zero limit in `capacity` means the truck is not limited in that dimension;
-    // at least one limit must be set. The status is for a truck read back from storage.
-    Truck(TruckId id, std::string plate, Cargo capacity, TruckDetails details = {},
+    // The limit is in boxes only: that is what the operator counts while
+    // loading; kilograms are shown for reference. The status is for a truck
+    // read back from storage.
+    Truck(TruckId id, std::string plate, int boxLimit, TruckDetails details = {},
           TruckStatus status = TruckStatus::Loading);
 
     // New truck with a fresh UUIDv7.
-    [[nodiscard]] static Truck create(std::string plate, Cargo capacity, TruckDetails details = {});
+    [[nodiscard]] static Truck create(std::string plate, int boxLimit, TruckDetails details = {});
 
     [[nodiscard]] const TruckId& id() const noexcept { return id_; }
     [[nodiscard]] const std::string& plate() const noexcept { return plate_; }
-    [[nodiscard]] const Cargo& capacity() const noexcept { return capacity_; }
+    [[nodiscard]] int boxLimit() const noexcept { return boxLimit_; }
     [[nodiscard]] const TruckDetails& details() const noexcept { return details_; }
     [[nodiscard]] TruckStatus status() const noexcept { return status_; }
 
@@ -49,16 +50,16 @@ public:
     void depart();
     void carryOver();
 
-    // Negative values mean the truck is overloaded in that dimension.
-    [[nodiscard]] Cargo remaining(const Cargo& loaded) const noexcept;
+    // Negative when the truck is overloaded.
+    [[nodiscard]] int boxesLeft(const Cargo& loaded) const noexcept;
     [[nodiscard]] bool isOverloaded(const Cargo& loaded) const noexcept;
-    // Fill level by the tighter of the two limits; may exceed 100 when overloaded.
+    // May exceed 100 when overloaded.
     [[nodiscard]] int fillPercent(const Cargo& loaded) const noexcept;
 
 private:
     TruckId id_;
     std::string plate_;
-    Cargo capacity_;
+    int boxLimit_;
     TruckDetails details_;
     TruckStatus status_ = TruckStatus::Loading;
 };

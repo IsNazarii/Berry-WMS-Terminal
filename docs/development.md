@@ -62,7 +62,7 @@ $CM/cmake -S . -B build -G Ninja && $CM/cmake --build build && $CM/ctest --test-
 | `transaction_test` | `Weighing`, `Receipt`, `Payment`: нетто, суми, валідація, анулювання, опт |
 | `open_receipt_test` | додавання, анулювання, закриття з тим самим id |
 | `scale_test` | симулятор, детектор стабільності |
-| `truck_test` | ліміти, заповненість, переповнення, статуси |
+| `truck_test` | ліміт у ящиках, заповненість, переповнення, статуси |
 | `allocation_test` | ціла палета, ящики, пропорційний поділ ваги |
 | `shipment_test` | відвантаження зі складу |
 | `journal_test` | баланс, завантаження, склад, ідемпотентність, усі `validate…` |

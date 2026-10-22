@@ -148,7 +148,7 @@ classDiagram
     class Truck {
         -TruckId id_
         -string plate_
-        -Cargo capacity_
+        -int boxLimit_
         -TruckDetails details_
         -TruckStatus status_
         +fillPercent(loaded) int
@@ -463,7 +463,7 @@ using Destination = std::variant<TruckId, ToWarehouse>;
 |---|---|
 | `id_` | `TruckId = Uuid` — фури створюються на будь-якому терміналі офлайн |
 | `plate_` | номер, обов'язковий |
-| `capacity_` | `Cargo`-ліміт; 0 у вимірі = без ліміту, але хоча б один ліміт обов'язковий |
+| `boxLimit_` | ліміт **лише в ящиках** (> 0): саме ящики оператор рахує при завантаженні; кг — довідково |
 | `details_` | `TruckDetails {make, note}` — марка і вільний текст «водій / куди їде», необов'язкові |
 | `status_` | `Loading` → `Departed` або `CarriedOver`; конструктор приймає статус для фури, прочитаної зі сховища |
 
@@ -480,9 +480,9 @@ stateDiagram-v2
 - `acceptsCargo()` — лише у стані `Loading`.
 - **Завантаження не зберігається** у фурі — його дає `Journal::loadOf(id)`. Методи фури
   приймають завантаження параметром:
-  - `remaining(loaded)` — скільки ще влізе (від'ємне = переповнення);
-  - `isOverloaded(loaded)` — перевищено хоча б один заданий ліміт;
-  - `fillPercent(loaded)` — за *тіснішим* з двох лімітів, може бути > 100.
+  - `boxesLeft(loaded)` — скільки ящиків ще влізе (від'ємне = переповнення);
+  - `isOverloaded(loaded)` — ящиків більше за ліміт (вага не враховується);
+  - `fillPercent(loaded)` — за ящиками, може бути > 100.
 
 ---
 
@@ -570,8 +570,8 @@ Append-only сховище фактів. Для кожного типу — ок
 | Метод | Що робить |
 |---|---|
 | `setPrice(crop, price, at)` | нова денна ціна |
-| `addTruck(plate, capacity, details)` | нова фура |
-| `repeatTruck(earlier)` | «повторити фуру з учора»: той самий номер, ліміти, деталі — **новий id**, порожня |
+| `addTruck(plate, boxLimit, details)` | нова фура |
+| `repeatTruck(earlier)` | «повторити фуру з учора»: той самий номер, ліміт, деталі — **новий id**, порожня |
 | `adoptTruck(carriedOver)` | прийняти перенесену фуру: **той самий id**, тож завантаження зберігається |
 | `departTruck(id)` / `carryOverTruck(id)` | рішення щодо фури |
 

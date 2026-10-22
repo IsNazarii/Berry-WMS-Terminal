@@ -102,6 +102,7 @@ flowchart BT
 | Прийнято ягоду | `Receipt` | + сума чека (роздріб), 0 (опт) |
 | Виплачено гроші | `Payment` | − сума |
 | Частину чека покладено у фуру / на склад | `Allocation` | 0 |
+| Розподіл скасовано (сторно) | `AllocationReversal` | 0 |
 | Зі складу відвантажено у фуру | `StockShipment` | 0 |
 
 Похідні величини **ніколи не зберігаються**, а обчислюються з журналу:
@@ -192,7 +193,7 @@ sequenceDiagram
     кожен крок і новий номер версії комітяться разом; база новішої версії відхиляється. Таблиці
     `STRICT`; id — UUID текстом; час — наносекунди від епохи Unix (`createdAt` повертається точно);
     гроші `_kop`, вага `_g`; переліки — текстом з `CHECK` (перестановка `enum` у C++ не змінить старі рядки).
-  - ✅ Журнал: інтерфейс `JournalStore` у core (`save(Receipt|Payment|Allocation|StockShipment)`, `load()`),
+  - ✅ Журнал: інтерфейс `JournalStore` у core (`save(Receipt|Payment|Allocation|AllocationReversal|StockShipment)`, `load()`),
     реалізація `SqliteJournalStore`: таблиці `receipt` + `weighing` (рядки з номером `line` — на нього
     посилаються розподіли), `payment`, `allocation` (`truck_id` NULL = склад; без зовнішнього ключа на `receipt`,
     бо палета відкритого чека йде у фуру раніше, ніж чек записано), `stock_shipment`; усі з `sync_status`.
@@ -217,6 +218,8 @@ sequenceDiagram
     `Repository<T>::remove` — `DELETE` за ключем (`Table<T>::deleteOne`).
   - ✅ Ліміт фури лише в ящиках: міграція 7 перебудовує `truck` без `limit_g`, з `CHECK (limit_boxes > 0)`.
     Фури з лімітом лише в кг (тільки тестові бази альфи) отримують грубо 2 кг на ящик.
+  - ✅ Сторно розподілу: міграція 8 — таблиця `allocation_reversal` (`allocation_id` без зовнішнього ключа:
+    sync може привезти сторно раніше за розподіл).
   - ✅ Оператор у `Payment` (`paidBy`): міграція 4 перебудовує таблицю `payment` з колонкою `paid_by NOT NULL`
     (SQLite не додає `NOT NULL`-колонку без `DEFAULT`, а `DEFAULT` мовчки підставляв би оператора в майбутні
     `INSERT`, що його забули). Старі виплати (лише тестові бази альфи) приписано оператору 1, порядок рядків збережено.

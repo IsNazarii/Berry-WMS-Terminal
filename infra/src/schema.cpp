@@ -18,7 +18,7 @@ namespace {
 // in kopecks (_kop), weight in grams (_g); enums are spelled out as text, so
 // reordering an enum in C++ cannot change what old rows mean. STRICT tables
 // reject a value of the wrong type instead of quietly storing it.
-constexpr std::array<std::string_view, 7> kMigrations{
+constexpr std::array<std::string_view, 8> kMigrations{
     R"sql(
     CREATE TABLE receipt (
         id            TEXT PRIMARY KEY,
@@ -223,6 +223,17 @@ constexpr std::array<std::string_view, 7> kMigrations{
         FROM truck;
     DROP TABLE truck;
     ALTER TABLE truck_new RENAME TO truck;
+    )sql",
+
+    // No foreign key to allocation, as allocation has none to receipt: sync
+    // may bring a reversal before the allocation it takes back.
+    R"sql(
+    CREATE TABLE allocation_reversal (
+        id            TEXT PRIMARY KEY,
+        created_at_ns INTEGER NOT NULL,
+        allocation_id TEXT NOT NULL,
+        sync_status   TEXT NOT NULL CHECK (sync_status IN ('pending', 'synced'))
+    ) STRICT;
     )sql",
 };
 

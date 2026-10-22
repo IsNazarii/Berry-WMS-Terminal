@@ -21,6 +21,7 @@ public:
     virtual bool save(const Receipt& receipt) = 0;
     virtual bool save(const Payment& payment) = 0;
     virtual bool save(const Allocation& allocation) = 0;
+    virtual bool save(const AllocationReversal& reversal) = 0;
     virtual bool save(const StockShipment& shipment) = 0;
 
     // Every stored record, each type in the order it was created.

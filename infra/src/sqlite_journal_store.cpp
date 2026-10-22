@@ -80,6 +80,17 @@ bool SqliteJournalStore::save(const Allocation& allocation) {
     return inserted(insert);
 }
 
+bool SqliteJournalStore::save(const AllocationReversal& reversal) {
+    sqlite::Statement insert = db_.prepare(
+        "INSERT INTO allocation_reversal (id, created_at_ns, allocation_id, sync_status) VALUES (?1, ?2, ?3, ?4) "
+        "ON CONFLICT (id) DO NOTHING RETURNING id");
+    insert.bind(1, reversal.id().toString())
+        .bind(2, toNanoseconds(reversal.createdAt()))
+        .bind(3, reversal.allocationId().toString())
+        .bind(4, toText(kSyncStatuses, reversal.syncStatus()));
+    return inserted(insert);
+}
+
 bool SqliteJournalStore::save(const StockShipment& shipment) {
     sqlite::Statement insert = db_.prepare(
         "INSERT INTO stock_shipment (id, created_at_ns, crop_code, boxes, weight_g, truck_id, sync_status) "
@@ -136,6 +147,13 @@ Journal SqliteJournalStore::load() const {
                                {.boxes = static_cast<int>(allocations.columnInt(5)),
                                 .weight = grams(allocations.columnInt(6))},
                                index, fromText(kSyncStatuses, allocations.columnText(8))});
+    }
+
+    sqlite::Statement reversals = db_.prepare(
+        "SELECT id, created_at_ns, allocation_id, sync_status FROM allocation_reversal ORDER BY created_at_ns, rowid");
+    while (reversals.step()) {
+        journal.add(AllocationReversal{uuidColumn(reversals, 0), fromNanoseconds(reversals.columnInt(1)),
+                                       uuidColumn(reversals, 2), fromText(kSyncStatuses, reversals.columnText(3))});
     }
 
     sqlite::Statement shipments = db_.prepare(

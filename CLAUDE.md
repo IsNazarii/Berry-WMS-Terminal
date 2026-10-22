@@ -117,7 +117,7 @@ $CM/cmake -S . -B build -G Ninja && $CM/cmake --build build && $CM/ctest --test-
 ## Мапа вимог курсу → код (оновлювати по ходу)
 Лаба 1: ≥9 класів, ≥15 полів, ≥25 нетривіальних методів, ≥2 ієрархії (одна ≥3 класи),
 ≥3 поліморфізми (≥1 статичний, ≥1 динамічний), інкапсуляція.
-- Ієрархія A: `Transaction` → `Receipt` ✅, `Payment` ✅, `Allocation` ✅, `StockShipment` ✅
+- Ієрархія A: `Transaction` → `Receipt` ✅, `Payment` ✅, `Allocation` ✅, `AllocationReversal` ✅, `StockShipment` ✅
 - Ієрархія B: `IScaleDriver` → `SimulatedScaleDriver` ✅, `SerialScaleDriver` ⏳ (infra, Qt)
 - Ієрархія C: `JournalStore` → `SqliteJournalStore` ✅, D: `SessionStore` → `SqliteSessionStore` ✅,
   E: `Repository<T>` → `SqliteRepository<T>` ✅ (infra)

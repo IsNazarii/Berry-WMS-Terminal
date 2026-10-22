@@ -17,6 +17,7 @@ public:
     bool save(const Receipt& receipt) override;
     bool save(const Payment& payment) override;
     bool save(const Allocation& allocation) override;
+    bool save(const AllocationReversal& reversal) override;
     bool save(const StockShipment& shipment) override;
 
     [[nodiscard]] Journal load() const override;

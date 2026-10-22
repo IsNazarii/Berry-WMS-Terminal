@@ -40,6 +40,7 @@
 | Фура | машина, яку завантажують ягодою | `Truck` |
 | Розподіл | частина чека пішла у фуру або на склад | `Allocation` |
 | Склад | холодильна камера, живе між сесіями | `ToWarehouse`, `Journal::stockOf` |
+| Сторно розподілу | розподіл скасовано, ягода знову вільна | `AllocationReversal` |
 | Відвантаження | зі складу у фуру | `StockShipment` |
 | Поправка | зміна в уже закритій сесії з поясненням | `Amendment` |
 
@@ -83,6 +84,10 @@ classDiagram
         +wholeWeighing(receipt, i, dest)$
         +boxesOf(receipt, crop, n, dest)$
     }
+    class AllocationReversal {
+        -Uuid allocationId_
+        +of(allocation)$
+    }
     class StockShipment {
         -string cropCode_
         -Cargo cargo_
@@ -91,6 +96,7 @@ classDiagram
     Transaction <|-- Receipt
     Transaction <|-- Payment
     Transaction <|-- Allocation
+    Transaction <|-- AllocationReversal
     Transaction <|-- StockShipment
 
     class IScaleDriver {
@@ -121,7 +127,7 @@ classDiagram
         +validate()
     }
     class Journal {
-        +add(Receipt|Payment|Allocation|StockShipment) bool
+        +add(Receipt|Payment|Allocation|AllocationReversal|StockShipment) bool
         +balanceOf(supplier) Money
         +historyOf(supplier) Transaction*[]
         +loadOf(truck) Cargo
@@ -129,9 +135,11 @@ classDiagram
         +findReceipt(id) Receipt*
         +unallocatedOf(...) Cargo
         +destinationOf(receipt, i) Destination?
+        +allocationOf(receipt, i) Allocation*
         +waitingForAllocation() Receipt*[]
         +validateAllocation(...)
         +validateCancel(...)
+        +validateReversal(r)
         +validateShipment(...)
     }
     class WorkDay {
@@ -297,12 +305,12 @@ PIN — **підтвердження «хто»**, не захист: 4–6 ци
 
 Чисті віртуальні методи (**динамічний поліморфізм**):
 
-| Метод | `Receipt` | `Payment` | `Allocation` | `StockShipment` |
-|---|---|---|---|---|
-| `kind()` | `Receipt` | `Payment` | `Allocation` | `Shipment` |
-| `balanceEffect()` | `+amount()` | `−amount` | `0` | `0` |
-| `validate()` | див. нижче | постачальник, сума > 0 | чек, місце, культура, ящики, вага | культура, фура, ящики, вага |
-| `describe()` | текст чека з рядками | «Виплата готівкою: …» | «Розподіл …: N ящ. → фура/склад» | «Відвантаження зі складу …» |
+| Метод | `Receipt` | `Payment` | `Allocation` | `AllocationReversal` | `StockShipment` |
+|---|---|---|---|---|---|
+| `kind()` | `Receipt` | `Payment` | `Allocation` | `AllocationReversal` | `Shipment` |
+| `balanceEffect()` | `+amount()` | `−amount` | `0` | `0` | `0` |
+| `validate()` | див. нижче | постачальник, сума > 0 | чек, місце, культура, ящики, вага | розподіл вказано | культура, фура, ящики, вага |
+| `describe()` | текст чека з рядками | «Виплата готівкою: …» | «Розподіл …: N ящ. → фура/склад» | «Скасування розподілу …» | «Відвантаження зі складу …» |
 
 Невіртуальний `isValid()` = `validate().empty()`.
 
@@ -447,7 +455,14 @@ using Destination = std::variant<TruckId, ToWarehouse>;
 **Чому розподіл — окремий запис, а не лічильник у фурі:** два офлайн-термінали, що вантажать
 одну фуру, не перезапишуть дані один одного (див. [architecture.md §4](architecture.md#4-модель-даних-журнал-фактів)).
 
-### 7.3 `StockShipment` (`shipment.h`)
+### 7.3 `AllocationReversal` (`allocation.h`)
+
+Сторно розподілу: лише `allocationId`. Сам розподіл лишається в журналі (слід помилки видно),
+але `Journal` його більше не рахує — ягода знову вільна, палету можна розподілити заново.
+Потрібне, щоб анулювати помилкову палету, яку авторозподіл уже поклав у фуру.
+Порядок не важливий: якщо sync привезе сторно раніше за розподіл, розподіл просто не рахуватиметься.
+
+### 7.4 `StockShipment` (`shipment.h`)
 
 Зі складу у фуру поточної сесії: `cropCode`, `cargo`, `truckId`. Без посилання на чек — на складі
 ящики однієї культури вже не розрізняються за постачальником. Рекомендоване створення —
@@ -505,7 +520,11 @@ Append-only сховище фактів. Для кожного типу — ок
 | `stockOf(crop)` | розподіли на склад − відвантаження; може бути від'ємним після офлайн-конфлікту |
 | `unallocatedOf(receiptId, crop)` | скільки культури з закритого чека ще не розподілено |
 | `unallocatedOf(openReceipt, crop)` | те саме для відкритого чека |
+| `allocationOf(receiptId, i)` | розподіл цілої палети `i` або `nullptr`; `destinationOf` — його місце |
 | `size()` | кількість записів |
+
+Усі запити рахують лише **несторновані** розподіли (приватний `activeAllocations()` —
+`std::views::filter` над вектором), крім `mentionsCrop`: запис із назвою культури лишається.
 
 **Фабрики з правильним поділом ваги:** `boxesOf(receiptId | openReceipt, crop, n, dest)`,
 `shipmentOf(crop, n, truck)`.
@@ -518,6 +537,7 @@ Append-only сховище фактів. Для кожного типу — ок
 | `validateAllocation(a, openReceipt)` | те саме для відкритого чека (кидає, якщо `a` від іншого чека) |
 | `validateCancel(openReceipt, i)` | не анульовано вже; палету не розподілено цілою; після анулювання ящиків культури лишиться не менше, ніж уже розподілено поштучно |
 | `validateShipment(s)` | власний `s.validate()`; на складі достатньо ящиків |
+| `validateReversal(r)` | власний `r.validate()`; розподіл є в журналі й ще не сторнований; для складу — залишок ще тримає його ящики (інакше став би від'ємним) |
 
 Перевіряються **ящики**, а не вага: оператор рахує ящики, вага з них випливає, тож окрема
 перевірка ваги лише ловила б шум округлення.
@@ -526,7 +546,7 @@ Append-only сховище фактів. Для кожного типу — ок
 
 ### `JournalStore` (`journal_store.h`)
 
-Інтерфейс сховища журналу між запусками: `save(Receipt | Payment | Allocation | StockShipment)` →
+Інтерфейс сховища журналу між запусками: `save(Receipt | Payment | Allocation | AllocationReversal | StockShipment)` →
 `false`, якщо такий UUID уже збережено (як `Journal::add`); `load()` → `Journal`. Ядро знає лише
 інтерфейс; реалізація — `SqliteJournalStore` в `infra/` (див. [architecture.md](architecture.md)).
 

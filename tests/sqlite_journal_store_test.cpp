@@ -132,6 +132,23 @@ TEST(SqliteJournalStore, WarehouseAllocationAndShipmentMakeStock) {
     EXPECT_EQ(journal.loadOf(kTruck), (Cargo{.boxes = 10, .weight = kilograms(25)}));
 }
 
+TEST(SqliteJournalStore, ReversalTakesTheAllocationBackAfterLoading) {
+    sqlite::Database db{":memory:"};
+    SqliteJournalStore store{db};
+    const Receipt receipt = sampleReceipt();
+    store.save(receipt);
+    const Allocation allocation = Allocation::wholeWeighing(receipt, 0, kTruck);
+    store.save(allocation);
+    const AllocationReversal reversal{Uuid::generateV7(kAt, 5, 5), kAt, allocation.id()};
+    EXPECT_TRUE(store.save(reversal));
+    EXPECT_FALSE(store.save(reversal));
+
+    const Journal journal = store.load();
+    EXPECT_EQ(journal.size(), 3U);
+    EXPECT_EQ(journal.loadOf(kTruck), Cargo{});
+    EXPECT_EQ(journal.allocationOf(receipt.id(), 0), nullptr);
+}
+
 TEST(SqliteJournalStore, SameIdIsSavedOnce) {
     sqlite::Database db{":memory:"};
     SqliteJournalStore store{db};

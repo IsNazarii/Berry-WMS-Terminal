@@ -42,6 +42,20 @@ struct Table<Operator> {
     }
 };
 
+// The code is the key: the journal refers to crops by it. Upsert keeps the
+// rowid, so a renamed crop stays in its place in the list.
+template <>
+struct Table<Crop> {
+    static constexpr std::string_view upsert =
+        "INSERT INTO crop (code, name) VALUES (?1, ?2) ON CONFLICT (code) DO UPDATE SET name = excluded.name";
+    static constexpr std::string_view selectAll = "SELECT code, name FROM crop ORDER BY rowid";
+
+    static void bind(sqlite::Statement& statement, const Crop& crop) {
+        statement.bind(1, crop.code()).bind(2, crop.name());
+    }
+    static Crop read(const sqlite::Statement& row) { return {row.columnText(0), row.columnText(1)}; }
+};
+
 } // namespace
 
 template <class T>
@@ -67,5 +81,6 @@ std::vector<T> SqliteRepository<T>::all() const {
 
 template class SqliteRepository<Supplier>;
 template class SqliteRepository<Operator>;
+template class SqliteRepository<Crop>;
 
 } // namespace wms

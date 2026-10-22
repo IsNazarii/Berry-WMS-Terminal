@@ -1,5 +1,6 @@
 #pragma once
 
+#include "wms/crop.h"
 #include "wms/operator.h"
 #include "wms/repository.h"
 #include "wms/sqlite.h"
@@ -11,8 +12,8 @@ namespace wms {
 
 // Reference data in SQLite. The SQL is the same for every kind of record
 // except for the table and its columns, which come from a per-type mapping
-// in the .cpp; the template exists for Supplier and Operator only (explicit
-// instantiation there), so another type fails at link time, not at run time.
+// in the .cpp; the template exists for Supplier, Operator and Crop only
+// (explicit instantiation there), so another type fails at link time, not at run time.
 template <class T>
 class SqliteRepository final : public Repository<T> {
 public:
@@ -29,5 +30,6 @@ private:
 
 extern template class SqliteRepository<Supplier>;
 extern template class SqliteRepository<Operator>;
+extern template class SqliteRepository<Crop>;
 
 } // namespace wms

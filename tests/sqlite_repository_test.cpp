@@ -59,3 +59,21 @@ TEST(SqliteRepository, SharesTheDatabaseWithOtherStores) {
     suppliers.save({42, "Шевченко Тарас"});
     EXPECT_EQ(SqliteRepository<Supplier>{db}.all().size(), 1U);
 }
+
+// Crops have no number; they come back in the order they were added, which
+// is the order the operator is used to seeing them in.
+TEST(SqliteRepository, CropsComeBackInTheOrderAdded) {
+    sqlite::Database db{":memory:"};
+    SqliteRepository<Crop> crops{db};
+    crops.save({"raspberry", "Малина"});
+    crops.save({"strawberry", "Полуниця"});
+    crops.save({"агрус", "Агрус"});
+    crops.save({"raspberry", "Малина ремонтантна"});
+
+    const auto loaded = crops.all();
+    ASSERT_EQ(loaded.size(), 3U);
+    EXPECT_EQ(loaded[0].code(), "raspberry");
+    EXPECT_EQ(loaded[0].name(), "Малина ремонтантна");
+    EXPECT_EQ(loaded[1].code(), "strawberry");
+    EXPECT_EQ(loaded[2].code(), "агрус");
+}

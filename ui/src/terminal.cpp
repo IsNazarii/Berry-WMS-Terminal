@@ -841,8 +841,7 @@ void Terminal::activateReceipt(const QString& receiptId) {
 }
 
 QString Terminal::recordWeighing(const QString& cropCode, const QString& boxes, const QString& tarePerBox,
-                                 const QString& palletTare, const QString& price, const QString& manualWeight,
-                                 bool acceptUnstable) {
+                                 const QString& palletTare, const QString& manualWeight, bool acceptUnstable) {
     if (!workDay_ || !activeReceipt()) return tr("Спершу відкрийте чек постачальника");
 
     if (!isActiveCrop(cropCode.toStdString())) return tr("Оберіть культуру");
@@ -858,13 +857,6 @@ QString Terminal::recordWeighing(const QString& cropCode, const QString& boxes, 
     const auto pallet = parseWeight(palletTare.toStdString());
     if (!pallet) return tr("Вкажіть вагу палети, кг (0 — без палети)");
     weighing.palletTare = *pallet;
-
-    if (!price.trimmed().isEmpty()) {
-        const auto manual = parseMoney(price.toStdString());
-        if (!manual || manual->isZero()) return tr("Ціна — додатне число гривень, напр. 85 або 85,50");
-        weighing.pricePerKg = *manual;
-        weighing.priceSource = PriceSource::Manual;
-    }
 
     if (!manualWeight.trimmed().isEmpty()) {
         const auto typed = parseWeight(manualWeight.toStdString());
@@ -953,27 +945,90 @@ QVariantMap Terminal::nextPlacement(std::string_view cropCode) const {
     return {{"text", text}, {"follows", next != target}, {"hangs", false}, {"boxesLeft", boxesLeft}};
 }
 
-QStringList Terminal::receiptCloseBlockers(bool wholesale) const {
+QVariantList Terminal::payRows() const {
+    QVariantList list;
+    const OpenReceipt* receipt = activeReceipt();
+    if (!receipt) return list;
+    for (const std::string& code : receipt->crops()) {
+        const Cargo cargo = receipt->cargoOf(code);
+        const auto dayPrice = workDay_->prices().current(code);
+        list.append(QVariantMap{
+            {"cropCode", QString::fromStdString(code)},
+            {"crop", cropName(code)},
+            {"boxes", cargo.boxes},
+            {"net", kilogramsText(cargo.weight)},
+            {"price", dayPrice ? moneyInput(*dayPrice) : QString{}},
+        });
+    }
+    return list;
+}
+
+QVariantMap Terminal::payCheck(const QVariantMap& prices) const {
+    const OpenReceipt* receipt = activeReceipt();
+    if (!receipt) return {};
+    QStringList blockers;
+    const std::vector<CropPrice> typed = typedPrices(prices, blockers);
+    if (blockers.isEmpty()) {
+        for (const std::string& error : workDay_->validatePay(*activeReceiptId_, typed, Clock::now()))
+            blockers << QString::fromStdString(error);
+    }
+    // The amounts as the receipt will have them: rounded per line, like the printed receipt.
+    OpenReceipt priced = *receipt;
+    for (const CropPrice& p : typed) priced.setPrice(p.cropCode, p.pricePerKg, PriceSource::Manual);
+    QVariantMap amounts;
+    for (const CropPrice& p : typed) {
+        Money sum;
+        for (const Weighing& w : priced.weighings()) {
+            if (!w.cancelled && w.cropCode == p.cropCode) sum += w.amount();
+        }
+        amounts.insert(QString::fromStdString(p.cropCode), hryvniasText(sum));
+    }
+    // A total without some crop's price would look like the real one.
+    const QString total = typed.size() == receipt->crops().size() ? hryvniasText(amountOf(priced)) : QString{};
+    return {{"amounts", amounts}, {"total", total}, {"blockers", blockers}};
+}
+
+QString Terminal::payReceipt(const QVariantMap& prices, bool bankTransfer) {
+    if (!currentOperatorId_) return tr("Увійдіть як оператор");
+    if (!activeReceipt()) return tr("Немає відкритого чека");
+    QStringList errors;
+    const std::vector<CropPrice> typed = typedPrices(prices, errors);
+    if (!errors.isEmpty()) return errors.join('\n');
+    const TimePoint now = Clock::now();
+    if (const auto blockers = workDay_->validatePay(*activeReceiptId_, typed, now); !blockers.empty())
+        return joined(blockers);
+    PaidReceipt paid = workDay_->payReceipt(*activeReceiptId_, typed,
+                                            bankTransfer ? PaymentMethod::BankTransfer : PaymentMethod::Cash,
+                                            *currentOperatorId_, now);
+    receiptClosed(std::move(paid.receipt), std::move(paid.payment));
+    return {};
+}
+
+QStringList Terminal::handOverBlockers() const {
     QStringList list;
     const OpenReceipt* receipt = activeReceipt();
     if (!receipt) return list;
-    for (const std::string& error : receipt->validateClose(wholesale ? Settlement::HandedOver : Settlement::OnSite))
+    for (const std::string& error : receipt->validateClose(Settlement::HandedOver))
         list << QString::fromStdString(error);
     return list;
 }
 
-void Terminal::closeReceipt(bool wholesale) {
-    if (!activeReceipt() || !receiptCloseBlockers(wholesale).isEmpty()) return;
-    const Settlement settlement = wholesale ? Settlement::HandedOver : Settlement::OnSite;
-    Receipt receipt = workDay_->closeReceipt(*activeReceiptId_, settlement);
+void Terminal::handOverReceipt() {
+    if (!activeReceipt() || !handOverBlockers().isEmpty()) return;
+    receiptClosed(workDay_->closeReceipt(*activeReceiptId_, Settlement::HandedOver), std::nullopt);
+}
+
+void Terminal::receiptClosed(Receipt receipt, std::optional<Payment> payment) {
     {
         // Into the journal and out of the open list together: never both or neither after a crash.
         sqlite::ScopedTransaction transaction{db_};
         journalStore_.save(receipt);
+        if (payment) journalStore_.save(*payment);
         saveSession();
         transaction.commit();
     }
     journal_.add(std::move(receipt));
+    if (payment) journal_.add(std::move(*payment));
     const auto& left = workDay_->openReceipts();
     setActiveReceipt(left.empty() ? std::nullopt : std::optional{left.front().id()});
     emit journalChanged();
@@ -1121,6 +1176,20 @@ std::optional<Terminal::SourceReceipt> Terminal::findSource(const Uuid& id) cons
     }
     if (const Receipt* closed = journal_.findReceipt(id)) return closed;
     return std::nullopt;
+}
+
+std::vector<CropPrice> Terminal::typedPrices(const QVariantMap& prices, QStringList& errors) const {
+    std::vector<CropPrice> typed;
+    for (const std::string& code : activeReceipt()->crops()) {
+        const QString text = prices.value(QString::fromStdString(code)).toString();
+        const auto money = parseMoney(text.toStdString());
+        if (!money || !money->isPositive()) {
+            errors << tr("%1: ціна — додатне число гривень за кг, напр. 85 або 85,50").arg(cropName(code));
+            continue;
+        }
+        typed.push_back({.cropCode = code, .pricePerKg = *money});
+    }
+    return typed;
 }
 
 QString Terminal::cropName(std::string_view code) const {

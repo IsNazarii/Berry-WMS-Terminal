@@ -179,7 +179,6 @@ Page {
                 spacing: Theme.spacingM
 
                 property string cropCode: Terminal.crops.length > 0 ? Terminal.crops[0].cropCode : ""
-                readonly property string dayPrice: Terminal.prices[cropCode] ?? ""
                 readonly property var placement: Terminal.nextPlacements[cropCode] ?? {}
                 // A truck with fewer free boxes than typed: the pallet will wait on the allocation screen.
                 readonly property bool wontFit: placement.boxesLeft !== undefined && placement.boxesLeft >= 0
@@ -207,15 +206,13 @@ Page {
                 }
 
                 // Crop and box tare are usually the same for the next pallet, so they
-                // stay; the pallet, the price raise and a typed weight are per weighing.
+                // stay; the pallet and a typed weight are per weighing.
                 function record(acceptUnstable) {
                     weighingError.text = Terminal.recordWeighing(cropCode, boxes.text, boxTare.text,
-                                                                 palletTare.text, price.text, manualWeight.text,
-                                                                 acceptUnstable)
+                                                                 palletTare.text, manualWeight.text, acceptUnstable)
                     if (weighingError.text === "") {
                         boxes.clear()
                         palletTare.clear()
-                        price.clear()
                         manualWeight.clear()
                         boxes.forceActiveFocus()
                     }
@@ -354,20 +351,12 @@ Page {
                     // every field of a row on one line.
                     GridLayout {
                         Layout.fillWidth: true
-                        columns: 3
+                        columns: 2
                         columnSpacing: Theme.spacingM
                         rowSpacing: Theme.spacingXs
 
-                        FieldCaption { caption: qsTr("Ціна, грн/кг"); hint: qsTr("порожньо — денна") }
                         FieldCaption { caption: qsTr("Тара ящика, кг") }
                         FieldCaption { caption: qsTr("Ціль"); hint: qsTr("фура або склад") }
-                        TextField {
-                            id: price
-                            Layout.fillWidth: true
-                            // Empty means the day price; anything typed is a one-off raise for this weighing.
-                            placeholderText: weighingForm.dayPrice !== "" ? weighingForm.dayPrice : qsTr("введіть ціну")
-                            inputMethodHints: Qt.ImhFormattedNumbersOnly
-                        }
                         TextField {
                             id: boxTare
                             Layout.fillWidth: true
@@ -721,11 +710,22 @@ Page {
                         font.weight: Font.DemiBold
                     }
                 }
-                Button {
-                    text: qsTr("Закрити чек…")
-                    enabled: screen.hasReceipt
+                // Retail is paid here and now; wholesale only gets the receipt.
+                RowLayout {
                     Layout.fillWidth: true
-                    onClicked: closeDialog.open()
+                    enabled: screen.hasReceipt
+
+                    Button {
+                        text: qsTr("Оплатити…")
+                        highlighted: true
+                        Layout.fillWidth: true
+                        onClicked: payDialog.open()
+                    }
+                    Button {
+                        text: qsTr("Видати чек…")
+                        Layout.fillWidth: true
+                        onClicked: handOverDialog.open()
+                    }
                 }
             }
         }
@@ -742,30 +742,181 @@ Page {
     }
 
     // Closing is final: the receipt becomes immutable and is printed.
+    // Retail: one price per crop for all its pallets, then the whole amount is paid out.
     Dialog {
-        id: closeDialog
+        id: payDialog
         anchors.centerIn: parent
+        width: 520
         modal: true
-        title: qsTr("Закрити чек: %1").arg(Terminal.supplierName)
+        title: qsTr("Оплатити: %1").arg(Terminal.supplierName)
 
-        // Re-read on every change of the choice; nothing else changes while the dialog is modal.
-        readonly property var blockers: Terminal.receiptCloseBlockers(wholesale.checked)
+        // Read once on opening: rebuilding the rows while typing would wipe the fields.
+        property var rows: []
+        property var typed: ({})
+        readonly property var check: Terminal.payCheck(typed)
 
-        onOpened: retail.checked = true
+        function typePrice(cropCode, text) {
+            const next = Object.assign({}, typed)
+            next[cropCode] = text
+            typed = next
+        }
+
+        onAboutToShow: {
+            rows = Terminal.payRows()
+            const prices = {}
+            for (const row of rows)
+                prices[row.cropCode] = row.price
+            typed = prices
+            cash.checked = true
+            payError.text = ""
+        }
+
+        ColumnLayout {
+            anchors.fill: parent
+            spacing: Theme.spacingS
+
+            GridLayout {
+                Layout.fillWidth: true
+                columns: 4
+                columnSpacing: Theme.spacingM
+                rowSpacing: Theme.spacingXs
+
+                ColumnHeader { text: qsTr("Культура"); horizontalAlignment: Text.AlignLeft; Layout.fillWidth: true }
+                ColumnHeader { text: qsTr("Нетто, кг"); horizontalAlignment: Text.AlignRight }
+                ColumnHeader { text: qsTr("Ціна, грн/кг"); horizontalAlignment: Text.AlignLeft }
+                ColumnHeader { text: qsTr("Сума, грн"); horizontalAlignment: Text.AlignRight }
+
+                Repeater {
+                    model: payDialog.rows
+                    delegate: Label {
+                        required property var modelData
+                        required property int index
+                        // Four cells per row of the grid, one Repeater per column keeps them in order.
+                        text: modelData.crop
+                        elide: Text.ElideRight
+                        Layout.fillWidth: true
+                        Layout.row: index + 1
+                        Layout.column: 0
+                    }
+                }
+                Repeater {
+                    model: payDialog.rows
+                    delegate: Label {
+                        required property var modelData
+                        required property int index
+                        text: modelData.net
+                        Layout.alignment: Qt.AlignRight
+                        Layout.row: index + 1
+                        Layout.column: 1
+                    }
+                }
+                Repeater {
+                    model: payDialog.rows
+                    delegate: TextField {
+                        required property var modelData
+                        required property int index
+                        // The day price is filled in; typing another one makes it manual for the whole crop.
+                        text: modelData.price
+                        placeholderText: qsTr("введіть ціну")
+                        inputMethodHints: Qt.ImhFormattedNumbersOnly
+                        Layout.preferredWidth: Theme.controlHeightLarge * 2
+                        Layout.row: index + 1
+                        Layout.column: 2
+                        onTextEdited: payDialog.typePrice(modelData.cropCode, text)
+                    }
+                }
+                Repeater {
+                    model: payDialog.rows
+                    delegate: Label {
+                        required property var modelData
+                        required property int index
+                        text: payDialog.check.amounts?.[modelData.cropCode] ?? "—"
+                        Layout.alignment: Qt.AlignRight
+                        Layout.row: index + 1
+                        Layout.column: 3
+                    }
+                }
+            }
+
+            RowLayout {
+                Layout.fillWidth: true
+                Label { text: qsTr("До виплати, грн"); font.weight: Font.DemiBold; Layout.fillWidth: true }
+                Label {
+                    text: payDialog.check.total || "—"
+                    font.pixelSize: Theme.fontSizeHeading
+                    font.weight: Font.DemiBold
+                }
+            }
+
+            RowLayout {
+                RadioButton { id: cash; text: qsTr("Готівка") }
+                RadioButton { id: transfer; text: qsTr("Переказ") }
+            }
+
+            Repeater {
+                model: payDialog.check.blockers ?? []
+                Label {
+                    required property string modelData
+                    text: "• " + modelData
+                    color: Theme.danger
+                    wrapMode: Text.WordWrap
+                    Layout.fillWidth: true
+                }
+            }
+            Label {
+                id: payError
+                visible: text !== ""
+                color: Theme.danger
+                wrapMode: Text.WordWrap
+                Layout.fillWidth: true
+            }
+        }
+
+        footer: DialogButtonBox {
+            Button {
+                text: qsTr("Виплатити")
+                highlighted: true
+                enabled: (payDialog.check.blockers ?? []).length === 0
+                DialogButtonBox.buttonRole: DialogButtonBox.AcceptRole
+            }
+            Button {
+                text: qsTr("Скасувати")
+                DialogButtonBox.buttonRole: DialogButtonBox.RejectRole
+            }
+        }
+
+        // Kept open on an error, so the typed prices stay.
+        onAccepted: {
+            payError.text = Terminal.payReceipt(typed, transfer.checked)
+            if (payError.text !== "")
+                open()
+            else
+                receiptError.text = ""
+        }
+    }
+
+    // Wholesale: weight only, priced and paid outside the terminal.
+    Dialog {
+        id: handOverDialog
+        anchors.centerIn: parent
+        width: 420
+        modal: true
+        title: qsTr("Видати чек: %1").arg(Terminal.supplierName)
+
+        property var blockers: []
+        onAboutToShow: blockers = Terminal.handOverBlockers()
 
         ColumnLayout {
             anchors.fill: parent
 
-            RadioButton {
-                id: retail
-                text: qsTr("Роздріб — ціна відома, розрахунок тут (зараз або пізніше)")
-            }
-            RadioButton {
-                id: wholesale
-                text: qsTr("Опт — лише вага, чек передається відповідальній особі")
+            Label {
+                text: qsTr("Опт: %1 ящ., нетто %2 кг. Ціни в чеку не буде — його отримує відповідальна особа.")
+                      .arg(Terminal.activeSummary.boxes ?? 0).arg(Terminal.activeSummary.net ?? "")
+                wrapMode: Text.WordWrap
+                Layout.fillWidth: true
             }
             Repeater {
-                model: closeDialog.blockers
+                model: handOverDialog.blockers
                 Label {
                     required property string modelData
                     text: "• " + modelData
@@ -776,9 +927,9 @@ Page {
 
         footer: DialogButtonBox {
             Button {
-                text: qsTr("Закрити чек")
+                text: qsTr("Видати чек")
                 highlighted: true
-                enabled: closeDialog.blockers.length === 0
+                enabled: handOverDialog.blockers.length === 0
                 DialogButtonBox.buttonRole: DialogButtonBox.AcceptRole
             }
             Button {
@@ -788,7 +939,7 @@ Page {
         }
 
         onAccepted: {
-            Terminal.closeReceipt(wholesale.checked)
+            Terminal.handOverReceipt()
             receiptError.text = ""
         }
     }

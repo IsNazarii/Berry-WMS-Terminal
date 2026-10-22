@@ -155,18 +155,19 @@ sequenceDiagram
     participant W as WorkDay
     participant J as Journal
 
-    Q->>T: recordWeighing(crop, boxes, tare, pallet, price, manual, acceptUnstable)
-    T->>T: parseWeight / parseMoney, вага з ScaleMonitor
+    Q->>T: recordWeighing(crop, boxes, tare, pallet, manual, acceptUnstable)
+    T->>T: parseWeight, вага з ScaleMonitor
     T->>W: addWeighing(activeReceiptId, weighing, now)
-    W->>W: ціна дня на момент now (якщо не ручна)
+    W->>W: ціна дня на момент now
     W-->>T: індекс рядка / виняток
     T-->>Q: "" або текст помилки
     T--)Q: receiptsChanged → перемальовка рядків
 
-    Q->>T: closeReceipt(wholesale)
-    T->>W: closeReceipt(id, settlement)
-    W-->>T: Receipt (незмінний)
-    T->>J: add(receipt)
+    Q->>T: payReceipt({crop: ціна}, bankTransfer)
+    T->>T: parseMoney для кожної культури
+    T->>W: payReceipt(id, prices, method, operator, now)
+    W-->>T: PaidReceipt {Receipt (незмінний), Payment на всю суму}
+    T->>J: add(receipt), add(payment) — одна транзакція SQLite
     T--)Q: journalChanged → balanceChanged, trucksChanged
 ```
 

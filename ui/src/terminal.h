@@ -207,20 +207,27 @@ public:
     [[nodiscard]] Q_INVOKABLE QStringList newSupplierErrors(const QString& fullName, const QString& phone) const;
     Q_INVOKABLE qint64 addSupplier(const QString& fullName, const QString& phone);
     Q_INVOKABLE void activateReceipt(const QString& receiptId);
-    // A weighing into the active receipt. Weights in kilograms as typed. An
-    // empty price takes the day price, a typed one is a manual price. A typed
+    // A weighing into the active receipt, at the day price; the operator
+    // changes it only when paying. Weights in kilograms as typed. A typed
     // weight is recorded as manual; otherwise the scale must be stable, unless
     // the operator accepts the unstable reading.
     Q_INVOKABLE QString recordWeighing(const QString& cropCode, const QString& boxes, const QString& tarePerBox,
-                                       const QString& palletTare, const QString& price, const QString& manualWeight,
-                                       bool acceptUnstable);
+                                       const QString& palletTare, const QString& manualWeight, bool acceptUnstable);
     // Returns why the line cannot be cancelled, empty when it was.
     Q_INVOKABLE QString cancelWeighing(int index);
     Q_INVOKABLE void setReceivingTarget(const QString& destinationId);
-    // Why the active receipt cannot be closed as retail / wholesale yet.
-    [[nodiscard]] Q_INVOKABLE QStringList receiptCloseBlockers(bool wholesale) const;
-    // The receipt goes into the journal and the next open one becomes active.
-    Q_INVOKABLE void closeReceipt(bool wholesale);
+    // Closing the active receipt; afterwards the next open one becomes active.
+    // "Pay" (retail): [{cropCode, crop, boxes, net, price}], one row per crop,
+    // the price prefilled with the current day price as the operator types it.
+    [[nodiscard]] Q_INVOKABLE QVariantList payRows() const;
+    // For typed prices {cropCode: text}: {amounts: {cropCode: "8 823,00"}, total, blockers}.
+    [[nodiscard]] Q_INVOKABLE QVariantMap payCheck(const QVariantMap& prices) const;
+    // Closes as retail and pays the whole amount at once. Returns an
+    // operator-facing error, empty on success.
+    Q_INVOKABLE QString payReceipt(const QVariantMap& prices, bool bankTransfer);
+    // "Issue receipt" (wholesale): weight only, priced outside the terminal.
+    [[nodiscard]] Q_INVOKABLE QStringList handOverBlockers() const;
+    Q_INVOKABLE void handOverReceipt();
 
     // Allocation of the selected receipt into a truck or the warehouse
     // (destinationId as in `destinations`). Each returns an operator-facing
@@ -288,6 +295,11 @@ private:
     // Archived crops keep their names here.
     [[nodiscard]] QString cropName(std::string_view code) const;
     [[nodiscard]] bool isActiveCrop(std::string_view code) const noexcept;
+    // Typed prices of the active receipt's crops; a crop whose price does not
+    // parse is left out and named in `errors`.
+    [[nodiscard]] std::vector<CropPrice> typedPrices(const QVariantMap& prices, QStringList& errors) const;
+    // The receipt is closed: stored and journalled with what came with it, in one transaction.
+    void receiptClosed(Receipt receipt, std::optional<Payment> payment);
     // In the journal or in a receipt still being weighed.
     [[nodiscard]] bool hasCropRecords(std::string_view code) const noexcept;
     void saveCropKeys() const;

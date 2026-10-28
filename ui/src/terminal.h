@@ -70,8 +70,13 @@ class Terminal : public QObject {
     Q_PROPERTY(QVariantList trucks READ truckList NOTIFY trucksChanged)
     // [{index, plate, make, note, capacity}] of the previous session, for "repeat the truck from yesterday".
     Q_PROPERTY(QVariantList previousTrucks READ previousTruckList NOTIFY sessionChanged)
+    // The day so far, from SessionSummary: {receivedKg, receivedBoxes, crops ("малина 1 920,4 · …"),
+    // closedReceipts, openReceipts, inTrucks, inWarehouse, waiting (boxes), paid, paidCash, paidTransfer};
+    // weights and money as bare numbers. Empty without an open session.
+    Q_PROPERTY(QVariantMap sessionSummary READ sessionSummary NOTIFY summaryChanged)
     // Why the session cannot be closed yet, straight from WorkDay::validateClose().
-    Q_PROPERTY(QStringList closeBlockers READ closeBlockers NOTIFY trucksChanged)
+    // Open receipts block closing as well as loading trucks, so both changes notify.
+    Q_PROPERTY(QStringList closeBlockers READ closeBlockers NOTIFY closeBlockersChanged)
 
     // [{receiptId, supplierName, openedAt, boxes, amount}] of the session, oldest first; amount as "8 823,00".
     Q_PROPERTY(QVariantList openReceipts READ openReceiptList NOTIFY receiptsChanged)
@@ -148,6 +153,7 @@ public:
     [[nodiscard]] QVariantMap priceMap() const;
     [[nodiscard]] QVariantList truckList() const;
     [[nodiscard]] QVariantList previousTruckList() const;
+    [[nodiscard]] QVariantMap sessionSummary() const;
     [[nodiscard]] QStringList closeBlockers() const;
     [[nodiscard]] QVariantList openReceiptList() const;
     [[nodiscard]] QString activeReceiptId() const;
@@ -274,6 +280,8 @@ signals:
     void receiptsChanged();
     // Anything the allocation screen shows: receipts, trucks, the journal.
     void allocationChanged();
+    void summaryChanged();
+    void closeBlockersChanged();
     // The chosen supplier of the cash screen or its records.
     void cashChanged();
     // Chosen, or its truck stopped loading.

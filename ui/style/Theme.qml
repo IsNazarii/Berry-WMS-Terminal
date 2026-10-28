@@ -26,6 +26,8 @@ QtObject {
     readonly property color ok: dark ? "#5CCB8A" : "#1E7A45"
     readonly property color warn: dark ? "#F0A63C" : "#B45F06"
     readonly property color danger: dark ? "#F2807A" : "#B3261E"
+    readonly property color okSoft: dark ? "#1E3A2A" : "#DDF1E5"
+    readonly property color warnSoft: dark ? "#3A2E1C" : "#FDF3E6"
     readonly property color dangerSoft: dark ? "#3A1F22" : "#FBE7E5"
 
     // Dims the window behind a modal dialog.

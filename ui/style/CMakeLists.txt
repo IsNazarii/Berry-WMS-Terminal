@@ -39,5 +39,6 @@ qt_add_qml_module(wms_style
         icons/more.svg
         icons/search.svg
         icons/circle-check.svg
+        icons/circle-alert.svg
 )
 target_link_libraries(wms_style PUBLIC Qt6::Quick Qt6::QuickControls2)

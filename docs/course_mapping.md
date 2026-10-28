@@ -28,7 +28,7 @@
 ### Класи ядра
 
 `Quantity<Tag>` (`Money`, `Weight`), `Uuid`, `Supplier`, `Operator`, `Crop`, `CropKeys`, `Transaction`, `Receipt`,
-`Payment`, `Allocation`, `AllocationReversal`, `StockShipment`, `OpenReceipt`, `Truck`, `Journal`, `DayPrices`, `WorkDay`,
+`Payment`, `Allocation`, `AllocationReversal`, `StockShipment`, `OpenReceipt`, `Truck`, `Journal`, `DayPrices`, `WorkDay`, `SessionSummary`,
 `IScaleDriver`, `SimulatedScaleDriver`, `StabilityDetector`, `JournalStore`, `SessionStore`, `Repository<T>` + infra-класи
 `sqlite::Database`, `sqlite::Statement`, `sqlite::ScopedTransaction`, `sqlite::Error`, `SqliteJournalStore`, `SqliteSessionStore`, `SqliteRepository<T>` (+ функція `backupDatabase`) + UI-класи `Terminal`, `SupplierListModel`,
 `ScaleMonitor`. Детально — [domain.md](domain.md).

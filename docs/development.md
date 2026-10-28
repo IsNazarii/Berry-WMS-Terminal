@@ -63,7 +63,8 @@ $CM/cmake -S . -B build -G Ninja && $CM/cmake --build build && $CM/ctest --test-
 | `crop_keys_test` | кнопки культур: заміна найдавнішої, `fill` з довідника |
 | `operator_test` | формат PIN, `checkPin` |
 | `transaction_test` | `Weighing`, `Receipt`, `Payment` (`paidBy`): нетто, суми, валідація, анулювання, опт |
-| `open_receipt_test` | додавання, анулювання, `crops` / `setPrice`, закриття з тим самим id |
+| `open_receipt_test` | додавання, анулювання, `crops` / `setPrice`, закриття з тим самим id і сесією |
+| `session_summary_test` | підсумок дня: лише записи своєї сесії + відкриті чеки, культури, де ящики, виплати за способом |
 | `scale_test` | симулятор, детектор стабільності |
 | `truck_test` | ліміт у ящиках, заповненість, переповнення, статуси |
 | `allocation_test` | ціла палета, ящики, пропорційний поділ ваги |

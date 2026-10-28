@@ -32,7 +32,7 @@ flowchart LR
 | Шар | Каталог | Ціль CMake | Залежить від | Що містить |
 |---|---|---|---|---|
 | Ядро | `core/` | `wms_core` (статична бібліотека) | лише стандартна бібліотека C++20 | доменні класи, правила, валідація, обчислення |
-| Інфраструктура | `infra/` | `wms_infra` + `sqlite3` (амальгамація) | core; Qt — лише для пристроїв | обгортка SQLite (`sqlite::Database`/`Statement`/`ScopedTransaction`) ✅; схема з версіями (`migrateSchema`, 8 міграцій) + `SqliteJournalStore` + `SqliteSessionStore` + `SqliteRepository<T>` + `backupDatabase` ✅; ваги RS-232, HTTP-sync, друк — далі |
+| Інфраструктура | `infra/` | `wms_infra` + `sqlite3` (амальгамація) | core; Qt — лише для пристроїв | обгортка SQLite (`sqlite::Database`/`Statement`/`ScopedTransaction`) ✅; схема з версіями (`migrateSchema`, 10 міграцій) + `SqliteJournalStore` + `SqliteSessionStore` + `SqliteRepository<T>` + `backupDatabase` ✅; ваги RS-232, HTTP-sync, друк — далі |
 | Інтерфейс | `ui/` | `wms_ui` + `wms_uiplugin` (QML-модуль `BerryWms.Ui`) | core, Qt Quick | QML-екрани і тонкі адаптери |
 | Точка входу | `app/` | `wms_terminal` (виконуваний) | ui | `main()`: створює `QGuiApplication`, завантажує `Main.qml` |
 | Тести | `tests/` | `wms_core_tests`, `wms_infra_tests` | core / infra, GoogleTest | 235 тестів ядра + 36 тестів infra на справжній SQLite |
@@ -219,6 +219,9 @@ sequenceDiagram
     `Repository<T>::remove` — `DELETE` за ключем (`Table<T>::deleteOne`).
   - ✅ Ліміт фури лише в ящиках: міграція 7 перебудовує `truck` без `limit_g`, з `CHECK (limit_boxes > 0)`.
     Фури з лімітом лише в кг (тільки тестові бази альфи) отримують грубо 2 кг на ящик.
+  - ✅ Сесія запису: міграція 9 додає `session_id` у `receipt` і `payment` (без зовнішнього ключа — sync може
+    привезти запис раніше за сесію; `NULL` — виплата без відкритої сесії); міграція 10 один раз заповнює старі
+    рядки сесією, відкритою на момент запису. Окремим кроком, щоб заповнення перевірялося тестом окремо.
   - ✅ Сторно розподілу: міграція 8 — таблиця `allocation_reversal` (`allocation_id` без зовнішнього ключа:
     sync може привезти сторно раніше за розподіл).
   - ✅ Оператор у `Payment` (`paidBy`): міграція 4 перебудовує таблицю `payment` з колонкою `paid_by NOT NULL`

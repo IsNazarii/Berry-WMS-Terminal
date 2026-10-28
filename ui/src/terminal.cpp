@@ -6,6 +6,7 @@
 #include "wms/backup.h"
 #include "wms/payment.h"
 #include "wms/receipt.h"
+#include "wms/session_summary.h"
 #include "wms/text.h"
 
 #include <QDate>
@@ -129,29 +130,30 @@ WorkDay demoYesterday(OperatorId by) {
 }
 
 // History from an earlier day, so the cash screen has a debt to show and the
-// carried-over truck already has a pallet in it.
-void addDemoHistory(JournalStore& journal, const TruckId& carriedOverTruck, OperatorId by) {
-    const Receipt receipt = Receipt::create(42, Settlement::OnSite, {{
+// carried-over truck already has a pallet in it. The records belong to that day.
+void addDemoHistory(JournalStore& journal, const WorkDay& day, const TruckId& carriedOverTruck) {
+    const Receipt receipt{Uuid::generateV7(), day.openedAt(), 42, Settlement::OnSite, {{
         .cropCode = "raspberry",
         .gross = kilograms(120),
         .boxCount = 40,
         .tarePerBox = grams(350),
         .palletTare = kilograms(25),
         .pricePerKg = hryvnias(85),
-    }});
+    }}, SyncStatus::Pending, day.id()};
     journal.save(receipt);
     journal.save(Allocation::wholeWeighing(receipt, 0, carriedOverTruck));
-    journal.save(Payment::create(42, hryvnias(3'000), PaymentMethod::Cash, by));
+    journal.save(Payment{Uuid::generateV7(), day.openedAt(), 42, hryvnias(3'000), PaymentMethod::Cash, day.openedBy(),
+                         SyncStatus::Pending, day.id()});
 
     // Strawberries that waited overnight in the warehouse: stock outlives the session.
-    const Receipt stored = Receipt::create(45, Settlement::OnSite, {{
+    const Receipt stored{Uuid::generateV7(), day.openedAt(), 45, Settlement::OnSite, {{
         .cropCode = "strawberry",
         .gross = kilograms(90),
         .boxCount = 30,
         .tarePerBox = grams(300),
         .palletTare = kilograms(20),
         .pricePerKg = hryvnias(60),
-    }});
+    }}, SyncStatus::Pending, day.id()};
     journal.save(stored);
     journal.save(Allocation::wholeWeighing(stored, 0, ToWarehouse{}));
 }
@@ -295,6 +297,12 @@ Terminal::Terminal(QObject* parent)
     connect(this, &Terminal::trucksChanged, this, &Terminal::allocationChanged);
     connect(this, &Terminal::receiptsChanged, this, &Terminal::allocationChanged);
     connect(this, &Terminal::journalChanged, this, &Terminal::cashChanged);
+    // Receipts weighed, paid, allocated or a session opened: the day's totals move.
+    connect(this, &Terminal::journalChanged, this, &Terminal::summaryChanged);
+    connect(this, &Terminal::receiptsChanged, this, &Terminal::summaryChanged);
+    connect(this, &Terminal::sessionChanged, this, &Terminal::summaryChanged);
+    connect(this, &Terminal::trucksChanged, this, &Terminal::closeBlockersChanged);
+    connect(this, &Terminal::receiptsChanged, this, &Terminal::closeBlockersChanged);
     connect(this, &Terminal::trucksChanged, this, &Terminal::receivingTargetChanged);
     connect(this, &Terminal::receivingTargetChanged, this, &Terminal::placementsChanged);
     connect(this, &Terminal::receiptsChanged, this, &Terminal::placementsChanged);
@@ -318,6 +326,27 @@ QString Terminal::supplierBalance() const {
 QString Terminal::sessionTitle() const {
     if (!workDay_) return {};
     return QString::fromStdString(std::format("Сесія {:%d.%m.%Y}", workDay_->date()));
+}
+
+QVariantMap Terminal::sessionSummary() const {
+    if (!workDay_) return {};
+    const SessionSummary summary{*workDay_, journal_};
+    QStringList crops;
+    for (const CropTotal& crop : summary.byCrop())
+        crops << QString("%1 %2").arg(cropName(crop.cropCode).toLower(), kilogramsText(crop.cargo.weight));
+    return {
+        {"receivedKg", kilogramsText(summary.received().weight)},
+        {"receivedBoxes", summary.received().boxes},
+        {"crops", crops.join(" · ")},
+        {"closedReceipts", summary.closedReceipts()},
+        {"openReceipts", summary.openReceipts()},
+        {"inTrucks", summary.inTrucks().boxes},
+        {"inWarehouse", summary.inWarehouse().boxes},
+        {"waiting", summary.waiting().boxes},
+        {"paid", hryvniasText(summary.paid())},
+        {"paidCash", hryvniasText(summary.paidCash())},
+        {"paidTransfer", hryvniasText(summary.paidTransfer())},
+    };
 }
 
 QString Terminal::sessionOpenedBy() const {
@@ -1114,7 +1143,8 @@ QString Terminal::pay(const QString& amount, bool bankTransfer) {
     if (!paid) return tr("Сума — число гривень, напр. 1500 або 1500,50");
     const Payment payment = Payment::create(*cashSupplierId_, *paid,
                                             bankTransfer ? PaymentMethod::BankTransfer : PaymentMethod::Cash,
-                                            *currentOperatorId_);
+                                            *currentOperatorId_,
+                                            workDay_ ? std::optional{workDay_->id()} : std::nullopt);
     if (const auto errors = payment.validate(); !errors.empty()) return joined(errors);
     record(payment);
     emit journalChanged();
@@ -1255,7 +1285,7 @@ void Terminal::seedDemoData() {
     sqlite::ScopedTransaction transaction{db_};
     const WorkDay yesterday = demoYesterday(operators_.front().id());
     sessionStore_.save(yesterday);
-    addDemoHistory(journalStore_, yesterday.trucks()[1].id(), yesterday.openedBy());
+    addDemoHistory(journalStore_, yesterday, yesterday.trucks()[1].id());
     transaction.commit();
 }
 

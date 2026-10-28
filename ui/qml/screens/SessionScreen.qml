@@ -2,12 +2,13 @@ pragma ComponentBehavior: Bound
 
 import QtQuick
 import QtQuick.Controls
+import QtQuick.Controls.impl
 import QtQuick.Layouts
 import BerryWms.Ui
 
 // The working session: opened around noon, prices of the day, trucks to load,
 // and closing once every truck has been sent off or carried over.
-// Prices on the left, the trucks in the middle, a new truck on the right.
+// The day so far in tiles on top, prices on the left, trucks as cards on the right.
 Page {
     id: screen
     title: qsTr("Сесія")
@@ -26,32 +27,65 @@ Page {
     }
 
     // Closed session: the only thing to do is to open a new one.
-    Frame {
+    EmptyState {
         anchors.centerIn: parent
         visible: !Terminal.sessionOpen
-        padding: Theme.spacingXl
+        icon: "calendar"
+        title: qsTr("Сесію не відкрито")
+        text: qsTr("Перенесені фури з попередньої сесії додадуться автоматично.")
+        actionText: qsTr("Відкрити сесію")
+        onActionTriggered: Terminal.openSession()
+    }
+
+    // One number of the day: a caption, the figure, and what it is made of.
+    component StatTile: Rectangle {
+        id: tile
+        property string caption
+        property string value
+        property string unit
+        property string detail
+        property color detailColor: Theme.textMuted
+
+        Layout.fillWidth: true
+        Layout.preferredWidth: 1
+        implicitHeight: tileColumn.implicitHeight + 2 * Theme.spacingM
+        radius: Theme.radiusM
+        color: Theme.surface
+        border.color: Theme.border
 
         ColumnLayout {
-            spacing: Theme.spacingM
+            id: tileColumn
+            anchors.fill: parent
+            anchors.margins: Theme.spacingM
+            anchors.leftMargin: Theme.spacingL
+            spacing: Theme.spacingXs
 
             Label {
-                text: qsTr("Сесію не відкрито")
-                font.pixelSize: Theme.fontSizeHeading
-                font.weight: Font.Bold
-                Layout.alignment: Qt.AlignHCenter
+                text: tile.caption
+                font.pixelSize: Theme.fontSizeCaption
+                color: Theme.textMuted
+            }
+            RowLayout {
+                spacing: Theme.spacingXs
+                Label {
+                    text: tile.value
+                    font.pixelSize: Theme.fontSizeHeading
+                    font.weight: Font.Bold
+                }
+                Label {
+                    visible: tile.unit !== ""
+                    text: tile.unit
+                    font.pixelSize: Theme.fontSizeField
+                    color: Theme.textMuted
+                    Layout.alignment: Qt.AlignBaseline
+                }
             }
             Label {
-                text: qsTr("Перенесені фури з попередньої сесії додадуться автоматично.")
-                color: Theme.textMuted
-                Layout.alignment: Qt.AlignHCenter
-            }
-            Button {
-                text: qsTr("Відкрити сесію")
-                highlighted: true
-                font.pixelSize: Theme.fontSizeField
-                Layout.preferredHeight: Theme.controlHeightLarge
-                Layout.alignment: Qt.AlignHCenter
-                onClicked: Terminal.openSession()
+                text: tile.detail
+                font.pixelSize: Theme.fontSizeCaption
+                color: tile.detailColor
+                elide: Text.ElideRight
+                Layout.fillWidth: true
             }
         }
     }
@@ -72,6 +106,20 @@ Page {
                 font.weight: Font.Bold
             }
             Label {
+                text: qsTr("ВІДКРИТА")
+                font.pixelSize: Theme.fontSizeCaption
+                font.weight: Font.DemiBold
+                color: Theme.ok
+                leftPadding: Theme.spacingS
+                rightPadding: Theme.spacingS
+                topPadding: Theme.spacingXs
+                bottomPadding: Theme.spacingXs
+                background: Rectangle {
+                    radius: height / 2
+                    color: Theme.okSoft
+                }
+            }
+            Label {
                 text: Terminal.sessionOpenedBy
                 color: Theme.textMuted
                 elide: Text.ElideRight
@@ -84,18 +132,37 @@ Page {
             }
         }
 
-        // Shown right away rather than on a failed click: the operator sees what is left to do.
-        // A to-do list, not an error: the warning tone, not the danger one.
-        Label {
-            visible: Terminal.closeBlockers.length > 0
-            text: qsTr("Щоб закрити сесію:") + "\n• " + Terminal.closeBlockers.join("\n• ")
-            color: Theme.warn
-            wrapMode: Text.WordWrap
-            padding: Theme.spacingS
+        // The day so far: what came in, where it is, how much was paid out.
+        RowLayout {
+            readonly property var summary: Terminal.sessionSummary
             Layout.fillWidth: true
-            background: Rectangle {
-                color: Theme.surfaceAlt
-                radius: Theme.radiusS
+            spacing: Theme.spacingM
+
+            StatTile {
+                caption: qsTr("Прийнято")
+                value: parent.summary.receivedKg ?? ""
+                unit: qsTr("кг")
+                detail: parent.summary.crops || qsTr("ще нічого")
+            }
+            StatTile {
+                caption: qsTr("Ящиків")
+                value: parent.summary.receivedBoxes ?? ""
+                detail: qsTr("у фурах %1 · на складі %2 · чекає %3")
+                        .arg(parent.summary.inTrucks).arg(parent.summary.inWarehouse).arg(parent.summary.waiting)
+                detailColor: parent.summary.waiting > 0 ? Theme.warn : Theme.textMuted
+            }
+            StatTile {
+                caption: qsTr("Чеків")
+                value: (parent.summary.closedReceipts ?? 0) + (parent.summary.openReceipts ?? 0)
+                detail: parent.summary.openReceipts > 0 ? qsTr("%1 відкрито").arg(parent.summary.openReceipts)
+                                                        : qsTr("усі закрито")
+                detailColor: parent.summary.openReceipts > 0 ? Theme.warn : Theme.textMuted
+            }
+            StatTile {
+                caption: qsTr("Виплачено")
+                value: parent.summary.paid ?? ""
+                unit: qsTr("грн")
+                detail: qsTr("готівка %1 · переказ %2").arg(parent.summary.paidCash).arg(parent.summary.paidTransfer)
             }
         }
 
@@ -219,7 +286,7 @@ Page {
                     RowLayout {
                         Layout.fillWidth: true
                         SectionCaption {
-                            text: qsTr("Фури сесії")
+                            text: truckList.count > 0 ? qsTr("Фури сесії · %1").arg(truckList.count) : qsTr("Фури сесії")
                             Layout.fillWidth: true
                         }
                         Button {
@@ -233,175 +300,161 @@ Page {
                         Layout.fillWidth: true
                         Layout.fillHeight: true
                         clip: true
+                        spacing: Theme.spacingS
                         model: Terminal.trucks
-                        headerPositioning: ListView.OverlayHeader
                         ScrollBar.vertical: ScrollBar {}
 
-                        // Column widths shared by the header and the rows; the truck takes the rest.
-                        readonly property int boxesWidth: 64
-                        readonly property int kgWidth: 84
-                        readonly property int fillWidth: 72
-                        readonly property int actionWidth: 224
-                        readonly property int columnSpacing: Theme.spacingM
+                        // Narrower in a small window, so the plate keeps its room.
+                        readonly property real loadWidth: Math.min(280, width * 0.4)
 
-                        Label {
+                        EmptyState {
                             anchors.centerIn: parent
                             visible: truckList.count === 0
-                            text: qsTr("Фур ще немає")
-                            color: Theme.textMuted
+                            icon: "truck"
+                            title: qsTr("Фур ще немає")
+                            text: qsTr("Додайте фуру або повторіть учорашню — тоді палети з «Прийому» підуть одразу в неї.")
                         }
 
-                        header: Rectangle {
-                            z: 2
-                            width: ListView.view.width
-                            height: 28
-                            visible: truckList.count > 0
-                            color: Theme.surface
-
-
-                            RowLayout {
-                                anchors.fill: parent
-                                spacing: truckList.columnSpacing
-                                ColumnHeader { text: qsTr("Фура"); horizontalAlignment: Text.AlignLeft; Layout.fillWidth: true }
-                                ColumnHeader { text: qsTr("Ящиків"); Layout.preferredWidth: truckList.boxesWidth }
-                                ColumnHeader { text: qsTr("Кг"); Layout.preferredWidth: truckList.kgWidth }
-                                ColumnHeader { text: qsTr("Заповн."); Layout.preferredWidth: truckList.fillWidth }
-                                Item { Layout.preferredWidth: truckList.actionWidth }
-                            }
-                            Rectangle {
-                                anchors.bottom: parent.bottom
-                                width: parent.width
-                                height: 1
-                                color: Theme.border
-                            }
-                        }
-
+                        // A card per truck: who it is, how full, and what to do with it.
                         delegate: Rectangle {
-                            id: truckRow
+                            id: truckCard
                             required property var modelData
                             width: ListView.view.width
-                            height: 60
-                            color: rowHover.hovered ? Theme.surfaceAlt : "transparent"
-
-                            HoverHandler { id: rowHover }
-
-                            // A load over its limit; the limit itself is the muted line below.
-                            component LoadCell: ColumnLayout {
-                                id: loadCell
-                                required property string load
-                                required property string limit
-                                spacing: 0
-                                Label {
-                                    text: loadCell.load
-                                    font.weight: Font.DemiBold
-                                    color: truckRow.modelData.overloaded ? Theme.danger : Theme.text
-                                    Layout.alignment: Qt.AlignRight
-                                }
-                                Label {
-                                    text: qsTr("з %1").arg(loadCell.limit)
-                                    font.pixelSize: Theme.fontSizeCaption
-                                    color: Theme.textMuted
-                                    Layout.alignment: Qt.AlignRight
-                                }
-                            }
+                            implicitHeight: cardRow.implicitHeight + 2 * Theme.spacingM
+                            radius: Theme.radiusM
+                            color: Theme.surface
+                            border.color: Theme.surfaceAlt
 
                             RowLayout {
+                                id: cardRow
                                 anchors.fill: parent
-                                spacing: truckList.columnSpacing
+                                anchors.margins: Theme.spacingM
+                                anchors.leftMargin: Theme.spacingL
+                                spacing: Theme.spacingXl
 
                                 ColumnLayout {
-                                    spacing: 0
+                                    spacing: 2
                                     Layout.fillWidth: true
+                                    // The plate is never cut: the load bar gives way instead.
                                     Label {
-                                        text: [truckRow.modelData.plate, truckRow.modelData.make]
-                                              .filter(part => part !== "").join(" · ")
-                                        font.weight: Font.DemiBold
-                                        elide: Text.ElideRight
+                                        text: truckCard.modelData.plate
+                                        font.pixelSize: Theme.fontSizeTitle
+                                        font.weight: Font.Bold
+                                        Layout.minimumWidth: implicitWidth
                                         Layout.fillWidth: true
                                     }
                                     Label {
                                         visible: text !== ""
-                                        text: truckRow.modelData.note
+                                        text: [truckCard.modelData.make, truckCard.modelData.note]
+                                              .filter(part => part !== "").join(" · ")
                                         font.pixelSize: Theme.fontSizeCaption
                                         color: Theme.textMuted
                                         elide: Text.ElideRight
                                         Layout.fillWidth: true
                                     }
                                 }
-                                LoadCell {
-                                    load: truckRow.modelData.loadBoxes
-                                    limit: truckRow.modelData.limitBoxes
-                                    Layout.preferredWidth: truckList.boxesWidth
-                                    Layout.minimumWidth: truckList.boxesWidth
-                                    Layout.maximumWidth: truckList.boxesWidth
-                                }
-                                // Kilograms are for reference: the limit is in boxes only.
-                                Label {
-                                    text: truckRow.modelData.loadKg
-                                    color: Theme.textMuted
-                                    horizontalAlignment: Text.AlignRight
-                                    Layout.preferredWidth: truckList.kgWidth
-                                    Layout.minimumWidth: truckList.kgWidth
-                                    Layout.maximumWidth: truckList.kgWidth
-                                }
-                                // Full is fine, over the limit is said in red: the facts are
-                                // accepted and the logistician sorts the overload out.
+
+                                // Boxes decide, kilograms are for reference. Over the limit is said in red:
+                                // the facts are accepted and the logistician sorts the overload out.
                                 ColumnLayout {
                                     spacing: Theme.spacingXs
-                                    Layout.preferredWidth: truckList.fillWidth
-                                    Layout.minimumWidth: truckList.fillWidth
-                                    Layout.maximumWidth: truckList.fillWidth
-                                    Label {
-                                        text: truckRow.modelData.overloaded ? qsTr("понад") : truckRow.modelData.fillPercent + "%"
-                                        font.pixelSize: Theme.fontSizeCaption
-                                        font.weight: truckRow.modelData.overloaded ? Font.DemiBold : Font.Normal
-                                        color: truckRow.modelData.overloaded ? Theme.danger : Theme.textMuted
-                                        Layout.alignment: Qt.AlignRight
+                                    Layout.preferredWidth: truckList.loadWidth
+                                    Layout.maximumWidth: truckList.loadWidth
+
+                                    RowLayout {
+                                        Layout.fillWidth: true
+                                        Label {
+                                            text: truckCard.modelData.loadBoxes
+                                            font.pixelSize: Theme.fontSizeField
+                                            font.weight: Font.Bold
+                                            color: truckCard.modelData.overloaded ? Theme.danger : Theme.text
+                                        }
+                                        Label {
+                                            text: qsTr("/ %1 ящ.").arg(truckCard.modelData.limitBoxes)
+                                            color: Theme.textMuted
+                                            Layout.fillWidth: true
+                                        }
+                                        Label {
+                                            text: truckCard.modelData.overloaded
+                                                  ? qsTr("%1 кг · понад").arg(truckCard.modelData.loadKg)
+                                                  : qsTr("%1 кг · %2%").arg(truckCard.modelData.loadKg)
+                                                                     .arg(truckCard.modelData.fillPercent)
+                                            font.pixelSize: Theme.fontSizeCaption
+                                            color: truckCard.modelData.overloaded ? Theme.danger : Theme.textMuted
+                                        }
                                     }
                                     ProgressBar {
                                         from: 0
                                         to: 100
-                                        value: Math.min(truckRow.modelData.fillPercent, 100)
+                                        value: Math.min(truckCard.modelData.fillPercent, 100)
                                         Layout.fillWidth: true
                                     }
                                 }
+
                                 // A loading truck waits for the decision; a decided one shows it.
                                 RowLayout {
-                                    spacing: Theme.spacingXs
-                                    Layout.preferredWidth: truckList.actionWidth
-                                    Layout.minimumWidth: truckList.actionWidth
-                                    Layout.maximumWidth: truckList.actionWidth
-
+                                    spacing: Theme.spacingS
                                     Button {
-                                        visible: truckRow.modelData.loading
+                                        visible: truckCard.modelData.loading
                                         text: qsTr("Відправити")
-                                        Layout.fillWidth: true
-                                        onClicked: Terminal.departTruck(truckRow.modelData.truckId)
+                                        onClicked: Terminal.departTruck(truckCard.modelData.truckId)
                                     }
                                     Button {
-                                        visible: truckRow.modelData.loading
+                                        visible: truckCard.modelData.loading
                                         text: qsTr("Перенести")
-                                        Layout.fillWidth: true
                                         ToolTip.visible: hovered
                                         ToolTip.text: qsTr("У наступну сесію з тим самим завантаженням")
-                                        onClicked: Terminal.carryOverTruck(truckRow.modelData.truckId)
+                                        onClicked: Terminal.carryOverTruck(truckCard.modelData.truckId)
                                     }
                                     Label {
-                                        visible: !truckRow.modelData.loading
-                                        text: truckRow.modelData.status
-                                        font.pixelSize: Theme.fontSizeCaption
+                                        visible: !truckCard.modelData.loading
+                                        text: truckCard.modelData.status
                                         color: Theme.textMuted
-                                        elide: Text.ElideRight
-                                        horizontalAlignment: Text.AlignRight
-                                        Layout.fillWidth: true
                                     }
                                 }
                             }
-                            Rectangle {
-                                anchors.bottom: parent.bottom
-                                width: parent.width
-                                height: 1
-                                color: Theme.surfaceAlt
+                        }
+                    }
+
+                    // Shown right away rather than on a failed click: the operator sees what is left to do.
+                    // A to-do list, not an error: the warning tone, not the danger one.
+                    Rectangle {
+                        visible: Terminal.closeBlockers.length > 0
+                        Layout.fillWidth: true
+                        implicitHeight: blockerRow.implicitHeight + 2 * Theme.spacingM
+                        radius: Theme.radiusM
+                        color: Theme.warnSoft
+
+                        RowLayout {
+                            id: blockerRow
+                            anchors.fill: parent
+                            anchors.margins: Theme.spacingM
+                            anchors.leftMargin: Theme.spacingL
+                            spacing: Theme.spacingM
+
+                            IconImage {
+                                source: Theme.icon("circle-alert")
+                                sourceSize: Qt.size(Theme.iconSize, Theme.iconSize)
+                                color: Theme.warn
+                                Layout.alignment: Qt.AlignTop
+                            }
+                            ColumnLayout {
+                                spacing: Theme.spacingXs
+                                Layout.fillWidth: true
+                                Label {
+                                    text: qsTr("Перед закриттям сесії")
+                                    font.weight: Font.DemiBold
+                                    color: Theme.warn
+                                }
+                                Repeater {
+                                    model: Terminal.closeBlockers
+                                    Label {
+                                        required property string modelData
+                                        text: modelData
+                                        wrapMode: Text.WordWrap
+                                        Layout.fillWidth: true
+                                    }
+                                }
                             }
                         }
                     }

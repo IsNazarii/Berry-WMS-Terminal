@@ -2,7 +2,8 @@ import QtQuick
 import QtQuick.Templates as T
 
 // A row of a list: open receipts, suppliers, debtors. `highlighted` marks the
-// selected row with the soft accent, like the active receipt in the mockup.
+// selected row with the soft accent and an accent bar on the left, so the
+// active receipt is found at a glance.
 T.ItemDelegate {
     id: control
 
@@ -28,5 +29,13 @@ T.ItemDelegate {
         radius: Theme.radiusS
         color: control.highlighted ? Theme.accentSoft
              : control.down || control.hovered || control.visualFocus ? Theme.surfaceAlt : "transparent"
+
+        Rectangle {
+            visible: control.highlighted
+            width: Theme.selectionBarWidth
+            height: parent.height
+            radius: width / 2
+            color: Theme.accent
+        }
     }
 }

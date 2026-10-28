@@ -78,7 +78,8 @@ class Terminal : public QObject {
     // Open receipts block closing as well as loading trucks, so both changes notify.
     Q_PROPERTY(QStringList closeBlockers READ closeBlockers NOTIFY closeBlockersChanged)
 
-    // [{receiptId, supplierName, openedAt, boxes, amount}] of the session, oldest first; amount as "8 823,00".
+    // [{receiptId, supplierName, openedAt, boxes, pallets, amount}] of the session, oldest first; amount as "8 823,00",
+    // pallets as "2 палети" (counted lines only).
     Q_PROPERTY(QVariantList openReceipts READ openReceiptList NOTIFY receiptsChanged)
     // The receipt new weighings go into; empty when none is open.
     Q_PROPERTY(QString activeReceiptId READ activeReceiptId NOTIFY receiptsChanged)
@@ -88,6 +89,9 @@ class Terminal : public QObject {
     Q_PROPERTY(QVariantList activeLines READ activeLines NOTIFY receiptsChanged)
     // {openedAt, boxes, net, amount} of the active receipt without cancelled lines; empty when none.
     Q_PROPERTY(QVariantMap activeSummary READ activeSummary NOTIFY receiptsChanged)
+    // The box tare a new receiving form starts with, in kilograms as typed ("1,2");
+    // set per terminal from the app bar menu, since crates differ between points.
+    Q_PROPERTY(QString defaultBoxTare READ defaultBoxTare NOTIFY defaultBoxTareChanged)
     // Where weighed pallets go unless an earlier pallet of the crop in the receipt leads
     // (destinationId as in `destinations`); empty: none, they hang. Remembered per terminal.
     Q_PROPERTY(QString receivingTarget READ receivingTarget NOTIFY receivingTargetChanged)
@@ -160,6 +164,7 @@ public:
     [[nodiscard]] QVariantList activeLines() const;
     [[nodiscard]] QVariantMap activeSummary() const;
     [[nodiscard]] QString receivingTarget() const;
+    [[nodiscard]] QString defaultBoxTare() const { return defaultBoxTare_; }
     [[nodiscard]] QVariantMap nextPlacements() const;
     [[nodiscard]] QVariantList allocationSources() const;
     [[nodiscard]] QString allocationReceiptId() const;
@@ -223,6 +228,8 @@ public:
     // Returns why the line cannot be cancelled, empty when it was.
     Q_INVOKABLE QString cancelWeighing(int index);
     Q_INVOKABLE void setReceivingTarget(const QString& destinationId);
+    // Returns why the value is not a box tare; empty when it was saved.
+    Q_INVOKABLE QString setDefaultBoxTare(const QString& kilograms);
     // Closing the active receipt; afterwards the next open one becomes active.
     // "Pay" (retail): [{cropCode, crop, boxes, net, price}], one row per crop,
     // the price prefilled with the current day price as the operator types it.
@@ -288,6 +295,7 @@ signals:
     void receivingTargetChanged();
     // The active receipt, the trucks or the target changed.
     void placementsChanged();
+    void defaultBoxTareChanged();
 
 private:
     [[nodiscard]] const Supplier* currentSupplier() const noexcept;
@@ -365,6 +373,7 @@ private:
     std::optional<SupplierId> cashSupplierId_;
     std::optional<OperatorId> currentOperatorId_;
     QString receivingTargetId_;
+    QString defaultBoxTare_;
 };
 
 } // namespace wms::ui

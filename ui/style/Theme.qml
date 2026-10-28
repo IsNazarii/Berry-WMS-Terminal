@@ -35,7 +35,9 @@ QtObject {
     readonly property color brandPanel: dark ? "#23254A" : "#2A2E70"
     readonly property color brandPanelText: dark ? "#E9E8F2" : "#FFFFFF"
     readonly property color brandPanelMuted: dark ? "#9C9AB3" : "#C9CBF2"
-    readonly property color brandMarkOnPanel: "#B9BCF7"
+    // Left, right and bottom berry of the mark on the brand panel: light shades of the accent.
+    readonly property list<color> brandBerriesOnPanel: ["#8F95F2", "#B9BCF7", "#E2E3F6"]
+    readonly property color brandStemOnPanel: "#7CF0B0"
 
     readonly property color overlay: dark ? "#99000000" : "#661C1B2B"
 
@@ -75,6 +77,8 @@ QtObject {
     readonly property int avatarSize: 32
     readonly property int avatarSizeLarge: 48
     readonly property int statusDotSize: 8
+    // The accent bar on the left of a selected list row.
+    readonly property int selectionBarWidth: 3
     readonly property int brandMarkSize: 28
     readonly property int brandMarkSizeLarge: 40
     // The round badge of an empty state and the icon in it.

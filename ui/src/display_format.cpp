@@ -26,4 +26,16 @@ QString kilogramsText(Weight weight) { return fixed(weight.raw(), 1000, 3, 1); }
 
 QString hryvniasText(Money money) { return fixed(money.raw(), 100, 2, 2); }
 
+QString palletsText(int count) {
+    const int lastTwo = count % 100;
+    const int last = count % 10;
+    const char* word = "палет";
+    if (last == 1 && lastTwo != 11) {
+        word = "палета";
+    } else if (last >= 2 && last <= 4 && (lastTwo < 12 || lastTwo > 14)) {
+        word = "палети";
+    }
+    return QString("%1 %2").arg(count).arg(QString::fromUtf8(word));
+}
+
 } // namespace wms::ui

@@ -282,7 +282,9 @@ Terminal::Terminal(QObject* parent)
       supplierModel_{suppliers_, journal_},
       simulator_{{grams(0)}},
       scaleMonitor_{simulator_},
-      receivingTargetId_{QSettings{}.value("receiving/target").toString()} {
+      receivingTargetId_{QSettings{}.value("receiving/target").toString()},
+      // The crates on the point weigh about this much; a terminal keeps its own.
+      defaultBoxTare_{QSettings{}.value("receiving/defaultBoxTare", "1,2").toString()} {
     if (!sessionStore_.current() && !sessionStore_.lastClosed() && journalStore_.load().size() == 0) seedDemoData();
     // The supplier model reads balances only when asked, so loading after it is fine.
     journal_ = journalStore_.load();
@@ -420,6 +422,8 @@ QVariantList Terminal::openReceiptList() const {
             {"supplierName", supplierNameOf(receipt.supplierId())},
             {"openedAt", localTime(receipt.openedAt())},
             {"boxes", receipt.total().boxes},
+            {"pallets", palletsText(static_cast<int>(std::ranges::count_if(
+                            receipt.weighings(), [](const Weighing& w) { return !w.cancelled; })))},
             {"amount", hryvniasText(amountOf(receipt))},
         });
     }
@@ -948,6 +952,16 @@ void Terminal::setReceivingTarget(const QString& destinationId) {
     receivingTargetId_ = destinationId;
     QSettings{}.setValue("receiving/target", destinationId);
     emit receivingTargetChanged();
+}
+
+QString Terminal::setDefaultBoxTare(const QString& kilograms) {
+    const auto tare = parseWeight(kilograms.toStdString());
+    if (!tare || tare->isNegative()) return tr("Тара — кілограми, напр. 1,2 або 0,35");
+    // Stored as the screen shows it, so "1.2" and "1,20" become one "1,2".
+    defaultBoxTare_ = kilogramsText(*tare);
+    QSettings{}.setValue("receiving/defaultBoxTare", defaultBoxTare_);
+    emit defaultBoxTareChanged();
+    return {};
 }
 
 QVariantMap Terminal::nextPlacements() const {

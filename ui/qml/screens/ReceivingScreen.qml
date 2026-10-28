@@ -103,7 +103,7 @@ Page {
 
         // Open receipts: two big suppliers unloading in turns, a retail one in between.
         Frame {
-            Layout.preferredWidth: Math.min(220, screen.width * 0.2)
+            Layout.preferredWidth: Math.min(236, screen.width * 0.2)
             Layout.fillHeight: true
 
             ColumnLayout {
@@ -152,12 +152,14 @@ Page {
                             }
                             RowLayout {
                                 Label {
-                                    text: receiptRow.modelData.openedAt
+                                    text: receiptRow.modelData.boxes > 0
+                                          ? receiptRow.modelData.openedAt + " · " + receiptRow.modelData.pallets
+                                          : receiptRow.modelData.openedAt
                                     font.pixelSize: Theme.fontSizeCaption
                                     color: Theme.textMuted
                                 }
                                 Label {
-                                    text: receiptRow.modelData.boxes > 0 ? qsTr("%1 грн").arg(receiptRow.modelData.amount)
+                                    text: receiptRow.modelData.boxes > 0 ? qsTr("%1 ₴").arg(receiptRow.modelData.amount)
                                                                          : qsTr("порожній")
                                     font.pixelSize: Theme.fontSizeCaption
                                     color: Theme.textMuted
@@ -346,7 +348,7 @@ Page {
                     }
 
                     // One row of equal cells, a caption over each field; a narrow window wraps them in two rows.
-                    // Boxes come first (typed for every pallet); box tare and the target usually stay.
+                    // Boxes and the pallet come first (typed for every pallet); box tare and the target usually stay.
                     GridLayout {
                         id: fieldGrid
                         Layout.fillWidth: true
@@ -383,18 +385,25 @@ Page {
                             }
                         }
                         FieldCell {
-                            caption: qsTr("Тара ящика, кг")
-                            FormField {
-                                id: boxTare
-                                placeholderText: qsTr("0,35")
-                            }
-                        }
-                        FieldCell {
                             caption: qsTr("Палета, кг")
                             FormField {
                                 id: palletTare
                                 placeholderText: qsTr("0 — без")
                                 onAccepted: weighingForm.record(false)
+                            }
+                        }
+                        // Starts with the terminal's usual crate (⋯ menu); changed here for an odd one.
+                        FieldCell {
+                            caption: qsTr("Тара ящика, кг")
+                            FormField {
+                                id: boxTare
+                                text: Terminal.defaultBoxTare
+                                placeholderText: Terminal.defaultBoxTare
+
+                                Connections {
+                                    target: Terminal
+                                    function onDefaultBoxTareChanged() { boxTare.text = Terminal.defaultBoxTare }
+                                }
                             }
                         }
                         // A typed weight is recorded as manual, so Enter here does not record by accident.

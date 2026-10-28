@@ -82,6 +82,64 @@ ToolBar {
         onTriggered: bar.scalePicked(factor)
     }
 
+    // What the box tare field on the receiving screen starts with.
+    Dialog {
+        id: tareDialog
+        parent: Overlay.overlay
+        anchors.centerIn: parent
+        width: 360
+        modal: true
+        title: qsTr("Тара ящика за замовчуванням")
+        standardButtons: Dialog.Cancel
+
+        function save() {
+            tareError.text = Terminal.setDefaultBoxTare(tareField.text)
+            if (tareError.text === "")
+                close()
+        }
+
+        onOpened: {
+            tareField.text = Terminal.defaultBoxTare
+            tareError.text = ""
+            tareField.selectAll()
+            tareField.forceActiveFocus()
+        }
+
+        ColumnLayout {
+            anchors.fill: parent
+            spacing: Theme.spacingS
+
+            Label {
+                text: qsTr("Вага порожнього ящика, кг. Нею починається поле «Тара ящика» на «Прийомі»; "
+                           + "для іншого ящика її можна змінити там же.")
+                color: Theme.textMuted
+                wrapMode: Text.WordWrap
+                Layout.fillWidth: true
+            }
+            TextField {
+                id: tareField
+                inputMethodHints: Qt.ImhFormattedNumbersOnly
+                Layout.fillWidth: true
+                onTextEdited: tareError.text = ""
+                onAccepted: tareDialog.save()
+            }
+            Label {
+                id: tareError
+                visible: text !== ""
+                color: Theme.danger
+                wrapMode: Text.WordWrap
+                Layout.fillWidth: true
+            }
+            Button {
+                text: qsTr("Зберегти")
+                highlighted: true
+                enabled: tareField.text.trim() !== ""
+                Layout.fillWidth: true
+                onClicked: tareDialog.save()
+            }
+        }
+    }
+
     RowLayout {
         anchors.fill: parent
         spacing: Theme.spacingXl
@@ -207,6 +265,11 @@ ToolBar {
                         ScaleItem { factor: 1.25 }
                         ScaleItem { factor: 1.5 }
                         ScaleItem { factor: 1.75 }
+                    }
+                    // Crates differ between points, so the usual one is a setting of the terminal.
+                    MenuItem {
+                        text: qsTr("Тара ящика: %1 кг…").arg(Terminal.defaultBoxTare)
+                        onTriggered: tareDialog.open()
                     }
                     // In full screen there is no window frame, so this is the way back too.
                     MenuItem {

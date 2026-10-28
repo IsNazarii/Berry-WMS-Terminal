@@ -133,7 +133,8 @@ Page {
 
                     BrandMark {
                         size: Theme.brandMarkSizeLarge
-                        color: Theme.brandMarkOnPanel
+                        berries: Theme.brandBerriesOnPanel
+                        stemColor: Theme.brandStemOnPanel
                     }
                     Label {
                         text: qsTr("Berry WMS")

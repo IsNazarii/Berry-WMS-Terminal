@@ -17,6 +17,12 @@
 
 namespace wms {
 
+// Where the berries of one receipt are now; the rest still waits for allocation.
+struct Placement {
+    Cargo inTrucks;
+    Cargo inWarehouse;
+};
+
 // Append-only log of every fact the terminal knows about. Balances and truck
 // loads are never stored: they are derived from the log on request, so records
 // from another terminal can be merged in any order without losing data.
@@ -47,6 +53,13 @@ public:
     // What the warehouse holds of the crop across all sessions: put in minus shipped out.
     // Negative after an offline conflict (two terminals shipped the same boxes).
     [[nodiscard]] Cargo stockOf(std::string_view cropCode) const noexcept;
+    // Closed receipts and payments of one work day (their sessionId), in the order
+    // added. Pointers are valid until the next add().
+    [[nodiscard]] std::vector<const Receipt*> receiptsOf(const Uuid& sessionId) const;
+    [[nodiscard]] std::vector<const Payment*> paymentsOf(const Uuid& sessionId) const;
+    // What allocations still in force took from the receipt (closed or open), by kind of place.
+    [[nodiscard]] Placement placementOf(const Uuid& receiptId) const noexcept;
+
     // Whether any record names the crop, cancelled receipt lines included.
     [[nodiscard]] bool mentionsCrop(std::string_view cropCode) const noexcept;
 

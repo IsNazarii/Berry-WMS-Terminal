@@ -592,3 +592,42 @@ TEST(Journal, MentionsACropOfAnyReceiptLine) {
     EXPECT_TRUE(journal.mentionsCrop("raspberry"));
     EXPECT_FALSE(journal.mentionsCrop("strawberry"));
 }
+
+TEST(Journal, ReceiptsAndPaymentsOfOneSession) {
+    const Uuid today = Uuid::generateV7(TimePoint{}, 2, 1);
+    const Uuid yesterday = Uuid::generateV7(TimePoint{}, 2, 2);
+    Journal journal;
+    const Receipt mine{Uuid::generateV7(), Clock::now(), 42, Settlement::OnSite,
+                       {pallet("raspberry", 10, kilograms(20))}, SyncStatus::Pending, today};
+    journal.add(mine);
+    journal.add(Receipt{Uuid::generateV7(), Clock::now(), 43, Settlement::OnSite,
+                        {pallet("raspberry", 10, kilograms(20))}, SyncStatus::Pending, yesterday});
+    journal.add(Receipt::create(44, Settlement::OnSite, {pallet("raspberry", 10, kilograms(20))}));
+    journal.add(Payment::create(42, hryvnias(100), PaymentMethod::Cash, 1, today));
+    journal.add(Payment::create(42, hryvnias(50), PaymentMethod::Cash, 1)); // no session open
+
+    const auto receipts = journal.receiptsOf(today);
+    ASSERT_EQ(receipts.size(), 1U);
+    EXPECT_EQ(receipts[0]->id(), mine.id());
+    const auto payments = journal.paymentsOf(today);
+    ASSERT_EQ(payments.size(), 1U);
+    EXPECT_EQ(payments[0]->amount(), hryvnias(100));
+}
+
+TEST(Journal, PlacementSplitsTrucksAndWarehouseWithoutReversed) {
+    Journal journal;
+    const Receipt receipt = Receipt::create(42, Settlement::OnSite,
+                                            {pallet("raspberry", 10, kilograms(20)), pallet("raspberry", 6, kilograms(12)),
+                                             pallet("raspberry", 4, kilograms(8))});
+    journal.add(receipt);
+    journal.add(Allocation::wholeWeighing(receipt, 0, kTruck));
+    journal.add(Allocation::wholeWeighing(receipt, 1, ToWarehouse{}));
+    const Allocation takenBack = Allocation::wholeWeighing(receipt, 2, kOtherTruck);
+    journal.add(takenBack);
+    journal.add(*journal.reversalOf(receipt.id(), 2));
+
+    const Placement placement = journal.placementOf(receipt.id());
+    EXPECT_EQ(placement.inTrucks.boxes, 10);
+    EXPECT_EQ(placement.inTrucks.weight, kilograms(20));
+    EXPECT_EQ(placement.inWarehouse.boxes, 6);
+}

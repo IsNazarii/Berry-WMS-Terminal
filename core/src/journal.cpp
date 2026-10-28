@@ -4,6 +4,7 @@
 #include <format>
 #include <stdexcept>
 #include <utility>
+#include <variant>
 
 namespace wms {
 
@@ -63,6 +64,35 @@ std::vector<const Transaction*> Journal::historyOf(SupplierId supplierId) const 
     // Stable: records made in the same instant keep receipts before payments.
     std::ranges::stable_sort(history, {}, &Transaction::createdAt);
     return history;
+}
+
+std::vector<const Receipt*> Journal::receiptsOf(const Uuid& sessionId) const {
+    std::vector<const Receipt*> found;
+    for (const auto& r : receipts_) {
+        if (r.sessionId() == sessionId) found.push_back(&r);
+    }
+    return found;
+}
+
+std::vector<const Payment*> Journal::paymentsOf(const Uuid& sessionId) const {
+    std::vector<const Payment*> found;
+    for (const auto& p : payments_) {
+        if (p.sessionId() == sessionId) found.push_back(&p);
+    }
+    return found;
+}
+
+Placement Journal::placementOf(const Uuid& receiptId) const noexcept {
+    Placement placement;
+    for (const auto& a : activeAllocations()) {
+        if (a.receiptId() != receiptId) continue;
+        if (std::holds_alternative<ToWarehouse>(a.destination())) {
+            placement.inWarehouse += a.cargo();
+        } else {
+            placement.inTrucks += a.cargo();
+        }
+    }
+    return placement;
 }
 
 Cargo Journal::loadOf(const TruckId& truckId) const noexcept {

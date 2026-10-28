@@ -22,6 +22,7 @@ add_executable(wms_core_tests
     shipment_test.cpp
     operator_test.cpp
     open_receipt_test.cpp
+    session_summary_test.cpp
 )
 target_link_libraries(wms_core_tests PRIVATE wms_core GTest::gtest_main)
 

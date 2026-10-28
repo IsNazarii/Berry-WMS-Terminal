@@ -1,6 +1,7 @@
 import QtQuick
 import QtQuick.Templates as T
 
+// Navigation inside the app bar: the bar draws the surface, the tabs draw themselves.
 T.TabBar {
     id: control
 
@@ -8,6 +9,7 @@ T.TabBar {
                             implicitContentWidth + leftPadding + rightPadding)
     implicitHeight: Math.max(implicitBackgroundHeight + topInset + bottomInset,
                              implicitContentHeight + topPadding + bottomPadding)
+    spacing: Theme.spacingXs
 
     contentItem: ListView {
         model: control.contentModel
@@ -18,15 +20,5 @@ T.TabBar {
         flickableDirection: Flickable.AutoFlickIfNeeded
         snapMode: ListView.SnapToItem
         highlightMoveDuration: 0
-    }
-
-    background: Rectangle {
-        color: Theme.surface
-        Rectangle {
-            width: parent.width
-            height: 1
-            anchors.bottom: parent.bottom
-            color: Theme.border
-        }
     }
 }

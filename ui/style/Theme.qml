@@ -53,6 +53,20 @@ QtObject {
     readonly property int controlHeight: 40
     readonly property int controlHeightLarge: 48
 
+    // The app bar over every screen: brand, navigation, session and operator.
+    readonly property int appBarHeight: 56
+    readonly property int iconSize: 18
+    readonly property int iconSizeSmall: 14
+    readonly property int badgeSize: 18
+    readonly property int avatarSize: 32
+    readonly property int statusDotSize: 8
+    readonly property int brandMarkSize: 28
+
+    // A monochrome icon from ui/style/icons; controls tint it with their text color.
+    function icon(name: string): url {
+        return Qt.resolvedUrl("icons/" + name + ".svg")
+    }
+
     // Onest ships with the app (ui/style/fonts): the terminal must look the same on
     // any laptop. One loader per weight, all under the family "Onest".
     readonly property FontLoader onestRegular: FontLoader { source: "fonts/Onest-Regular.ttf" }

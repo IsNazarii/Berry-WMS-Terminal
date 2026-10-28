@@ -1,7 +1,7 @@
 import QtQuick
 import QtQuick.Templates as T
 
-// The window footer: a status line on the surface color, split off by a hairline.
+// The app bar over the screens: the surface color, split off by a hairline.
 T.ToolBar {
     id: control
 
@@ -9,10 +9,11 @@ T.ToolBar {
                             implicitContentWidth + leftPadding + rightPadding)
     implicitHeight: Math.max(implicitBackgroundHeight + topInset + bottomInset,
                              implicitContentHeight + topPadding + bottomPadding)
-    font.pixelSize: Theme.fontSizeCaption
+    leftPadding: Theme.spacingL
+    rightPadding: Theme.spacingL
 
     background: Rectangle {
-        implicitHeight: Theme.controlHeight
+        implicitHeight: Theme.appBarHeight
         color: Theme.surface
 
         Rectangle {

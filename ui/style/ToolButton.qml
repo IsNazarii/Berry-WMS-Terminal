@@ -1,7 +1,8 @@
 import QtQuick
+import QtQuick.Controls.impl
 import QtQuick.Templates as T
 
-// Small text-only button for bars and row actions (✕, «Вийти»).
+// Small button for bars and row actions (✕, the app bar menu): text, an icon or both.
 T.ToolButton {
     id: control
 
@@ -10,16 +11,21 @@ T.ToolButton {
     implicitHeight: Math.max(implicitBackgroundHeight + topInset + bottomInset,
                              implicitContentHeight + topPadding + bottomPadding)
     padding: Theme.spacingS
+    spacing: Theme.spacingS
     font.weight: Font.Medium
     opacity: control.enabled ? 1 : Theme.disabledOpacity
+    icon.width: Theme.iconSize
+    icon.height: Theme.iconSize
+    icon.color: control.hovered || control.checked ? Theme.text : Theme.textMuted
 
-    contentItem: Text {
+    contentItem: IconLabel {
+        spacing: control.spacing
+        mirrored: control.mirrored
+        display: control.display
+        icon: control.icon
         text: control.text
         font: control.font
-        color: control.hovered || control.checked ? Theme.text : Theme.textMuted
-        horizontalAlignment: Text.AlignHCenter
-        verticalAlignment: Text.AlignVCenter
-        elide: Text.ElideRight
+        color: control.icon.color
     }
 
     background: Rectangle {

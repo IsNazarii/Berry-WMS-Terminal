@@ -61,85 +61,27 @@ ApplicationWindow {
     // The scale this run was started with (set by main.cpp), to tell the operator a restart is pending.
     required property real startScale
 
-    // Not "scale": that is every Item's own transform.
-    component ScaleItem: MenuItem {
-        required property real factor
-        text: qsTr("%1%").arg(Math.round(factor * 100))
-        checkable: true
-        checked: uiSettings.scale === factor
-        onTriggered: uiSettings.scale = factor
-    }
-
-    // Operator workflow goes left to right: open the day, receive, load, ship from stock, pay.
-    header: TabBar {
-        id: tabs
+    header: AppBar {
+        id: appBar
         visible: Terminal.loggedIn
-        TabButton { text: qsTr("Сесія") }
-        TabButton { text: qsTr("Прийом") }
-        TabButton { text: qsTr("Розподіл") }
-        TabButton { text: qsTr("Склад") }
-        TabButton { text: qsTr("Каса") }
+        uiScale: uiSettings.scale
+        fullScreen: uiSettings.fullScreen
+        startScale: window.startScale
+        onScalePicked: factor => uiSettings.scale = factor
+        onFullScreenToggled: uiSettings.fullScreen = !uiSettings.fullScreen
     }
 
-    // Always visible, so the operator never loses track of whose berries are on the scale.
-    footer: ToolBar {
-        visible: Terminal.loggedIn
-
-        RowLayout {
-            anchors.fill: parent
-            anchors.leftMargin: 12
-            anchors.rightMargin: 12
-
-            Label {
-                text: Terminal.hasSupplier
-                      ? qsTr("Постачальник: %1 · борг: %2").arg(Terminal.supplierName).arg(Terminal.supplierBalance)
-                      : qsTr("Чек не обрано")
-                elide: Text.ElideRight
-                Layout.fillWidth: true
-            }
-            Label {
-                text: Terminal.sessionOpen ? Terminal.sessionTitle : qsTr("Сесію не відкрито")
-                color: Terminal.sessionOpen ? Theme.text : Theme.danger
-            }
-            Label { text: qsTr("Записів у журналі: %1").arg(Terminal.journalSize) }
-            Label { text: qsTr("Оператор: %1").arg(Terminal.operatorName) }
-            // Set once per terminal: laptops differ, and Qt only takes a scale at startup.
-            ToolButton {
-                text: window.startScale === uiSettings.scale
-                      ? qsTr("Масштаб %1%").arg(Math.round(uiSettings.scale * 100))
-                      : qsTr("Масштаб %1% — після перезапуску").arg(Math.round(uiSettings.scale * 100))
-                onClicked: scaleMenu.open()
-
-                Menu {
-                    id: scaleMenu
-                    y: -height
-                    ScaleItem { factor: 1 }
-                    ScaleItem { factor: 1.25 }
-                    ScaleItem { factor: 1.5 }
-                    ScaleItem { factor: 1.75 }
-                }
-            }
-            // In full screen there is no window frame, so this is the way back too.
-            ToolButton {
-                text: uiSettings.fullScreen ? qsTr("Вікно · F11") : qsTr("Повний екран · F11")
-                onClicked: uiSettings.fullScreen = !uiSettings.fullScreen
-            }
-            // A shed in daylight wants light, an evening shift wants dark.
-            ToolButton {
-                text: Theme.dark ? qsTr("Світла тема") : qsTr("Темна тема")
-                onClicked: Theme.dark = !Theme.dark
-            }
-            ToolButton {
-                text: qsTr("Вийти")
-                onClicked: Terminal.logout()
-            }
-        }
-    }
+    // One key per screen, in the order of the tabs; F2 (new receipt / supplier) stays with the screens.
+    Shortcut { sequence: "F5"; enabled: Terminal.loggedIn; onActivated: appBar.currentIndex = 0 }
+    Shortcut { sequence: "F6"; enabled: Terminal.loggedIn; onActivated: appBar.currentIndex = 1 }
+    Shortcut { sequence: "F7"; enabled: Terminal.loggedIn; onActivated: appBar.currentIndex = 2 }
+    Shortcut { sequence: "F8"; enabled: Terminal.loggedIn; onActivated: appBar.currentIndex = 3 }
+    Shortcut { sequence: "F9"; enabled: Terminal.loggedIn; onActivated: appBar.currentIndex = 4 }
 
     // Nothing is recorded without knowing who did it, so the screens wait for a login.
     Connections {
         target: Terminal
-        function onOperatorChanged() { tabs.currentIndex = 0 }
+        function onOperatorChanged() { appBar.currentIndex = 0 }
     }
 
     LoginScreen {
@@ -150,11 +92,11 @@ ApplicationWindow {
     StackLayout {
         anchors.fill: parent
         visible: Terminal.loggedIn
-        currentIndex: tabs.currentIndex
+        currentIndex: appBar.currentIndex
 
         SessionScreen {}
-        ReceivingScreen { onSessionRequested: tabs.currentIndex = 0 }
-        AllocationScreen { onSessionRequested: tabs.currentIndex = 0 }
+        ReceivingScreen { onSessionRequested: appBar.currentIndex = 0 }
+        AllocationScreen { onSessionRequested: appBar.currentIndex = 0 }
         WarehouseScreen {}
         CashScreen {}
     }

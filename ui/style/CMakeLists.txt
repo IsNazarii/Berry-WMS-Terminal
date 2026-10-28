@@ -31,5 +31,11 @@ qt_add_qml_module(wms_style
         fonts/Onest-Medium.ttf
         fonts/Onest-SemiBold.ttf
         fonts/Onest-Bold.ttf
+        icons/calendar.svg
+        icons/weight.svg
+        icons/truck.svg
+        icons/warehouse.svg
+        icons/wallet.svg
+        icons/more.svg
 )
 target_link_libraries(wms_style PUBLIC Qt6::Quick Qt6::QuickControls2)

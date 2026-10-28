@@ -25,6 +25,7 @@
 #include <filesystem>
 #include <optional>
 #include <string>
+#include <utility>
 #include <variant>
 #include <vector>
 
@@ -302,6 +303,8 @@ private:
     [[nodiscard]] const Operator* findOperator(OperatorId id) const noexcept;
     [[nodiscard]] QString operatorNameOf(OperatorId id) const;
     [[nodiscard]] QVariantMap truckInfo(const Truck& truck) const;
+    // A receipt in the cash history: the headline and one line per weighing, in screen format.
+    [[nodiscard]] std::pair<QString, QString> receiptStory(const Receipt& receipt) const;
     [[nodiscard]] const OpenReceipt* activeReceipt() const noexcept;
     void setActiveReceipt(std::optional<Uuid> id);
     // A receipt to allocate from is either still open in the session or closed in the journal.

@@ -21,6 +21,7 @@
 #include <chrono>
 #include <exception>
 #include <format>
+#include <tuple>
 
 namespace wms::ui {
 namespace {
@@ -644,25 +645,46 @@ QVariantList Terminal::cashHistory() const {
     QVariantList list;
     if (!cashSupplierId_) return list;
     for (const Transaction* record : journal_.historyOf(*cashSupplierId_)) {
-        // describe() is virtual: each record type tells its own story. The first
-        // line is the headline, the rest (receipt lines) is the detail.
-        const QString text = QString::fromStdString(record->describe());
-        const qsizetype newline = text.indexOf('\n');
+        // The sum comes from the virtual balanceEffect(): the screen does not care which
+        // record it is. The words are the screen's own: crop names live in the dictionary,
+        // not in the core, whose describe() stays for logs.
         const Money effect = record->balanceEffect();
-        // A payment has no lines; its detail is who handed the money over.
-        const auto* payment = dynamic_cast<const Payment*>(record);
-        const QString detail = payment ? tr("видав(ла): %1").arg(operatorNameOf(payment->paidBy()))
-                               : newline < 0 ? QString{}
-                                             : text.mid(newline + 1);
+        QString title;
+        QString detail;
+        if (const auto* payment = dynamic_cast<const Payment*>(record)) {
+            title = payment->method() == PaymentMethod::Cash ? tr("Виплата готівкою") : tr("Виплата переказом");
+            detail = tr("видав(ла): %1").arg(operatorNameOf(payment->paidBy()));
+        } else if (const auto* receipt = dynamic_cast<const Receipt*>(record)) {
+            std::tie(title, detail) = receiptStory(*receipt);
+        }
         list.append(QVariantMap{
             {"at", localDateTime(record->createdAt())},
-            {"title", text.left(newline)},
+            {"title", title},
             {"detail", detail},
             {"effect", effect.isNegative() ? hryvniasText(effect) : "+" + hryvniasText(effect)},
             {"payment", record->kind() == TransactionKind::Payment},
         });
     }
     return list;
+}
+
+std::pair<QString, QString> Terminal::receiptStory(const Receipt& receipt) const {
+    const bool handedOver = receipt.settlement() == Settlement::HandedOver;
+    const auto counted = std::ranges::count(receipt.weighings(), false, &Weighing::cancelled);
+    const Cargo total = receipt.total();
+    const QString title = (handedOver ? tr("Чек (опт): %1 · %2 ящ. · %3 кг") : tr("Чек: %1 · %2 ящ. · %3 кг"))
+                              .arg(palletsText(static_cast<int>(counted)))
+                              .arg(total.boxes)
+                              .arg(kilogramsText(total.weight));
+    QStringList lines;
+    for (const Weighing& w : receipt.weighings()) {
+        QString line = tr("%1 — %2 ящ., %3 кг").arg(cropName(w.cropCode)).arg(w.boxCount).arg(kilogramsText(w.net()));
+        if (!handedOver) line += tr(" × %1 = %2 грн").arg(hryvniasText(w.pricePerKg), hryvniasText(w.amount()));
+        if (w.weightSource == WeightSource::Manual) line += tr(" · вага вручну");
+        if (w.cancelled) line += tr(" · анульовано");
+        lines << line;
+    }
+    return {title, lines.join('\n')};
 }
 
 QVariantList Terminal::operatorList() const {

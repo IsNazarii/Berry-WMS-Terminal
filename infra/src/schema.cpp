@@ -18,7 +18,7 @@ namespace {
 // in kopecks (_kop), weight in grams (_g); enums are spelled out as text, so
 // reordering an enum in C++ cannot change what old rows mean. STRICT tables
 // reject a value of the wrong type instead of quietly storing it.
-constexpr std::array<std::string_view, 8> kMigrations{
+constexpr std::array<std::string_view, 10> kMigrations{
     R"sql(
     CREATE TABLE receipt (
         id            TEXT PRIMARY KEY,
@@ -234,6 +234,32 @@ constexpr std::array<std::string_view, 8> kMigrations{
         allocation_id TEXT NOT NULL,
         sync_status   TEXT NOT NULL CHECK (sync_status IN ('pending', 'synced'))
     ) STRICT;
+    )sql",
+
+    // The work day a receipt or payment belongs to. No foreign key to session:
+    // sync may bring a record before its session. NULL: a payment made with no
+    // session open (the cash desk works without one).
+    R"sql(
+    ALTER TABLE receipt ADD COLUMN session_id TEXT;
+    ALTER TABLE payment ADD COLUMN session_id TEXT;
+    )sql",
+
+    // Records saved before they knew their session get, once, the session that
+    // was open when they were made: the best guess for old rows. New records
+    // carry their session, which is what is trusted from now on.
+    R"sql(
+    UPDATE receipt SET session_id = (
+        SELECT s.id FROM session s
+        WHERE receipt.created_at_ns >= s.opened_at_ns
+          AND (s.closed_at_ns IS NULL OR receipt.created_at_ns < s.closed_at_ns)
+        ORDER BY s.opened_at_ns DESC LIMIT 1)
+    WHERE session_id IS NULL;
+    UPDATE payment SET session_id = (
+        SELECT s.id FROM session s
+        WHERE payment.created_at_ns >= s.opened_at_ns
+          AND (s.closed_at_ns IS NULL OR payment.created_at_ns < s.closed_at_ns)
+        ORDER BY s.opened_at_ns DESC LIMIT 1)
+    WHERE session_id IS NULL;
     )sql",
 };
 

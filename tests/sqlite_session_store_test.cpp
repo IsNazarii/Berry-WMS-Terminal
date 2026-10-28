@@ -87,6 +87,7 @@ TEST(SqliteSessionStore, OpenSessionComesBackAsItWas) {
     EXPECT_EQ(receipt.id(), original.id());
     EXPECT_EQ(receipt.openedAt(), original.openedAt());
     EXPECT_EQ(receipt.supplierId(), 42);
+    EXPECT_EQ(receipt.sessionId(), day.id());
     ASSERT_EQ(receipt.weighings().size(), 2U);
     EXPECT_TRUE(receipt.weighings()[0].cancelled);
     EXPECT_EQ(receipt.weighings()[1].pricePerKg, kopecks(9050));

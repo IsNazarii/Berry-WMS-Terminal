@@ -200,8 +200,9 @@ std::optional<WorkDay> loadSession(sqlite::Database& db, std::string_view where,
         lines.bind(1, receipts.columnText(0));
         while (lines.step()) weighings.push_back(readWeighing(lines, 0));
         lines.reset();
+        // An open receipt lives inside its session, so the session's id is its sessionId.
         record.openReceipts.emplace_back(uuidColumn(receipts, 0), fromNanoseconds(receipts.columnInt(1)),
-                                         receipts.columnInt(2), std::move(weighings));
+                                         receipts.columnInt(2), std::move(weighings), record.id);
     }
 
     return WorkDay::restore(std::move(record));

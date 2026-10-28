@@ -19,13 +19,14 @@ SqliteJournalStore::SqliteJournalStore(sqlite::Database& db) : db_{db} { migrate
 bool SqliteJournalStore::save(const Receipt& receipt) {
     sqlite::ScopedTransaction transaction{db_};
     sqlite::Statement insert = db_.prepare(
-        "INSERT INTO receipt (id, created_at_ns, supplier_id, settlement, sync_status) VALUES (?1, ?2, ?3, ?4, ?5) "
-        "ON CONFLICT (id) DO NOTHING RETURNING id");
+        "INSERT INTO receipt (id, created_at_ns, supplier_id, settlement, sync_status, session_id) "
+        "VALUES (?1, ?2, ?3, ?4, ?5, ?6) ON CONFLICT (id) DO NOTHING RETURNING id");
     insert.bind(1, receipt.id().toString())
         .bind(2, toNanoseconds(receipt.createdAt()))
         .bind(3, receipt.supplierId())
         .bind(4, toText(kSettlements, receipt.settlement()))
         .bind(5, toText(kSyncStatuses, receipt.syncStatus()));
+    bindOptionalUuid(insert, 6, receipt.sessionId());
     // Nothing written yet; the transaction's destructor rolls back the empty BEGIN.
     if (!inserted(insert)) return false;
 
@@ -46,8 +47,8 @@ bool SqliteJournalStore::save(const Receipt& receipt) {
 
 bool SqliteJournalStore::save(const Payment& payment) {
     sqlite::Statement insert = db_.prepare(
-        "INSERT INTO payment (id, created_at_ns, supplier_id, amount_kop, method, paid_by, sync_status) "
-        "VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7) ON CONFLICT (id) DO NOTHING RETURNING id");
+        "INSERT INTO payment (id, created_at_ns, supplier_id, amount_kop, method, paid_by, sync_status, session_id) "
+        "VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8) ON CONFLICT (id) DO NOTHING RETURNING id");
     insert.bind(1, payment.id().toString())
         .bind(2, toNanoseconds(payment.createdAt()))
         .bind(3, payment.supplierId())
@@ -55,6 +56,7 @@ bool SqliteJournalStore::save(const Payment& payment) {
         .bind(5, toText(kPaymentMethods, payment.method()))
         .bind(6, payment.paidBy())
         .bind(7, toText(kSyncStatuses, payment.syncStatus()));
+    bindOptionalUuid(insert, 8, payment.sessionId());
     return inserted(insert);
 }
 
@@ -110,7 +112,8 @@ Journal SqliteJournalStore::load() const {
 
     // rowid breaks ties between records created in the same instant.
     sqlite::Statement receipts = db_.prepare(
-        "SELECT id, created_at_ns, supplier_id, settlement, sync_status FROM receipt ORDER BY created_at_ns, rowid");
+        "SELECT id, created_at_ns, supplier_id, settlement, sync_status, session_id FROM receipt "
+        "ORDER BY created_at_ns, rowid");
     sqlite::Statement lines = db_.prepare(
         "SELECT crop_code, gross_g, box_count, tare_per_box_g, pallet_tare_g, price_per_kg_kop, price_source, "
         "weight_source, cancelled FROM weighing WHERE receipt_id = ?1 ORDER BY line");
@@ -121,16 +124,17 @@ Journal SqliteJournalStore::load() const {
         lines.reset();
         journal.add(Receipt{uuidColumn(receipts, 0), fromNanoseconds(receipts.columnInt(1)), receipts.columnInt(2),
                             fromText(kSettlements, receipts.columnText(3)), std::move(weighings),
-                            fromText(kSyncStatuses, receipts.columnText(4))});
+                            fromText(kSyncStatuses, receipts.columnText(4)), optionalUuidColumn(receipts, 5)});
     }
 
     sqlite::Statement payments = db_.prepare(
-        "SELECT id, created_at_ns, supplier_id, amount_kop, method, paid_by, sync_status FROM payment "
+        "SELECT id, created_at_ns, supplier_id, amount_kop, method, paid_by, sync_status, session_id FROM payment "
         "ORDER BY created_at_ns, rowid");
     while (payments.step()) {
         journal.add(Payment{uuidColumn(payments, 0), fromNanoseconds(payments.columnInt(1)), payments.columnInt(2),
                             kopecks(payments.columnInt(3)), fromText(kPaymentMethods, payments.columnText(4)),
-                            payments.columnInt(5), fromText(kSyncStatuses, payments.columnText(6))});
+                            payments.columnInt(5), fromText(kSyncStatuses, payments.columnText(6)),
+                            optionalUuidColumn(payments, 7)});
     }
 
     sqlite::Statement allocations = db_.prepare(

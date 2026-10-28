@@ -61,6 +61,9 @@ std::optional<TimePoint> optionalTime(const sqlite::Statement& row, int column);
 
 // Throws std::runtime_error for text that is not a UUID.
 Uuid uuidColumn(const sqlite::Statement& row, int column);
+// NULL for an empty optional, both ways.
+std::optional<Uuid> optionalUuidColumn(const sqlite::Statement& row, int column);
+void bindOptionalUuid(sqlite::Statement& statement, int index, const std::optional<Uuid>& id);
 
 // A weighing takes 9 consecutive parameters / columns, starting at `first`,
 // in the order of the weighing tables: crop_code, gross_g, box_count,

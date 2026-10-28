@@ -1,3 +1,4 @@
+#include "wms/schema.h"
 #include "wms/sqlite_journal_store.h"
 
 #include <gtest/gtest.h>
@@ -6,6 +7,7 @@
 #include <filesystem>
 #include <string>
 #include <utility>
+#include <vector>
 
 using namespace wms;
 
@@ -182,4 +184,50 @@ TEST(SqliteJournalStore, RefusesDatabaseFromNewerVersion) {
     sqlite::Database db{":memory:"};
     db.execute("PRAGMA user_version = 999");
     EXPECT_THROW(SqliteJournalStore{db}, std::runtime_error);
+}
+
+TEST(SqliteJournalStore, ReceiptAndPaymentKeepTheirSession) {
+    sqlite::Database db{":memory:"};
+    SqliteJournalStore store{db};
+    const Uuid session = Uuid::generateV7(kAt, 3, 3);
+    const Receipt receipt{Uuid::generateV7(kAt, 1, 2), kAt, 42, Settlement::OnSite,
+                          {pallet("raspberry", 60, grams(185'400))}, SyncStatus::Pending, session};
+    store.save(receipt);
+    store.save(Payment{Uuid::generateV7(kAt, 2, 3), kAt, 42, hryvnias(100), PaymentMethod::Cash, 1,
+                       SyncStatus::Pending, session});
+    store.save(Payment::create(42, hryvnias(50), PaymentMethod::Cash, 1)); // no session open
+
+    const Journal journal = store.load();
+    ASSERT_EQ(journal.receiptsOf(session).size(), 1U);
+    EXPECT_EQ(journal.receiptsOf(session)[0]->id(), receipt.id());
+    EXPECT_EQ(journal.paymentsOf(session).size(), 1U);
+    const auto history = journal.historyOf(42);
+    ASSERT_EQ(history.size(), 3U);
+    EXPECT_FALSE(dynamic_cast<const Payment&>(*history[2]).sessionId().has_value());
+}
+
+TEST(SqliteJournalStore, OldRecordsGetTheSessionTheyFellInto) {
+    // Records saved before sessionId existed: the one-off backfill goes by time.
+    sqlite::Database db{":memory:"};
+    { SqliteJournalStore store{db}; }
+    db.execute("INSERT INTO session (id, date, opened_at_ns, opened_by, closed_at_ns, closed_by) "
+               "VALUES ('0193a000-0000-7000-8000-000000000001', '2026-10-27', 1000000, 1, 2000000, 1)");
+    db.execute("INSERT INTO session (id, date, opened_at_ns, opened_by) "
+               "VALUES ('0193a000-0000-7000-8000-000000000002', '2026-10-28', 3000000, 1)");
+    db.execute("INSERT INTO receipt (id, created_at_ns, supplier_id, settlement, sync_status) VALUES "
+               "('0193a000-0000-7000-8000-0000000000a1', 1000010, 42, 'handed_over', 'pending'), "
+               "('0193a000-0000-7000-8000-0000000000a2', 2500000, 42, 'handed_over', 'pending'), "
+               "('0193a000-0000-7000-8000-0000000000a3', 3500000, 42, 'handed_over', 'pending')");
+    db.execute("INSERT INTO payment (id, created_at_ns, supplier_id, amount_kop, method, paid_by, sync_status) "
+               "VALUES ('0193a000-0000-7000-8000-0000000000b1', 3600000, 42, 100, 'cash', 1, 'pending')");
+    // Run the backfill step again, as an old database would on its first start.
+    db.execute("PRAGMA user_version = 9");
+    migrateSchema(db);
+
+    sqlite::Statement rows = db.prepare(
+        "SELECT session_id FROM receipt UNION ALL SELECT session_id FROM payment ORDER BY 1 NULLS FIRST");
+    std::vector<std::string> sessions;
+    while (rows.step()) sessions.push_back(rows.isNull(0) ? "-" : rows.columnText(0).substr(34));
+    // Between the sessions: none; the rest: the session open at that moment.
+    EXPECT_EQ(sessions, (std::vector<std::string>{"-", "01", "02", "02"}));
 }

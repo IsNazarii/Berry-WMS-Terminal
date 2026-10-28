@@ -27,6 +27,18 @@ Uuid uuidColumn(const sqlite::Statement& row, int column) {
     return *id;
 }
 
+std::optional<Uuid> optionalUuidColumn(const sqlite::Statement& row, int column) {
+    return row.isNull(column) ? std::nullopt : std::optional{uuidColumn(row, column)};
+}
+
+void bindOptionalUuid(sqlite::Statement& statement, int index, const std::optional<Uuid>& id) {
+    if (id) {
+        statement.bind(index, id->toString());
+    } else {
+        statement.bind(index, std::nullopt);
+    }
+}
+
 void bindWeighing(sqlite::Statement& statement, int first, const Weighing& weighing) {
     statement.bind(first, weighing.cropCode)
         .bind(first + 1, weighing.gross.raw())

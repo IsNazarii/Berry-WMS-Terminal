@@ -482,8 +482,20 @@ Page {
             Layout.preferredWidth: 440
             Layout.fillHeight: true
 
+            EmptyState {
+                anchors.centerIn: parent
+                width: parent.width
+                visible: !screen.hasReceipt
+                icon: "weight"
+                title: qsTr("Чек не обрано")
+                text: qsTr("Відкрийте чек постачальника — кожна записана палета з'явиться тут рядком.")
+                actionText: qsTr("Новий чек  ·  F2")
+                onActionTriggered: screen.newReceipt()
+            }
+
             ColumnLayout {
                 anchors.fill: parent
+                visible: screen.hasReceipt
                 spacing: Theme.spacingM
 
                 ColumnLayout {
@@ -491,17 +503,15 @@ Page {
                     Layout.fillWidth: true
 
                     Label {
-                        text: screen.hasReceipt ? Terminal.supplierName : qsTr("Чек не обрано")
+                        text: Terminal.supplierName
                         font.pixelSize: Theme.fontSizeTitle
                         font.weight: Font.Bold
                         elide: Text.ElideRight
                         Layout.fillWidth: true
                     }
                     Label {
-                        text: screen.hasReceipt
-                              ? qsTr("Відкрито %1 · борг до чека %2").arg(Terminal.activeSummary.openedAt)
-                                                                     .arg(Terminal.supplierBalance)
-                              : qsTr("Новий чек — F2")
+                        text: qsTr("Відкрито %1 · борг до чека %2").arg(Terminal.activeSummary.openedAt)
+                                                                   .arg(Terminal.supplierBalance)
                         font.pixelSize: Theme.fontSizeCaption
                         color: Theme.textMuted
                         elide: Text.ElideRight

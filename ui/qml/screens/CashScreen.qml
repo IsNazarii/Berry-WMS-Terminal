@@ -97,8 +97,26 @@ Page {
             }
         }
 
+        // Before a supplier is chosen the form and the history are one empty panel.
+        Frame {
+            visible: !screen.hasSupplier
+            Layout.fillWidth: true
+            Layout.fillHeight: true
+
+            EmptyState {
+                anchors.centerIn: parent
+                icon: "wallet"
+                title: qsTr("Кому платимо?")
+                text: qsTr("Оберіть боржника зліва або знайдіть будь-якого постачальника — "
+                           + "побачите його баланс, історію чеків і виплат.")
+                actionText: qsTr("Знайти постачальника  ·  F2")
+                onActionTriggered: supplierPicker.open()
+            }
+        }
+
         // The chosen supplier: the debt in big figures and the payment form.
         Frame {
+            visible: screen.hasSupplier
             Layout.preferredWidth: 320
             Layout.fillHeight: true
 
@@ -111,15 +129,14 @@ Page {
                     Layout.fillWidth: true
 
                     Label {
-                        text: screen.hasSupplier ? Terminal.cashSupplierName : qsTr("Постачальника не обрано")
+                        text: Terminal.cashSupplierName
                         font.pixelSize: Theme.fontSizeTitle
                         font.weight: Font.Bold
                         elide: Text.ElideRight
                         Layout.fillWidth: true
                     }
                     Label {
-                        text: screen.hasSupplier ? qsTr("Борги спільні для всіх сесій")
-                                                 : qsTr("Оберіть зліва або F2")
+                        text: qsTr("Борги спільні для всіх сесій")
                         font.pixelSize: Theme.fontSizeCaption
                         color: Theme.textMuted
                         Layout.fillWidth: true
@@ -233,6 +250,7 @@ Page {
 
         // Where the balance comes from: receipts add, payments take away.
         Frame {
+            visible: screen.hasSupplier
             Layout.fillWidth: true
             Layout.fillHeight: true
 
@@ -261,7 +279,7 @@ Page {
                     Label {
                         anchors.centerIn: parent
                         visible: history.count === 0
-                        text: screen.hasSupplier ? qsTr("Записів немає") : qsTr("Оберіть постачальника")
+                        text: qsTr("Записів немає")
                         color: Theme.textMuted
                     }
 

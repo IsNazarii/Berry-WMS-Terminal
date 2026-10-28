@@ -64,14 +64,8 @@ Page {
                     Layout.fillHeight: true
                     clip: true
                     spacing: Theme.spacingXs
+                    // Empty: the middle panel says so and why a receipt would turn up here.
                     model: Terminal.allocationSources
-
-                    Label {
-                        anchors.centerIn: parent
-                        visible: sourceList.count === 0
-                        text: qsTr("Усе розподілено")
-                        color: Theme.textMuted
-                    }
 
                     delegate: ItemDelegate {
                         id: sourceRow
@@ -117,8 +111,20 @@ Page {
             Layout.fillWidth: true
             Layout.fillHeight: true
 
+            // Nothing to work on yet: either all is placed or a receipt is still to be picked.
+            EmptyState {
+                anchors.centerIn: parent
+                visible: !screen.hasReceipt
+                icon: sourceList.count === 0 ? "circle-check" : "truck"
+                title: sourceList.count === 0 ? qsTr("Усе розподілено") : qsTr("Оберіть чек зліва")
+                text: sourceList.count === 0
+                      ? qsTr("Чек з'явиться зліва, коли палеті забракне місця у фурі або на «Прийомі» не обрано ціль.")
+                      : qsTr("Там чеки з палетами, що ще чекають на фуру або склад.")
+            }
+
             ColumnLayout {
                 anchors.fill: parent
+                visible: screen.hasReceipt
                 spacing: Theme.spacingM
 
                 ColumnLayout {

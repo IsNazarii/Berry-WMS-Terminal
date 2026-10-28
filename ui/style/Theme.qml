@@ -75,6 +75,9 @@ QtObject {
     readonly property int statusDotSize: 8
     readonly property int brandMarkSize: 28
     readonly property int brandMarkSizeLarge: 40
+    // The round badge of an empty state and the icon in it.
+    readonly property int emptyBadgeSize: 72
+    readonly property int iconSizeLarge: 34
 
     // A monochrome icon from ui/style/icons; controls tint it with their text color.
     function icon(name: string): url {

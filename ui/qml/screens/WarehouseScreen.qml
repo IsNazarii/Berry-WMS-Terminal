@@ -18,6 +18,8 @@ Page {
     readonly property bool hasTruck: truckId !== ""
     // Trucks of the session still loading; the warehouse itself is not a target here.
     readonly property var trucks: Terminal.destinations.filter(d => !d.warehouse)
+    // Nothing of any crop: the table of zeros gives way to what fills the warehouse.
+    readonly property bool empty: Terminal.stock.every(s => s.empty)
 
     // "40 / 400 ящ.": the load over the truck's limit.
     function boxesText(load, limit) {
@@ -54,7 +56,7 @@ Page {
                         font.weight: Font.Bold
                     }
                     Label {
-                        text: qsTr("Надходить з чеків на екрані «Розподіл»; відвантажується лише у фуру поточної сесії")
+                        text: qsTr("Надходить з «Прийому» і «Розподілу»; відвантажується лише у фуру поточної сесії")
                         font.pixelSize: Theme.fontSizeCaption
                         color: Theme.textMuted
                         elide: Text.ElideRight
@@ -64,6 +66,7 @@ Page {
 
                 // Where the boxes go: picked once on the right, shown here where the buttons are.
                 Label {
+                    visible: !screen.empty
                     text: !Terminal.sessionOpen ? qsTr("Відвантаження можливе лише у відкритій сесії")
                           : screen.hasTruck ? qsTr("Куди: %1").arg(screen.truckTitle)
                                             : qsTr("Оберіть фуру праворуч")
@@ -80,6 +83,7 @@ Page {
                 }
 
                 ColumnLayout {
+                    visible: !screen.empty
                     spacing: 0
                     Layout.fillWidth: true
 
@@ -193,7 +197,19 @@ Page {
                         radius: Theme.radiusS
                     }
                 }
-                Item { Layout.fillHeight: true }
+                Item {
+                    Layout.fillWidth: true
+                    Layout.fillHeight: true
+
+                    EmptyState {
+                        anchors.centerIn: parent
+                        visible: screen.empty
+                        icon: "warehouse"
+                        title: qsTr("Склад порожній")
+                        text: qsTr("Палети потрапляють сюди з «Прийому» (ціль «Склад») і з «Розподілу». "
+                                   + "Звідси ящики йдуть лише у фуру поточної сесії.")
+                    }
+                }
             }
         }
 

@@ -86,25 +86,10 @@ ToolBar {
         anchors.fill: parent
         spacing: Theme.spacingXl
 
-        // Brand: three berries drawn from the theme, so they follow light and dark.
         RowLayout {
             spacing: Theme.spacingS
 
-            Item {
-                id: mark
-                readonly property real berry: Theme.brandMarkSize * 0.42
-                implicitWidth: Theme.brandMarkSize
-                implicitHeight: Theme.brandMarkSize
-
-                component Berry: Rectangle {
-                    width: mark.berry
-                    height: mark.berry
-                    radius: width / 2
-                }
-                Berry { x: mark.width * 0.08; y: mark.height * 0.12; color: Theme.accent }
-                Berry { x: mark.width * 0.5; y: mark.height * 0.12; color: Qt.lighter(Theme.accent, 1.35) }
-                Berry { x: mark.width * 0.29; y: mark.height * 0.48; color: Qt.darker(Theme.accent, 1.25) }
-            }
+            BrandMark {}
             ColumnLayout {
                 spacing: 0
 

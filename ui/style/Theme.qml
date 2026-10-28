@@ -29,6 +29,12 @@ QtObject {
     readonly property color dangerSoft: dark ? "#3A1F22" : "#FBE7E5"
 
     // Dims the window behind a modal dialog.
+    // The brand panel of the login screen: deep blueberry in both themes.
+    readonly property color brandPanel: dark ? "#23254A" : "#2A2E70"
+    readonly property color brandPanelText: dark ? "#E9E8F2" : "#FFFFFF"
+    readonly property color brandPanelMuted: dark ? "#9C9AB3" : "#C9CBF2"
+    readonly property color brandMarkOnPanel: "#B9BCF7"
+
     readonly property color overlay: dark ? "#99000000" : "#661C1B2B"
 
     // The scale indicator is an instrument, dark in both themes.
@@ -52,6 +58,12 @@ QtObject {
 
     readonly property int controlHeight: 40
     readonly property int controlHeightLarge: 48
+    readonly property int controlHeightXl: 56
+    // A pickable card (an operator on the login screen).
+    readonly property int tileHeight: 80
+    // A lone form in the middle of a screen (login) does not stretch wider than this.
+    readonly property int formMaxWidth: 520
+    readonly property int loginPanelMinWidth: 340
 
     // The app bar over every screen: brand, navigation, session and operator.
     readonly property int appBarHeight: 56
@@ -59,8 +71,10 @@ QtObject {
     readonly property int iconSizeSmall: 14
     readonly property int badgeSize: 18
     readonly property int avatarSize: 32
+    readonly property int avatarSizeLarge: 48
     readonly property int statusDotSize: 8
     readonly property int brandMarkSize: 28
+    readonly property int brandMarkSizeLarge: 40
 
     // A monochrome icon from ui/style/icons; controls tint it with their text color.
     function icon(name: string): url {
@@ -84,5 +98,6 @@ QtObject {
     readonly property int fontSizeTitle: 18
     readonly property int fontSizeLarge: 20
     readonly property int fontSizeHeading: 24
+    readonly property int fontSizeDisplay: 36
     readonly property int fontSizeScale: 64
 }

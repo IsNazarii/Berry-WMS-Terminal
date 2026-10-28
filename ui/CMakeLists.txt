@@ -16,6 +16,7 @@ qt_add_qml_module(wms_ui
     QML_FILES
         qml/Main.qml
         qml/AppBar.qml
+        qml/BrandMark.qml
         qml/screens/LoginScreen.qml
         qml/screens/SessionScreen.qml
         qml/screens/ReceivingScreen.qml

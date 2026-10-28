@@ -8,7 +8,7 @@
 ```mermaid
 flowchart LR
     OP(("Оператор"))
-    SC["Промислові ваги<br/>(COM-порт)"]
+    SC["Ваги ВН-2000-4 / ІЕ-04<br/>(RS-232)"]
     PR["Термопринтер 80 мм<br/>(ESC/POS)"]
     T["Berry WMS Terminal<br/>(ноутбук на пункті)"]
     DB[("SQLite<br/>локально")]
@@ -32,7 +32,7 @@ flowchart LR
 | Шар | Каталог | Ціль CMake | Залежить від | Що містить |
 |---|---|---|---|---|
 | Ядро | `core/` | `wms_core` (статична бібліотека) | лише стандартна бібліотека C++20 | доменні класи, правила, валідація, обчислення |
-| Інфраструктура | `infra/` | `wms_infra` + `sqlite3` (амальгамація) | core; Qt — лише для пристроїв | обгортка SQLite (`sqlite::Database`/`Statement`/`ScopedTransaction`) ✅; схема з версіями (`migrateSchema`, 8 міграцій) + `SqliteJournalStore` + `SqliteSessionStore` + `SqliteRepository<T>` + `backupDatabase` ✅; COM-порт ваг, HTTP-sync, друк — далі |
+| Інфраструктура | `infra/` | `wms_infra` + `sqlite3` (амальгамація) | core; Qt — лише для пристроїв | обгортка SQLite (`sqlite::Database`/`Statement`/`ScopedTransaction`) ✅; схема з версіями (`migrateSchema`, 8 міграцій) + `SqliteJournalStore` + `SqliteSessionStore` + `SqliteRepository<T>` + `backupDatabase` ✅; ваги RS-232, HTTP-sync, друк — далі |
 | Інтерфейс | `ui/` | `wms_ui` + `wms_uiplugin` (QML-модуль `BerryWms.Ui`) | core, Qt Quick | QML-екрани і тонкі адаптери |
 | Точка входу | `app/` | `wms_terminal` (виконуваний) | ui | `main()`: створює `QGuiApplication`, завантажує `Main.qml` |
 | Тести | `tests/` | `wms_core_tests`, `wms_infra_tests` | core / infra, GoogleTest | 235 тестів ядра + 36 тестів infra на справжній SQLite |
@@ -228,7 +228,13 @@ sequenceDiagram
     (назва з часом UTC → сортування за назвою = за часом; ротація чіпає лише свої файли). `Terminal` — при запуску й закритті сесії.
 - **Sync**: outbox незасинхронізованих записів, батчі, сервер повертає прийняті UUID
   (`Transaction::markSynced()`), retry з backoff; pull довідників за курсором `updated_since`.
-- **`SerialScaleDriver`** — реалізація `IScaleDriver` через Qt SerialPort; `ScaleMonitor`
-  знає драйвер лише через інтерфейс, тож заміна симулятора не зачепить UI.
+- **`SerialScaleDriver`** — реалізація `IScaleDriver` через Qt SerialPort для ваг ВН-2000-4 з індикатором
+  ІЕ-04 (RS-232, 9600 8N1, протокол 0: запит `<00!>` → 10 байтів — 6 розрядів табло й байт статусу).
+  Розбір кадру — чистий C++ у ядрі (тестується на сирих байтах), порт — окрема Qt-ціль в `infra/`, щоб тести
+  SQLite не залежали від Qt. Опитування не блокує UI: на тіку `ScaleMonitor` драйвер забирає відповідь на
+  попередній запит і шле наступний. Стабільність для справжніх ваг — біт індикатора (він сам фільтрує
+  коливання), а не `StabilityDetector`. `ScaleMonitor` знає драйвер лише через інтерфейс, тож заміна
+  симулятора не зачепить екрани. Пишеться лише з доступом до ваг — план і невизначеності протоколу в
+  [hardware/scale-ie04.md](hardware/scale-ie04.md).
 - **Друк чека** (лаба 3, без Qt-друку): термопринтер 80 мм, команди ESC/POS; QR з UUID чека — nayuki qrcodegen
   або вбудований QR принтера. Модель принтера ще не обрана.

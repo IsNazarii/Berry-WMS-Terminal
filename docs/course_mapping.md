@@ -43,7 +43,7 @@ classDiagram
     Transaction <|-- AllocationReversal
     Transaction <|-- StockShipment
     IScaleDriver <|-- SimulatedScaleDriver
-    IScaleDriver <|.. SerialScaleDriver : заплановано (infra)
+    IScaleDriver <|.. SerialScaleDriver : заплановано (infra, ІЕ-04)
     JournalStore <|-- SqliteJournalStore
     SessionStore <|-- SqliteSessionStore
     Repository~T~ <|-- SqliteRepository~T~

@@ -67,8 +67,9 @@ Page {
                     text: !Terminal.sessionOpen ? qsTr("Відвантаження можливе лише у відкритій сесії")
                           : screen.hasTruck ? qsTr("Куди: %1").arg(screen.truckTitle)
                                             : qsTr("Оберіть фуру праворуч")
-                    font.weight: Font.DemiBold
-                    color: screen.hasTruck && Terminal.sessionOpen ? Theme.accent : Theme.warn
+                    font.weight: screen.hasTruck && Terminal.sessionOpen ? Font.DemiBold : Font.Normal
+                    // No session is a real obstacle; no truck picked yet is just the next step.
+                    color: !Terminal.sessionOpen ? Theme.warn : screen.hasTruck ? Theme.accent : Theme.textMuted
                     elide: Text.ElideRight
                     padding: Theme.spacingS
                     Layout.fillWidth: true

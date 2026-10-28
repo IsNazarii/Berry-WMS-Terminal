@@ -106,7 +106,7 @@ Page {
 
             // Prices of the day. A new price applies to weighings from now on.
             Frame {
-                Layout.preferredWidth: 280
+                Layout.preferredWidth: 340
                 Layout.fillHeight: true
 
                 ColumnLayout {
@@ -153,14 +153,6 @@ Page {
                                     elide: Text.ElideRight
                                     Layout.fillWidth: true
                                 }
-                                ToolButton {
-                                    text: "✕"
-                                    opacity: hovered || activeFocus ? 1 : 0.5
-                                    ToolTip.visible: hovered
-                                    ToolTip.text: qsTr("Прибрати культуру")
-                                    onClicked: removeCropDialog.ask(priceRow.modelData.cropCode,
-                                                                    priceRow.modelData.name)
-                                }
                                 // The current price, big: this is what goes into the next weighing.
                                 Label {
                                     text: priceRow.price !== "" ? priceRow.price : qsTr("не задано")
@@ -168,7 +160,7 @@ Page {
                                     font.weight: Font.DemiBold
                                     color: priceRow.price !== "" ? Theme.text : Theme.warn
                                     horizontalAlignment: Text.AlignRight
-                                    Layout.preferredWidth: 80
+                                    Layout.preferredWidth: 72
                                 }
                                 TextField {
                                     id: newPrice
@@ -177,6 +169,14 @@ Page {
                                     Layout.preferredWidth: 80
                                     onTextEdited: priceError.text = ""
                                     onAccepted: prices.applyAll()
+                                }
+                                // Rare, so last in the row: away from the price field the operator types into.
+                                ToolButton {
+                                    text: "✕"
+                                    ToolTip.visible: hovered
+                                    ToolTip.text: qsTr("Прибрати культуру")
+                                    onClicked: removeCropDialog.ask(priceRow.modelData.cropCode,
+                                                                    priceRow.modelData.name)
                                 }
                             }
                             ErrorLabel { id: priceError }

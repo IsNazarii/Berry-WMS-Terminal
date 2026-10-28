@@ -440,8 +440,7 @@ Page {
                     enabled: screen.hasReceipt
                     spacing: Theme.spacingS
 
-                    // The main action never gets elided: on a narrow screen it says less,
-                    // and the warning button gives way instead.
+                    // Neither button gets elided: on a narrow screen the main action says less.
                     Button {
                         text: recordActions.width < 520 ? qsTr("Записати  ·  Enter") : qsTr("Записати зважування  ·  Enter")
                         Layout.minimumWidth: implicitWidth
@@ -455,8 +454,7 @@ Page {
                     // A separate, deliberate action: the scale may keep flipping between two steps.
                     WarningButton {
                         text: qsTr("Прийняти нестабільну")
-                        Layout.fillWidth: true
-                        Layout.maximumWidth: implicitWidth
+                        Layout.minimumWidth: implicitWidth
                         enabled: !screen.scales.stable && manualWeight.text.trim() === ""
                         Layout.preferredHeight: Theme.controlHeightLarge
                         onClicked: weighingForm.record(true)
@@ -644,7 +642,6 @@ Page {
                                     anchors.centerIn: parent
                                     visible: !line.cancelled
                                     text: "✕"
-                                    opacity: rowHover.hovered || activeFocus ? 1 : 0.5
                                     ToolTip.visible: hovered
                                     ToolTip.text: qsTr("Анулювати зважування")
                                     onClicked: receiptError.text = Terminal.cancelWeighing(line.modelData.index)

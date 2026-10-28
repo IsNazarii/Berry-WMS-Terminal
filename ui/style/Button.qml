@@ -17,12 +17,15 @@ T.Button {
     padding: Theme.spacingS
     horizontalPadding: control.flat ? Theme.spacingS : Theme.spacingL
     font.weight: control.flat ? Font.Medium : Font.DemiBold
-    opacity: control.enabled ? 1 : Theme.disabledOpacity
+    // A disabled primary keeps full opacity and turns neutral: a washed-out accent looks broken.
+    readonly property bool primaryDisabled: control.highlighted && !control.enabled
+    opacity: control.enabled || control.primaryDisabled ? 1 : Theme.disabledOpacity
 
     contentItem: Text {
         text: control.text
         font: control.font
-        color: control.highlighted ? Theme.textOnAccent : control.warning ? Theme.warn
+        color: control.primaryDisabled ? Theme.textMuted
+             : control.highlighted ? Theme.textOnAccent : control.warning ? Theme.warn
              : control.flat ? Theme.textMuted : Theme.text
         horizontalAlignment: Text.AlignHCenter
         verticalAlignment: Text.AlignVCenter
@@ -34,6 +37,8 @@ T.Button {
         implicitHeight: control.flat ? 32 : Theme.controlHeight
         radius: Theme.radiusS
         color: {
+            if (control.primaryDisabled)
+                return Theme.surfaceAlt
             if (control.highlighted)
                 return control.down ? Qt.darker(Theme.accent, 1.15)
                      : control.hovered ? Qt.lighter(Theme.accent, 1.1) : Theme.accent

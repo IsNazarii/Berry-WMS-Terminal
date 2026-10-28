@@ -150,8 +150,8 @@ Page {
                 Label {
                     text: screen.hasDestination ? qsTr("Куди: %1").arg(screen.destinationTitle)
                                                 : qsTr("Оберіть фуру або склад праворуч")
-                    font.weight: Font.DemiBold
-                    color: screen.hasDestination ? Theme.accent : Theme.warn
+                    font.weight: screen.hasDestination ? Font.DemiBold : Font.Normal
+                    color: screen.hasDestination ? Theme.accent : Theme.textMuted
                     elide: Text.ElideRight
                     padding: Theme.spacingS
                     Layout.fillWidth: true

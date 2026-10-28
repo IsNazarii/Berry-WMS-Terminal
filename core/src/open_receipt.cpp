@@ -6,14 +6,15 @@
 
 namespace wms {
 
-OpenReceipt::OpenReceipt(Uuid id, TimePoint openedAt, SupplierId supplierId, std::vector<Weighing> weighings)
-    : id_{id}, openedAt_{openedAt}, supplierId_{supplierId}, weighings_{std::move(weighings)} {
+OpenReceipt::OpenReceipt(Uuid id, TimePoint openedAt, SupplierId supplierId, std::vector<Weighing> weighings,
+                         std::optional<Uuid> sessionId)
+    : id_{id}, openedAt_{openedAt}, supplierId_{supplierId}, weighings_{std::move(weighings)}, sessionId_{sessionId} {
     if (id_.isNil()) throw std::invalid_argument("Open receipt id must not be nil");
     if (supplierId_ <= 0) throw std::invalid_argument("Open receipt needs a supplier");
 }
 
-OpenReceipt OpenReceipt::open(SupplierId supplierId) {
-    return OpenReceipt{Uuid::generateV7(), Clock::now(), supplierId, {}};
+OpenReceipt OpenReceipt::open(SupplierId supplierId, std::optional<Uuid> sessionId) {
+    return OpenReceipt{Uuid::generateV7(), Clock::now(), supplierId, {}, sessionId};
 }
 
 Cargo OpenReceipt::total() const noexcept {
@@ -75,7 +76,7 @@ Receipt OpenReceipt::toReceipt(Settlement settlement) const {
             w.priceSource = PriceSource::DayPrice;
         }
     }
-    return Receipt{id_, openedAt_, supplierId_, settlement, std::move(lines)};
+    return Receipt{id_, openedAt_, supplierId_, settlement, std::move(lines), SyncStatus::Pending, sessionId_};
 }
 
 } // namespace wms

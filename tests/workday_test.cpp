@@ -599,3 +599,19 @@ TEST(WorkDay, CancelledPalletNoLongerLeadsTheCrop) {
     EXPECT_EQ(u.journal.loadOf(u.first), Cargo{});
     EXPECT_EQ(u.day.nextDestination(u.receipt, "raspberry", u.second, u.journal), Destination{u.second});
 }
+
+TEST(WorkDay, ReceiptsAndPaymentsBelongToTheSession) {
+    // Membership is a property of the record, not of its time: a clock may be off.
+    WorkDay day = dayWithRaspberryPrice();
+    const Uuid handedOver = day.openReceipt(42).id();
+    EXPECT_EQ(day.findReceipt(handedOver)->sessionId(), day.id());
+    day.addWeighing(handedOver, raspberryPallet(), kMidnight + 13h);
+    EXPECT_EQ(day.closeReceipt(handedOver, Settlement::HandedOver).sessionId(), day.id());
+
+    const Uuid paidOnSite = day.openReceipt(43).id();
+    day.addWeighing(paidOnSite, raspberryPallet(), kMidnight + 14h);
+    const PaidReceipt paid = day.payReceipt(paidOnSite, {{.cropCode = "raspberry", .pricePerKg = hryvnias(85)}},
+                                            PaymentMethod::Cash, kPetro, kMidnight + 15h);
+    EXPECT_EQ(paid.receipt.sessionId(), day.id());
+    EXPECT_EQ(paid.payment.sessionId(), day.id());
+}

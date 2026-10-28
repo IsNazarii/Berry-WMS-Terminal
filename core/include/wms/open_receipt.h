@@ -7,6 +7,7 @@
 #include "wms/uuid.h"
 
 #include <cstddef>
+#include <optional>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -22,13 +23,16 @@ public:
     // The id is final from the start: pallets may go into a truck before the
     // receipt is closed, and their allocations point at this id.
     // Throws std::invalid_argument for a nil id or no supplier.
-    OpenReceipt(Uuid id, TimePoint openedAt, SupplierId supplierId, std::vector<Weighing> weighings);
+    // sessionId: the work day it is weighed in; the closed Receipt keeps it.
+    OpenReceipt(Uuid id, TimePoint openedAt, SupplierId supplierId, std::vector<Weighing> weighings,
+                std::optional<Uuid> sessionId = std::nullopt);
 
-    [[nodiscard]] static OpenReceipt open(SupplierId supplierId);
+    [[nodiscard]] static OpenReceipt open(SupplierId supplierId, std::optional<Uuid> sessionId = std::nullopt);
 
     [[nodiscard]] const Uuid& id() const noexcept { return id_; }
     [[nodiscard]] TimePoint openedAt() const noexcept { return openedAt_; }
     [[nodiscard]] SupplierId supplierId() const noexcept { return supplierId_; }
+    [[nodiscard]] const std::optional<Uuid>& sessionId() const noexcept { return sessionId_; }
     [[nodiscard]] const std::vector<Weighing>& weighings() const noexcept { return weighings_; }
     // Without cancelled lines.
     [[nodiscard]] Cargo total() const noexcept;
@@ -58,6 +62,7 @@ private:
     TimePoint openedAt_;
     SupplierId supplierId_;
     std::vector<Weighing> weighings_;
+    std::optional<Uuid> sessionId_;
 };
 
 } // namespace wms

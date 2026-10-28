@@ -272,3 +272,18 @@ TEST(Weighing, ManualPriceCountsLikeDayPrice) {
     EXPECT_EQ(manual.describe(), usual.describe());
     EXPECT_EQ(manual.amount(), usual.amount());
 }
+
+TEST(Receipt, BelongsToTheSessionItWasWeighedIn) {
+    const Uuid session = Uuid::generateV7();
+    const Receipt receipt{Uuid::generateV7(), Clock::now(), 42, Settlement::OnSite, {raspberryPallet()},
+                          SyncStatus::Pending, session};
+    EXPECT_EQ(receipt.sessionId(), session);
+    EXPECT_FALSE(Receipt::create(42, Settlement::OnSite, {raspberryPallet()}).sessionId().has_value());
+}
+
+TEST(Payment, KnowsItsSessionOrNone) {
+    // The cash desk works without an open session: such a payment belongs to no work day.
+    EXPECT_FALSE(Payment::create(42, hryvnias(100), PaymentMethod::Cash, 1).sessionId().has_value());
+    const Uuid session = Uuid::generateV7();
+    EXPECT_EQ(Payment::create(42, hryvnias(100), PaymentMethod::Cash, 1, session).sessionId(), session);
+}

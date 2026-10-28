@@ -156,3 +156,12 @@ TEST(OpenReceipt, SetPriceRepricesEveryCountedLineOfTheCrop) {
     EXPECT_EQ(lines[3].pricePerKg, hryvnias(85));
     EXPECT_EQ(lines[3].priceSource, PriceSource::DayPrice);
 }
+
+TEST(OpenReceipt, ClosedReceiptKeepsItsSession) {
+    const Uuid session = Uuid::generateV7();
+    OpenReceipt r = OpenReceipt::open(42, session);
+    EXPECT_EQ(r.sessionId(), session);
+    r.add(pallet("raspberry", 80, kilograms(150)));
+    EXPECT_EQ(r.close(Settlement::OnSite).sessionId(), session);
+    EXPECT_FALSE(OpenReceipt::open(42).sessionId().has_value());
+}

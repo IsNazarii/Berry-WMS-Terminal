@@ -24,9 +24,9 @@ std::vector<std::string> Weighing::validate() const {
 }
 
 Receipt::Receipt(Uuid id, TimePoint createdAt, SupplierId supplierId, Settlement settlement,
-                 std::vector<Weighing> weighings, SyncStatus syncStatus)
+                 std::vector<Weighing> weighings, SyncStatus syncStatus, std::optional<Uuid> sessionId)
     : Transaction{id, createdAt, syncStatus}, supplierId_{supplierId}, settlement_{settlement},
-      weighings_{std::move(weighings)} {}
+      weighings_{std::move(weighings)}, sessionId_{sessionId} {}
 
 Receipt Receipt::create(SupplierId supplierId, Settlement settlement, std::vector<Weighing> weighings) {
     return Receipt{Uuid::generateV7(), Clock::now(), supplierId, settlement, std::move(weighings)};

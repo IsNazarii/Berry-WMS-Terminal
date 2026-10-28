@@ -85,7 +85,7 @@ const OpenReceipt& WorkDay::openReceipt(SupplierId supplierId) {
     requireOpen();
     const auto found = std::ranges::find(openReceipts_, supplierId, &OpenReceipt::supplierId);
     if (found != openReceipts_.end()) return *found;
-    return openReceipts_.emplace_back(OpenReceipt::open(supplierId));
+    return openReceipts_.emplace_back(OpenReceipt::open(supplierId, id_));
 }
 
 std::size_t WorkDay::addWeighing(const Uuid& receiptId, Weighing weighing, TimePoint at) {
@@ -170,7 +170,8 @@ PaidReceipt WorkDay::payReceipt(const Uuid& receiptId, const std::vector<CropPri
                                 OperatorId paidBy, TimePoint at) {
     if (!validatePay(receiptId, prices, at).empty()) throw std::logic_error("Receipt cannot be paid yet");
     Receipt closed = priced(receiptId, prices, at).close(Settlement::OnSite);
-    Payment payment{Uuid::generateV7(), at, closed.supplierId(), closed.amount(), method, paidBy};
+    Payment payment{Uuid::generateV7(), at, closed.supplierId(), closed.amount(), method, paidBy, SyncStatus::Pending,
+                    id_};
     openReceipts_.erase(receipt(receiptId));
     return {.receipt = std::move(closed), .payment = std::move(payment)};
 }

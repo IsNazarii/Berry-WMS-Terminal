@@ -5,6 +5,7 @@
 #include "wms/transaction.h"
 
 #include <concepts>
+#include <optional>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -51,8 +52,11 @@ struct Weighing {
 // different crops, paid by a single receipt.
 class Receipt final : public Transaction {
 public:
+    // sessionId: the work day the berries were received in; empty only for
+    // receipts made outside a session (tests, records from before sessions knew them).
     Receipt(Uuid id, TimePoint createdAt, SupplierId supplierId, Settlement settlement,
-            std::vector<Weighing> weighings, SyncStatus syncStatus = SyncStatus::Pending);
+            std::vector<Weighing> weighings, SyncStatus syncStatus = SyncStatus::Pending,
+            std::optional<Uuid> sessionId = std::nullopt);
 
     // New receipt with a fresh UUIDv7 and the current time. Settlement has no
     // default on purpose: it decides whether the receipt creates a debt.
@@ -60,6 +64,9 @@ public:
 
     [[nodiscard]] SupplierId supplierId() const noexcept { return supplierId_; }
     [[nodiscard]] Settlement settlement() const noexcept { return settlement_; }
+    // Belonging to a work day is a property of the record, not of its time: a late
+    // receipt goes into the day it belongs to, and a terminal clock may be off.
+    [[nodiscard]] const std::optional<Uuid>& sessionId() const noexcept { return sessionId_; }
     // All lines, cancelled ones included; totals below skip the cancelled.
     [[nodiscard]] const std::vector<Weighing>& weighings() const noexcept { return weighings_; }
 
@@ -78,6 +85,7 @@ private:
     SupplierId supplierId_;
     Settlement settlement_;
     std::vector<Weighing> weighings_;
+    std::optional<Uuid> sessionId_;
 };
 
 // Weighed berries with a final id: a closed Receipt or one still open.

@@ -2,6 +2,7 @@ pragma ComponentBehavior: Bound
 
 import QtQuick
 import QtQuick.Controls
+import QtQuick.Controls.impl
 import QtQuick.Layouts
 import BerryWms.Ui
 
@@ -32,7 +33,7 @@ Page {
         property string caption
         property bool selected: false
 
-        implicitHeight: Theme.controlHeightLarge
+        implicitHeight: Theme.controlHeightXl
         implicitWidth: 96
         Layout.fillWidth: true
         opacity: enabled ? 1 : Theme.disabledOpacity
@@ -41,6 +42,7 @@ Page {
             spacing: 0
             Label {
                 text: cropButton.text
+                font.pixelSize: Theme.fontSizeField
                 font.weight: Font.DemiBold
                 color: cropButton.selected ? Theme.textOnAccent : Theme.text
                 elide: Text.ElideRight
@@ -101,7 +103,7 @@ Page {
 
         // Open receipts: two big suppliers unloading in turns, a retail one in between.
         Frame {
-            Layout.preferredWidth: 220
+            Layout.preferredWidth: Math.min(220, screen.width * 0.2)
             Layout.fillHeight: true
 
             ColumnLayout {
@@ -114,7 +116,9 @@ Page {
                     Layout.fillWidth: true
                     onClicked: screen.newReceipt()
                 }
-                SectionCaption { text: qsTr("Відкриті чеки") }
+                SectionCaption {
+                    text: receiptList.count > 0 ? qsTr("Відкриті чеки · %1").arg(receiptList.count) : qsTr("Відкриті чеки")
+                }
 
                 ListView {
                     id: receiptList
@@ -173,172 +177,166 @@ Page {
             Layout.fillWidth: true
             Layout.fillHeight: true
 
-            ColumnLayout {
-                id: weighingForm
+            // A small window (high UI scale) is not tall enough for the whole form: it scrolls then.
+            Flickable {
+                id: formScroll
                 anchors.fill: parent
-                spacing: Theme.spacingM
+                contentHeight: weighingForm.height
+                // Only when it does not fit: a mouse drag must not move a form that fits.
+                interactive: contentHeight > height
+                boundsBehavior: Flickable.StopAtBounds
+                clip: true
+                ScrollBar.vertical: ScrollBar {}
 
-                property string cropCode: Terminal.crops.length > 0 ? Terminal.crops[0].cropCode : ""
-                readonly property var placement: Terminal.nextPlacements[cropCode] ?? {}
-                // A truck with fewer free boxes than typed: the pallet will wait on the allocation screen.
-                readonly property bool wontFit: placement.boxesLeft !== undefined && placement.boxesLeft >= 0
-                                                && parseInt(boxes.text) > placement.boxesLeft
-
-                // Five crops are keys, the rest wait behind "Ще"; which five is
-                // Terminal.cropKeys (a crop used from the menu replaces the key used
-                // longest ago). With six or fewer there is no point in a menu, all are keys.
-                readonly property var cropKeys: {
-                    const all = Terminal.crops
-                    if (all.length <= 6)
-                        return { keys: all, more: [] }
-                    const keyCodes = Terminal.cropKeys
-                    return {
-                        keys: keyCodes.map(code => all.find(c => c.cropCode === code)).filter(c => c !== undefined),
-                        more: all.filter(c => !keyCodes.includes(c.cropCode))
-                    }
-                }
-                readonly property var pickedFromMore:
-                    cropKeys.more.find(c => c.cropCode === cropCode) ?? null
-
-                function priceCaption(code) {
-                    const price = Terminal.prices[code]
-                    return price !== undefined ? qsTr("%1 грн").arg(price) : qsTr("ціни немає")
-                }
-
-                // Crop and box tare are usually the same for the next pallet, so they
-                // stay; the pallet and a typed weight are per weighing.
-                function record(acceptUnstable) {
-                    weighingError.text = Terminal.recordWeighing(cropCode, boxes.text, boxTare.text,
-                                                                 palletTare.text, manualWeight.text, acceptUnstable)
-                    if (weighingError.text === "") {
-                        boxes.clear()
-                        palletTare.clear()
-                        manualWeight.clear()
-                        boxes.forceActiveFocus()
-                    }
-                }
-
-                // The indicator is an instrument: dark in both themes, lamps like a real one.
-                Rectangle {
-                    Layout.fillWidth: true
-                    implicitHeight: readout.implicitHeight + 2 * Theme.spacingL
-                    radius: Theme.radiusM
-                    color: Theme.scaleBg
-
-                    ColumnLayout {
-                        anchors.left: parent.left
-                        anchors.leftMargin: Theme.spacingXl
-                        anchors.verticalCenter: parent.verticalCenter
-                        spacing: Theme.spacingS
-
-                        Lamp { caption: qsTr("СТАБ"); lit: screen.scales.stable }
-                        Lamp { caption: qsTr("НУЛЬ"); lit: screen.scales.zero }
-                        Lamp { caption: qsTr("БРУТТО"); lit: true }
-                    }
-
-                    RowLayout {
-                        id: readout
-                        anchors.right: parent.right
-                        anchors.rightMargin: Theme.spacingXl
-                        anchors.verticalCenter: parent.verticalCenter
-                        spacing: Theme.spacingS
-
-                        Label {
-                            text: screen.scales.display
-                            font.pixelSize: Theme.fontSizeScale
-                            font.weight: Font.DemiBold
-                            color: screen.scales.stable ? Theme.scaleDigit : Theme.scaleDigitUnstable
-                        }
-                        Label {
-                            text: qsTr("кг")
-                            font.pixelSize: Theme.fontSizeLarge
-                            color: screen.scales.stable ? Theme.scaleDigit : Theme.scaleDigitUnstable
-                            opacity: 0.8
-                            Layout.alignment: Qt.AlignBaseline
-                        }
-                    }
-                }
-
-                RowLayout {
-                    Layout.fillWidth: true
-                    Label {
-                        text: screen.scales.driverName
-                        font.pixelSize: Theme.fontSizeCaption
-                        color: Theme.textMuted
-                        elide: Text.ElideRight
-                        Layout.fillWidth: true
-                    }
-                    Button {
-                        text: qsTr("Поставити палету")
-                        flat: true
-                        onClicked: Terminal.simulatePallet()
-                    }
-                    Button {
-                        text: qsTr("Зняти")
-                        flat: true
-                        onClicked: Terminal.simulateEmptyScale()
-                    }
-                }
-
-                // What stays between pallets: the crop, its price, the box tare.
                 ColumnLayout {
-                    Layout.fillWidth: true
-                    enabled: screen.hasReceipt
-                    spacing: Theme.spacingS
+                    id: weighingForm
+                    width: formScroll.width
+                    // At least the panel's height, so the simulator row stays at the bottom.
+                    height: Math.max(implicitHeight, formScroll.height)
+                    spacing: Theme.spacingM
 
-                    SectionCaption { text: qsTr("Культура") }
+                    property string cropCode: Terminal.crops.length > 0 ? Terminal.crops[0].cropCode : ""
+                    readonly property var placement: Terminal.nextPlacements[cropCode] ?? {}
+                    // A truck with fewer free boxes than typed: the pallet will wait on the allocation screen.
+                    readonly property bool wontFit: placement.boxesLeft !== undefined && placement.boxesLeft >= 0
+                                                    && parseInt(boxes.text) > placement.boxesLeft
 
-                    RowLayout {
+                    // Five crops are keys, the rest wait behind "Ще"; which five is
+                    // Terminal.cropKeys (a crop used from the menu replaces the key used
+                    // longest ago). With six or fewer there is no point in a menu, all are keys.
+                    readonly property var cropKeys: {
+                        const all = Terminal.crops
+                        if (all.length <= 6)
+                            return { keys: all, more: [] }
+                        const keyCodes = Terminal.cropKeys
+                        return {
+                            keys: keyCodes.map(code => all.find(c => c.cropCode === code)).filter(c => c !== undefined),
+                            more: all.filter(c => !keyCodes.includes(c.cropCode))
+                        }
+                    }
+                    readonly property var pickedFromMore:
+                        cropKeys.more.find(c => c.cropCode === cropCode) ?? null
+
+                    function priceCaption(code) {
+                        const price = Terminal.prices[code]
+                        return price !== undefined ? qsTr("%1 грн/кг").arg(price) : qsTr("ціни немає")
+                    }
+
+                    // Crop and box tare are usually the same for the next pallet, so they
+                    // stay; the pallet and a typed weight are per weighing.
+                    function record(acceptUnstable) {
+                        weighingError.text = Terminal.recordWeighing(cropCode, boxes.text, boxTare.text,
+                                                                     palletTare.text, manualWeight.text, acceptUnstable)
+                        if (weighingError.text === "") {
+                            boxes.clear()
+                            palletTare.clear()
+                            manualWeight.clear()
+                            boxes.forceActiveFocus()
+                        }
+                    }
+
+                    // The indicator is an instrument: dark in both themes, lamps like a real one.
+                    Rectangle {
                         Layout.fillWidth: true
-                        spacing: Theme.spacingS
+                        implicitHeight: readout.implicitHeight + 2 * Theme.spacingL
+                        radius: Theme.radiusM
+                        color: Theme.scaleBg
 
-                        Repeater {
-                            model: weighingForm.cropKeys.keys
-                            CropButton {
-                                required property var modelData
-                                text: modelData.name
-                                caption: weighingForm.priceCaption(modelData.cropCode)
-                                selected: weighingForm.cropCode === modelData.cropCode
-                                onClicked: weighingForm.cropCode = modelData.cropCode
+                        ColumnLayout {
+                            anchors.left: parent.left
+                            anchors.leftMargin: Theme.spacingXl
+                            anchors.verticalCenter: parent.verticalCenter
+                            spacing: Theme.spacingS
+
+                            Lamp { caption: qsTr("СТАБ"); lit: screen.scales.stable }
+                            Lamp { caption: qsTr("НУЛЬ"); lit: screen.scales.zero }
+                            Lamp { caption: qsTr("БРУТТО"); lit: true }
+                        }
+
+                        RowLayout {
+                            id: readout
+                            anchors.right: parent.right
+                            anchors.rightMargin: Theme.spacingXl
+                            anchors.verticalCenter: parent.verticalCenter
+                            spacing: Theme.spacingS
+
+                            Label {
+                                text: screen.scales.display
+                                // A 1024 window leaves the middle column narrow: the readout gives way first.
+                                font.pixelSize: screen.width < 1200 ? Theme.fontSizeScaleCompact : Theme.fontSizeScale
+                                font.weight: Font.DemiBold
+                                color: screen.scales.stable ? Theme.scaleDigit : Theme.scaleDigitUnstable
+                            }
+                            Label {
+                                text: qsTr("кг")
+                                font.pixelSize: Theme.fontSizeLarge
+                                color: screen.scales.stable ? Theme.scaleDigit : Theme.scaleDigitUnstable
+                                opacity: 0.8
+                                Layout.alignment: Qt.AlignBaseline
                             }
                         }
-                        CropButton {
-                            visible: weighingForm.cropKeys.more.length > 0
-                            readonly property var picked: weighingForm.pickedFromMore
-                            text: picked ? picked.name + " ▾" : qsTr("Ще ▾")
-                            caption: picked ? weighingForm.priceCaption(picked.cropCode)
-                                            : qsTr("ще %1").arg(weighingForm.cropKeys.more.length)
-                            selected: picked !== null
-                            onClicked: moreCrops.open()
+                    }
 
-                            Popup {
-                                id: moreCrops
-                                y: parent.height + Theme.spacingXs
-                                width: Math.max(parent.width, 220)
-                                padding: Theme.spacingXs
+                    // The crop stays between pallets; its key shows today's price.
+                    ColumnLayout {
+                        Layout.fillWidth: true
+                        enabled: screen.hasReceipt
+                        spacing: Theme.spacingS
 
-                                contentItem: ListView {
-                                    implicitHeight: contentHeight
-                                    model: weighingForm.cropKeys.more
-                                    delegate: ItemDelegate {
-                                        id: moreRow
-                                        required property var modelData
-                                        width: ListView.view.width
-                                        highlighted: weighingForm.cropCode === modelData.cropCode
-                                        onClicked: {
-                                            weighingForm.cropCode = modelData.cropCode
-                                            Terminal.useCrop(modelData.cropCode)
-                                            moreCrops.close()
-                                        }
-                                        contentItem: RowLayout {
-                                            Label {
-                                                text: moreRow.modelData.name
-                                                Layout.fillWidth: true
+                        SectionCaption { text: qsTr("Культура") }
+
+                        RowLayout {
+                            Layout.fillWidth: true
+                            spacing: Theme.spacingS
+
+                            Repeater {
+                                model: weighingForm.cropKeys.keys
+                                CropButton {
+                                    required property var modelData
+                                    text: modelData.name
+                                    caption: weighingForm.priceCaption(modelData.cropCode)
+                                    selected: weighingForm.cropCode === modelData.cropCode
+                                    onClicked: weighingForm.cropCode = modelData.cropCode
+                                }
+                            }
+                            CropButton {
+                                visible: weighingForm.cropKeys.more.length > 0
+                                readonly property var picked: weighingForm.pickedFromMore
+                                text: picked ? picked.name + " ▾" : qsTr("Ще ▾")
+                                caption: picked ? weighingForm.priceCaption(picked.cropCode)
+                                                : qsTr("ще %1").arg(weighingForm.cropKeys.more.length)
+                                selected: picked !== null
+                                onClicked: moreCrops.open()
+
+                                Popup {
+                                    id: moreCrops
+                                    y: parent.height + Theme.spacingXs
+                                    width: Math.max(parent.width, 220)
+                                    padding: Theme.spacingXs
+
+                                    contentItem: ListView {
+                                        implicitHeight: contentHeight
+                                        model: weighingForm.cropKeys.more
+                                        delegate: ItemDelegate {
+                                            id: moreRow
+                                            required property var modelData
+                                            width: ListView.view.width
+                                            highlighted: weighingForm.cropCode === modelData.cropCode
+                                            onClicked: {
+                                                weighingForm.cropCode = modelData.cropCode
+                                                Terminal.useCrop(modelData.cropCode)
+                                                moreCrops.close()
                                             }
-                                            Label {
-                                                text: weighingForm.priceCaption(moreRow.modelData.cropCode)
-                                                font.pixelSize: Theme.fontSizeCaption
-                                                color: Theme.textMuted
+                                            contentItem: RowLayout {
+                                                Label {
+                                                    text: moreRow.modelData.name
+                                                    Layout.fillWidth: true
+                                                }
+                                                Label {
+                                                    text: weighingForm.priceCaption(moreRow.modelData.cropCode)
+                                                    font.pixelSize: Theme.fontSizeCaption
+                                                    color: Theme.textMuted
+                                                }
                                             }
                                         }
                                     }
@@ -347,139 +345,211 @@ Page {
                         }
                     }
 
-                    // Captions in the first row, fields in the second: the grid keeps
-                    // every field of a row on one line.
+                    // One row of equal cells, a caption over each field; a narrow window wraps them in two rows.
+                    // Boxes come first (typed for every pallet); box tare and the target usually stay.
                     GridLayout {
+                        id: fieldGrid
                         Layout.fillWidth: true
-                        columns: 2
-                        columnSpacing: Theme.spacingM
-                        rowSpacing: Theme.spacingXs
+                        enabled: screen.hasReceipt
+                        // From the column's width, not the grid's own: the grid is only as wide as its cells.
+                        columns: weighingForm.width < 560 ? 3 : 5
+                        columnSpacing: Theme.spacingS
+                        rowSpacing: Theme.spacingS
 
-                        FieldCaption { caption: qsTr("Тара ящика, кг") }
-                        FieldCaption { caption: qsTr("Ціль"); hint: qsTr("фура або склад") }
-                        TextField {
-                            id: boxTare
+                        readonly property real cellWidth: (weighingForm.width - (columns - 1) * columnSpacing) / columns
+
+                        component FieldCell: ColumnLayout {
+                            required property string caption
+                            spacing: Theme.spacingXs
+                            Layout.preferredWidth: fieldGrid.cellWidth
+                            Layout.maximumWidth: fieldGrid.cellWidth
+
+                            FieldCaption { caption: parent.caption }
+                        }
+                        component FormField: TextField {
                             Layout.fillWidth: true
-                            placeholderText: qsTr("напр. 0,35")
+                            Layout.preferredHeight: Theme.controlHeightLarge
+                            font.pixelSize: Theme.fontSizeLarge
                             inputMethodHints: Qt.ImhFormattedNumbersOnly
                         }
+
+                        FieldCell {
+                            caption: qsTr("Ящиків")
+                            FormField {
+                                id: boxes
+                                inputMethodHints: Qt.ImhDigitsOnly
+                                validator: IntValidator { bottom: 1 }
+                                onAccepted: weighingForm.record(false)
+                            }
+                        }
+                        FieldCell {
+                            caption: qsTr("Тара ящика, кг")
+                            FormField {
+                                id: boxTare
+                                placeholderText: qsTr("0,35")
+                            }
+                        }
+                        FieldCell {
+                            caption: qsTr("Палета, кг")
+                            FormField {
+                                id: palletTare
+                                placeholderText: qsTr("0 — без")
+                                onAccepted: weighingForm.record(false)
+                            }
+                        }
+                        // A typed weight is recorded as manual, so Enter here does not record by accident.
+                        FieldCell {
+                            caption: qsTr("Вага вручну, кг")
+                            FormField {
+                                id: manualWeight
+                                placeholderText: qsTr("з ваг")
+                            }
+                        }
                         // Where a crop's first pallet in the receipt goes; the next ones follow it.
-                        ComboBox {
-                            id: target
+                        FieldCell {
+                            caption: qsTr("Ціль")
+                            ComboBox {
+                                id: target
+                                Layout.fillWidth: true
+                                Layout.preferredHeight: Theme.controlHeightLarge
+                                model: [{ destinationId: "", title: qsTr("Без цілі") }].concat(Terminal.destinations)
+                                textRole: "title"
+                                valueRole: "destinationId"
+                                // Naming the model makes the binding re-run when it is rebuilt.
+                                currentIndex: model.findIndex(d => d.destinationId === Terminal.receivingTarget)
+                                onActivated: Terminal.setReceivingTarget(currentValue)
+                            }
+                        }
+                    }
+
+                    // Said before the pallet is weighed: the operator must see where it goes.
+                    Rectangle {
+                        id: placementBar
+                        readonly property var placement: weighingForm.placement
+                        readonly property bool warn: placement.hangs === true || weighingForm.wontFit
+                        readonly property bool toTruck: (placement.plate ?? "") !== ""
+
+                        visible: screen.hasReceipt && weighingForm.cropCode !== ""
+                        Layout.fillWidth: true
+                        implicitHeight: placementRow.implicitHeight + 2 * Theme.spacingS
+                        radius: Theme.radiusS
+                        color: Theme.bg
+
+                        RowLayout {
+                            id: placementRow
+                            anchors.fill: parent
+                            anchors.leftMargin: Theme.spacingM
+                            anchors.rightMargin: Theme.spacingM
+                            spacing: Theme.spacingS
+
+                            IconImage {
+                                source: Theme.icon(placementBar.toTruck || placementBar.placement.hangs ? "truck" : "warehouse")
+                                sourceSize: Qt.size(Theme.iconSize, Theme.iconSize)
+                                color: placementBar.warn ? Theme.warn : Theme.accent
+                            }
+                            Label {
+                                text: {
+                                    const p = placementBar.placement
+                                    if (weighingForm.wontFit)
+                                        return qsTr("Не влізе у фуру %1 — палета чекатиме на «Розподілі»").arg(p.plate)
+                                    if (p.hangs)
+                                        return qsTr("Палета піде %1").arg(p.text)
+                                    return (placementBar.toTruck ? qsTr("Палета піде у фуру <b>%1</b>").arg(p.plate)
+                                                                 : qsTr("Палета піде <b>на склад</b>"))
+                                           + (p.follows ? qsTr(" — як попередня цієї культури в чеку") : "")
+                                }
+                                textFormat: Text.StyledText
+                                color: placementBar.warn ? Theme.warn : Theme.text
+                                font.weight: placementBar.warn ? Font.DemiBold : Font.Normal
+                                elide: Text.ElideRight
+                                Layout.fillWidth: true
+                            }
+                            Label {
+                                visible: placementBar.toTruck
+                                text: qsTr("вільно %1 ящ.").arg(placementBar.placement.boxesLeft)
+                                font.pixelSize: Theme.fontSizeCaption
+                                color: weighingForm.wontFit ? Theme.warn : Theme.textMuted
+                            }
+                        }
+                    }
+
+                    // Neither button gets elided: in a narrow column they stack and the main action says less.
+                    GridLayout {
+                        id: recordActions
+                        Layout.fillWidth: true
+                        enabled: screen.hasReceipt
+                        columns: weighingForm.width < 440 ? 1 : 2
+                        columnSpacing: Theme.spacingS
+                        rowSpacing: Theme.spacingS
+
+                        Button {
+                            text: weighingForm.width < 520 ? qsTr("Записати  ·  Enter") : qsTr("Записати зважування  ·  Enter")
+                            Layout.minimumWidth: implicitWidth
+                            highlighted: true
+                            font.pixelSize: Theme.fontSizeField
+                            enabled: screen.scales.stable || manualWeight.text.trim() !== ""
                             Layout.fillWidth: true
-                            model: [{ destinationId: "", title: qsTr("Без цілі") }].concat(Terminal.destinations)
-                            textRole: "title"
-                            valueRole: "destinationId"
-                            // Naming the model makes the binding re-run when it is rebuilt.
-                            currentIndex: model.findIndex(d => d.destinationId === Terminal.receivingTarget)
-                            onActivated: Terminal.setReceivingTarget(currentValue)
+                            Layout.preferredHeight: Theme.controlHeightLarge
+                            onClicked: weighingForm.record(false)
+                        }
+                        // A separate, deliberate action: the scale may keep flipping between two steps.
+                        WarningButton {
+                            text: qsTr("Прийняти нестабільну")
+                            Layout.minimumWidth: implicitWidth
+                            Layout.fillWidth: recordActions.columns === 1
+                            enabled: !screen.scales.stable && manualWeight.text.trim() === ""
+                            Layout.preferredHeight: Theme.controlHeightLarge
+                            onClicked: weighingForm.record(true)
+                        }
+                    }
+
+                    Label {
+                        id: weighingError
+                        visible: text !== ""
+                        color: Theme.danger
+                        wrapMode: Text.WordWrap
+                        padding: Theme.spacingS
+                        Layout.fillWidth: true
+                        background: Rectangle {
+                            color: Theme.dangerSoft
+                            radius: Theme.radiusS
+                        }
+                    }
+                    Item { Layout.fillHeight: true }
+
+                    // Until real scales are connected: put a pallet on and take it off.
+                    Rectangle {
+                        Layout.fillWidth: true
+                        implicitHeight: 1
+                        color: Theme.surfaceAlt
+                    }
+                    RowLayout {
+                        Layout.fillWidth: true
+                        Label {
+                            text: screen.scales.driverName
+                            font.pixelSize: Theme.fontSizeCaption
+                            color: Theme.textMuted
+                            elide: Text.ElideRight
+                            Layout.fillWidth: true
+                        }
+                        Button {
+                            text: qsTr("Поставити палету")
+                            flat: true
+                            onClicked: Terminal.simulatePallet()
+                        }
+                        Button {
+                            text: qsTr("Зняти")
+                            flat: true
+                            onClicked: Terminal.simulateEmptyScale()
                         }
                     }
                 }
-
-                Rectangle {
-                    Layout.fillWidth: true
-                    implicitHeight: 1
-                    color: Theme.border
-                }
-
-                // What is typed for every pallet; right above the record button.
-                GridLayout {
-                    Layout.fillWidth: true
-                    enabled: screen.hasReceipt
-                    columns: 3
-                    columnSpacing: Theme.spacingM
-                    rowSpacing: Theme.spacingXs
-
-                    FieldCaption { caption: qsTr("Ящиків") }
-                    FieldCaption { caption: qsTr("Палета, кг"); hint: qsTr("0 — без палети") }
-                    FieldCaption { caption: qsTr("Вага вручну, кг"); hint: qsTr("порожньо — з ваг") }
-                    TextField {
-                        id: boxes
-                        Layout.fillWidth: true
-                        Layout.preferredHeight: Theme.controlHeightLarge
-                        font.pixelSize: Theme.fontSizeLarge
-                        inputMethodHints: Qt.ImhDigitsOnly
-                        validator: IntValidator { bottom: 1 }
-                        onAccepted: weighingForm.record(false)
-                    }
-                    TextField {
-                        id: palletTare
-                        Layout.fillWidth: true
-                        Layout.preferredHeight: Theme.controlHeightLarge
-                        font.pixelSize: Theme.fontSizeLarge
-                        inputMethodHints: Qt.ImhFormattedNumbersOnly
-                        onAccepted: weighingForm.record(false)
-                    }
-                    TextField {
-                        id: manualWeight
-                        Layout.fillWidth: true
-                        Layout.preferredHeight: Theme.controlHeightLarge
-                        font.pixelSize: Theme.fontSizeLarge
-                        inputMethodHints: Qt.ImhFormattedNumbersOnly
-                    }
-                }
-
-                // Said before the pallet is weighed: the operator must see where it goes.
-                Label {
-                    visible: screen.hasReceipt && weighingForm.cropCode !== ""
-                    readonly property bool warn: weighingForm.placement.hangs || weighingForm.wontFit
-                    text: (weighingForm.wontFit ? qsTr("Не влізе: %1 — палета чекатиме на «Розподілі»")
-                                                : qsTr("Палета піде %1"))
-                              .arg(weighingForm.placement.text ?? "")
-                          + (weighingForm.placement.follows ? qsTr(" (як попередня цієї культури в чеку)") : "")
-                    color: warn ? Theme.warn : Theme.textMuted
-                    font.weight: warn ? Font.DemiBold : Font.Normal
-                    elide: Text.ElideRight
-                    Layout.fillWidth: true
-                }
-
-                RowLayout {
-                    id: recordActions
-                    Layout.fillWidth: true
-                    enabled: screen.hasReceipt
-                    spacing: Theme.spacingS
-
-                    // Neither button gets elided: on a narrow screen the main action says less.
-                    Button {
-                        text: recordActions.width < 520 ? qsTr("Записати  ·  Enter") : qsTr("Записати зважування  ·  Enter")
-                        Layout.minimumWidth: implicitWidth
-                        highlighted: true
-                        font.pixelSize: Theme.fontSizeField
-                        enabled: screen.scales.stable || manualWeight.text.trim() !== ""
-                        Layout.fillWidth: true
-                        Layout.preferredHeight: Theme.controlHeightLarge
-                        onClicked: weighingForm.record(false)
-                    }
-                    // A separate, deliberate action: the scale may keep flipping between two steps.
-                    WarningButton {
-                        text: qsTr("Прийняти нестабільну")
-                        Layout.minimumWidth: implicitWidth
-                        enabled: !screen.scales.stable && manualWeight.text.trim() === ""
-                        Layout.preferredHeight: Theme.controlHeightLarge
-                        onClicked: weighingForm.record(true)
-                    }
-                }
-
-                Label {
-                    id: weighingError
-                    visible: text !== ""
-                    color: Theme.danger
-                    wrapMode: Text.WordWrap
-                    padding: Theme.spacingS
-                    Layout.fillWidth: true
-                    background: Rectangle {
-                        color: Theme.dangerSoft
-                        radius: Theme.radiusS
-                    }
-                }
-                Item { Layout.fillHeight: true }
             }
         }
 
-        // The active receipt: one table row per weighing.
+        // The active receipt: one table row per weighing; narrower in a small window.
         Frame {
-            Layout.preferredWidth: 440
+            Layout.preferredWidth: Math.min(440, screen.width * 0.4)
             Layout.fillHeight: true
 
             EmptyState {
@@ -613,10 +683,10 @@ Page {
                                 }
                                 Cell {
                                     visible: !line.cancelled
-                                    text: line.modelData.hanging ? qsTr("чекає розподілу") : "→ " + line.modelData.placedIn
+                                    text: line.modelData.hanging ? qsTr("чекає розподілу") : "→" + line.modelData.placedIn
                                     font.pixelSize: Theme.fontSizeCaption
                                     font.weight: line.modelData.hanging ? Font.DemiBold : Font.Normal
-                                    color: line.modelData.hanging ? Theme.warn : Theme.textMuted
+                                    color: line.modelData.hanging ? Theme.warn : Theme.accent
                                     horizontalAlignment: Text.AlignLeft
                                     Layout.fillWidth: true
                                 }
@@ -729,7 +799,7 @@ Page {
                         onClicked: payDialog.open()
                     }
                     Button {
-                        text: qsTr("Видати чек…")
+                        text: qsTr("Видати чек (опт)…")
                         Layout.fillWidth: true
                         onClicked: handOverDialog.open()
                     }

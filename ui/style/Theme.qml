@@ -102,5 +102,6 @@ QtObject {
     readonly property int fontSizeLarge: 20
     readonly property int fontSizeHeading: 24
     readonly property int fontSizeDisplay: 36
-    readonly property int fontSizeScale: 64
+    readonly property int fontSizeScale: 72
+    readonly property int fontSizeScaleCompact: 48
 }

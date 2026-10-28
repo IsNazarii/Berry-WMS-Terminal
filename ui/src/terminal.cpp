@@ -936,13 +936,14 @@ QVariantMap Terminal::nextPlacement(std::string_view cropCode) const {
                 {"follows", false}, {"hangs", true}, {"boxesLeft", -1}};
     }
     int boxesLeft = -1;
-    QString text = tr("на склад");
+    QString plate;
     if (const auto* truckId = std::get_if<TruckId>(&*next)) {
         const Truck* truck = workDay_->findTruck(*truckId);
-        boxesLeft = truck->boxesLeft(journal_.loadOf(*truckId));
-        text = tr("у фуру %1 · вільно %2 ящ.").arg(QString::fromStdString(truck->plate())).arg(std::max(boxesLeft, 0));
+        boxesLeft = std::max(truck->boxesLeft(journal_.loadOf(*truckId)), 0);
+        plate = QString::fromStdString(truck->plate());
     }
-    return {{"text", text}, {"follows", next != target}, {"hangs", false}, {"boxesLeft", boxesLeft}};
+    const QString text = plate.isEmpty() ? tr("на склад") : tr("у фуру %1").arg(plate);
+    return {{"text", text}, {"plate", plate}, {"follows", next != target}, {"hangs", false}, {"boxesLeft", boxesLeft}};
 }
 
 QVariantList Terminal::payRows() const {

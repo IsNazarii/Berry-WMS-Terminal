@@ -16,7 +16,7 @@ ApplicationWindow {
     // A terminal on a laptop: the whole screen; the size above is what "restore" gives.
     // Full screen hides the desktop panels too, but some operators want them, so it is an option.
     visibility: uiSettings.fullScreen ? Window.FullScreen : Window.Maximized
-    title: qsTr("Berry WMS — термінал приймальника")
+    title: qsTr("Berry WMS — термінал оператора")
 
     // Our style (ui/style) draws from Theme; controls it does not override
     // fall back to Basic, which draws from the palette — so it gets the tokens too.

@@ -158,7 +158,7 @@ ToolBar {
                 }
                 Label {
                     visible: !bar.compact
-                    text: qsTr("термінал приймальника")
+                    text: qsTr("термінал оператора")
                     font.pixelSize: Theme.fontSizeCaption
                     color: Theme.textMuted
                 }

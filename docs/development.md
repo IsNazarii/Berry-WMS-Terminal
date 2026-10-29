@@ -11,7 +11,7 @@
 | Qt | ≥ 6.8: Quick, QuickControls2, плагін SVG (`qt6-qtsvg` — іконки панелі), SerialPort (для драйвера ваг — ще не підключено); переклади `qt6-qttranslations` — необов'язково, для українських стандартних кнопок |
 | SQLite | 3.51.2, амальгамація через `FetchContent` (системний `sqlite-devel` не потрібен); компілюється з `-w` — чужий код |
 | GoogleTest | 1.17, завантажується через `FetchContent` — потрібна мережа при першій конфігурації |
-| Порт ваг | USB↔RS-232 null-modem (FTDI `ft232r-null`); користувач у групі `dialout`; для CH340 — без пакета `brltty`. Деталі — [hardware/scale-ie04.md](hardware/scale-ie04.md) |
+| Порт ваг | USB↔RS-232 + 3-провідний null-modem DB9F–DB9F; користувач у групі `dialout`; для CH340 — без пакета `brltty`. Деталі — [hardware/scale-ie04.md](hardware/scale-ie04.md) |
 
 ## 2. Збірка
 

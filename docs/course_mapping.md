@@ -10,7 +10,7 @@
 | Сучасна ООП-мова | C++20 (concepts, `std::variant`, `<=>`, `std::format`, designated initializers, ranges) |
 | Одна програма, одна точка входу `main()` | `app/main.cpp` → `wms_terminal` |
 | Git з регулярними змістовними комітами | малі кроки, кожен — окремий коміт; `git log` |
-| Unit-тести (для «відмінно») | 271 тест GoogleTest у `tests/` (235 ядра + 36 infra на справжній SQLite), ядро пишеться тест-першим |
+| Unit-тести (для «відмінно») | 284 тести GoogleTest у `tests/` (246 ядра + 38 infra на справжній SQLite), ядро пишеться тест-першим |
 | Декларація використання ШІ | розділ у [README](../README.md#використання-ші), домовленості в `CLAUDE.md` |
 | Аналіз конкурентів (для «відмінно») | ⏳ `docs/competitors.md` |
 
@@ -18,8 +18,8 @@
 
 | Вимога | Мінімум | Є |
 |---|---|---|
-| Класи / типи | 9 | 23 класи ядра + допоміжні структури (`Weighing`, `Cargo`, `TruckDetails`, `PriceChange`, `Amendment`, `AmendmentRecord`, `WorkDayRecord`, `CropPrice`, `PaidReceipt`, `ToWarehouse`) |
-| Поля | 15 | значно більше (напр., лише `Weighing` — 9, `WorkDay` — 9, `Truck` — 5) |
+| Класи / типи | 9 | 24 класи ядра + допоміжні структури (`Weighing`, `Cargo`, `TruckDetails`, `PriceChange`, `Amendment`, `AmendmentRecord`, `WorkDayRecord`, `CropPrice`, `PaidReceipt`, `ToWarehouse`) |
+| Поля | 15 | значно більше (напр., лише `Weighing` — 9, `WorkDay` — 10, `Truck` — 5) |
 | Нетривіальні методи | 25 | значно більше (див. нижче) |
 | Ієрархії успадкування | 2, одна ≥ 3 класи | A: `Transaction` → 5 класів; B: `IScaleDriver` → `SimulatedScaleDriver`; C: `JournalStore` → `SqliteJournalStore`, D: `SessionStore` → `SqliteSessionStore`, E: `Repository<T>` → `SqliteRepository<T>` (infra) |
 | Поліморфізм | 3, ≥1 статичний, ≥1 динамічний | 7 випадків (таблиця нижче) |
@@ -66,7 +66,7 @@ classDiagram
 `Weighing::net/amount/validate`, `Receipt::total/cargoOf/amount/validate/describe`,
 `OpenReceipt::add/cancel/crops/setPrice/validateClose/close`, `Allocation::wholeWeighing/boxesOf`,
 `Journal::balanceOf/historyOf/loadOf/stockOf/unallocatedOf/destinationOf/allocationOf/reversalOf/waitingForAllocation/validateAllocation/validateCancel/validateReversal/validateShipment/shipmentOf`,
-`Truck::depart/carryOver/remaining/isOverloaded/fillPercent`, `DayPrices::priceAt`,
+`Truck::depart/carryOver/boxesLeft/isOverloaded/fillPercent`, `DayPrices::priceAt`,
 `WorkDay::openReceipt/addWeighing/validateCancel/cancelWeighing/nextDestination/autoAllocation/closeReceipt/validatePay/payReceipt/validateClose/close/repeatTruck/adoptTruck/trucksForNextSession`,
 `Uuid::generateV7/parse/toString/timestamp`, `StabilityDetector::push/isStable/stableWeight`,
 `Supplier::matches`, `validateNewSupplier/nextSupplierId`, `validateNewCrop/cropCodeFor/validateRemoveCrop`,

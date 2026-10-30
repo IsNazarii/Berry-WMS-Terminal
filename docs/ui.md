@@ -351,6 +351,7 @@ UI — QML-модуль `BerryWms.Ui` (статична бібліотека `wm
 | `prices` | `pricesChanged` | `{cropCode: "85,00"}` — число без одиниці |
 | `trucks` | `trucksChanged` | фури сесії з завантаженням, % і статусом |
 | `previousTrucks` | `sessionChanged` | учорашні фури для «повторити» |
+| `sessionSummary` | `summaryChanged` (← `journalChanged`, `receiptsChanged`, `sessionChanged`) | `SessionSummary`: плитки зведення дня на «Сесії» |
 | `closeBlockers` | `closeBlockersChanged` (← `trucksChanged`, `receiptsChanged`) | `WorkDay::validateClose()`: відкриті чеки й фури, що вантажаться |
 | `openReceipts`, `activeReceiptId`, `activeLines`, `activeSummary` | `receiptsChanged` | прийом; вага й гроші — голі числа для таблиці (`display_format.h`); рядок має `placedIn`/`hanging`; відкритий чек — `pallets` («2 палети», `palletsText`) |
 | `receivingTarget` | `receivingTargetChanged` | ціль авторозподілу (`destinationId`, порожньо — без цілі; фура, що вже не вантажиться, — теж порожньо) |
@@ -385,6 +386,7 @@ UI — QML-модуль `BerryWms.Ui` (статична бібліотека `wm
 | `newSupplierErrors(name, phone)`, `addSupplier(name, phone)` → id | новий постачальник із `SupplierPicker` (0 — не додано) |
 | `recordWeighing(crop, boxes, tare, pallet, manualWeight, acceptUnstable)` | зважування в активний чек (за денною ціною) |
 | `setReceivingTarget(destinationId)` | ціль авторозподілу на «Прийомі» |
+| `setDefaultBoxTare(text)` | типова тара ящика термінала (меню ⋯) → помилка або "" |
 | `cancelWeighing(i)` | анулювати рядок (палета у фурі — разом зі сторно розподілу, одна транзакція) або повернути причину |
 | `payRows()`, `payCheck(prices)`, `payReceipt(prices, bankTransfer)` | «Оплатити»: ціна на культуру, сума, закриття + виплата |
 | `handOverBlockers()`, `handOverReceipt()` | «Видати чек» (опт) |
@@ -411,6 +413,11 @@ flowchart LR
     T --> G[receivingTargetChanged]
     G --> N[placementsChanged]
     R --> N
+    J --> Y[summaryChanged]
+    R --> Y
+    S --> Y
+    T --> B[closeBlockersChanged]
+    R --> B
 ```
 
 `sessionChanged` означає лише «відкрито / закрито». Завантаження фур залежить і від сесії, і від

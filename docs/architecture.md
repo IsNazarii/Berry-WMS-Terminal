@@ -35,7 +35,7 @@ flowchart LR
 | Інфраструктура | `infra/` | `wms_infra` + `sqlite3` (амальгамація) | core; Qt — лише для пристроїв | обгортка SQLite (`sqlite::Database`/`Statement`/`ScopedTransaction`) ✅; схема з версіями (`migrateSchema`, 10 міграцій) + `SqliteJournalStore` + `SqliteSessionStore` + `SqliteRepository<T>` + `backupDatabase` ✅; ваги RS-232, HTTP-sync, друк — далі |
 | Інтерфейс | `ui/` | `wms_ui` + `wms_uiplugin` (QML-модуль `BerryWms.Ui`) | core, Qt Quick | QML-екрани і тонкі адаптери |
 | Точка входу | `app/` | `wms_terminal` (виконуваний) | ui | `main()`: створює `QGuiApplication`, завантажує `Main.qml` |
-| Тести | `tests/` | `wms_core_tests`, `wms_infra_tests` | core / infra, GoogleTest | 235 тестів ядра + 36 тестів infra на справжній SQLite |
+| Тести | `tests/` | `wms_core_tests`, `wms_infra_tests` | core / infra, GoogleTest | 246 тестів ядра + 38 тестів infra на справжній SQLite |
 
 **Правило залежностей:** лише вниз (`app → ui → infra → core`). Ядро не підключає жодного
 заголовка Qt — це перевіряється тим, що `wms_core` лінкується без Qt і тестується окремо.
@@ -168,7 +168,7 @@ sequenceDiagram
     T->>W: payReceipt(id, prices, method, operator, now)
     W-->>T: PaidReceipt {Receipt (незмінний), Payment на всю суму}
     T->>J: add(receipt), add(payment) — одна транзакція SQLite
-    T--)Q: journalChanged → balanceChanged, trucksChanged
+    T--)Q: journalChanged → trucksChanged, cashChanged, summaryChanged
 ```
 
 Методи `Terminal`, які може зламати ввід оператора, повертають `QString` з помилкою
@@ -229,8 +229,12 @@ sequenceDiagram
     `INSERT`, що його забули). Старі виплати (лише тестові бази альфи) приписано оператору 1, порядок рядків збережено.
   - ✅ Бекап: `sqlite::Database::backupTo` (`VACUUM INTO` — цілісна копія навіть у WAL) + `backupDatabase(db, folder, at, keep)`
     (назва з часом UTC → сортування за назвою = за часом; ротація чіпає лише свої файли). `Terminal` — при запуску й закритті сесії.
-- **Sync**: outbox незасинхронізованих записів, батчі, сервер повертає прийняті UUID
-  (`Transaction::markSynced()`), retry з backoff; pull довідників за курсором `updated_since`.
+- **Sync** (рішення 28.10; сесія спільна для всієї точки): outbox незасинхронізованих записів, батчі, сервер
+  повертає прийняті UUID (`Transaction::markSynced()`), retry з backoff. Pull — не лише довідники, а й **чужі записи
+  журналу** (баланси спільні для терміналів); курсор — порядковий номер сервера, а не час (годинники терміналів
+  можуть розходитися). Сесія зберігатиметься фактами (відкрито, ціна, фура, закрито, поправка), її id —
+  UUIDv5(точка, дата відкриття), закрити спільну сесію — лише онлайн. Сервер-заглушка (Python/FastAPI) лише
+  зберігає факти й видає номери; правила — в ядрі клієнта.
 - **`SerialScaleDriver`** — реалізація `IScaleDriver` через Qt SerialPort для ваг ВН-2000-4 з індикатором
   ІЕ-04 (RS-232, 9600 8N1, протокол 0: запит `<00!>` → 10 байтів — 6 розрядів табло й байт статусу).
   Розбір кадру — чистий C++ у ядрі (тестується на сирих байтах), порт — окрема Qt-ціль в `infra/`, щоб тести

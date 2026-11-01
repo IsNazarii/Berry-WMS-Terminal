@@ -1,5 +1,7 @@
 #include "wms/ie04.h"
 
+#include "scale_reading_print.h"
+
 #include <gtest/gtest.h>
 
 #include <fstream>
@@ -7,14 +9,6 @@
 #include <string>
 
 using namespace wms;
-
-namespace wms {
-// Readable failure messages instead of a byte dump.
-void PrintTo(const ScaleReading& r, std::ostream* os) {
-    *os << r.weight.raw() << " g" << (r.stable ? " stable" : "") << (r.zero ? " zero" : "")
-        << (r.tare ? " tare" : "");
-}
-} // namespace wms
 
 namespace {
 

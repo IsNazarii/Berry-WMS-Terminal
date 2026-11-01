@@ -32,27 +32,8 @@ public:
     virtual void close() = 0;
     [[nodiscard]] virtual bool isOpen() const = 0;
     // Next reading, or std::nullopt when closed or nothing is available.
-    [[nodiscard]] virtual std::optional<Weight> read() = 0;
-};
-
-// Plays back a scripted sequence of readings, then keeps repeating the last one.
-// Used for demos and tests without physical scales.
-class SimulatedScaleDriver final : public IScaleDriver {
-public:
-    explicit SimulatedScaleDriver(std::vector<Weight> script = {});
-
-    void setScript(std::vector<Weight> script);
-
-    [[nodiscard]] std::string name() const override { return "Симулятор ваг"; }
-    bool open() override;
-    void close() override;
-    [[nodiscard]] bool isOpen() const override { return open_; }
-    [[nodiscard]] std::optional<Weight> read() override;
-
-private:
-    std::vector<Weight> script_;
-    std::size_t position_ = 0;
-    bool open_ = false;
+    // The driver decides stability: a real indicator reports it itself.
+    [[nodiscard]] virtual std::optional<ScaleReading> read() = 0;
 };
 
 // Decides when the weight has settled: the last `windowSize` readings must all
@@ -74,6 +55,28 @@ private:
     std::size_t windowSize_;
     Weight tolerance_;
     std::deque<Weight> window_;
+};
+
+// Plays back a scripted sequence of readings, then keeps repeating the last one.
+// Used for demos and tests without physical scales. Having no indicator to ask,
+// it calls a weight stable after three equal readings in a row.
+class SimulatedScaleDriver final : public IScaleDriver {
+public:
+    explicit SimulatedScaleDriver(std::vector<Weight> script = {});
+
+    void setScript(std::vector<Weight> script);
+
+    [[nodiscard]] std::string name() const override { return "Симулятор ваг"; }
+    bool open() override;
+    void close() override;
+    [[nodiscard]] bool isOpen() const override { return open_; }
+    [[nodiscard]] std::optional<ScaleReading> read() override;
+
+private:
+    std::vector<Weight> script_;
+    std::size_t position_ = 0;
+    bool open_ = false;
+    StabilityDetector detector_;
 };
 
 } // namespace wms

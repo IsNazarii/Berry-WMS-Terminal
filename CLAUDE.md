@@ -163,7 +163,7 @@ $CM/cmake -S . -B build -G Ninja && $CM/cmake --build build && $CM/ctest --test-
   (приймають `Receipt` і `OpenReceipt`) ✅
 - Інші класи: `Uuid`, `Supplier`, `Crop`, `CropKeys`, `StabilityDetector`, `ScaleReading`, `Ie04FrameReader`, `Weighing`, `Truck`, `Cargo`, `Journal`, `DayPrices`,
   `WorkDay`, `Operator`, `OpenReceipt`, `SessionSummary` ✅
-- Стан на 26.09: 19 класів ядра, 2 ієрархії (A — 5 класів), 6+ поліморфізмів, 158 тестів (зараз 258 ядра + 38 infra) — лаба 1 закрита із запасом.
+- Стан на 26.09: 19 класів ядра, 2 ієрархії (A — 5 класів), 6+ поліморфізмів, 158 тестів (зараз 261 ядра + 38 infra) — лаба 1 закрита із запасом.
 
 Лаба 2: ≥4 екрани (Вхід, Прийом, Сесія, Розподіл, Склад, Каса, + Sync/Довідники),
 ≥20 контролів, ≥1 контейнер (ListView), ≥10 обробників, логіка відділена.
@@ -205,7 +205,8 @@ UUID і часом відкриття; для опту ціни обнуляют
 `validateClose` не пускає з відкритими чеками);
 `Operator` (id, ім'я, PIN 4–6 цифр, лише `checkPin`); `parseMoney("85,50")` — ціна з вводу оператора (крапка або кома);
 симулятор ваг + `StabilityDetector`; кадри індикатора ІЕ-04 — `parseIe04Frame` / `Ie04FrameReader` → `ScaleReading`
-(вага + `stable`/`zero`/`tare`; `IScaleDriver::read()` ще віддає лише `Weight`); `Journal` — append-only: `balanceOf`, `loadOf` (з чеків і складу),
+(вага + `stable`/`zero`/`tare`); `IScaleDriver::read()` віддає `ScaleReading` — стабільність вирішує драйвер
+(симулятор — власним `StabilityDetector`, `ScaleMonitor` лише тримає останній показ); `Journal` — append-only: `balanceOf`, `loadOf` (з чеків і складу),
 `stockOf`, `unallocatedOf`, `boxesOf`/`shipmentOf`, `validateAllocation`/`validateShipment` (для закритого чека
 і для відкритого — палета йде у фуру ще під час розвантаження), `validateCancel` (палета у фурі анулюється разом зі сторно, якщо сторно можливе), `reversalOf`, `validateReversal`.
 Відновлення відкритих чеків після перезапуску — конструктор `OpenReceipt` є, метод у `WorkDay` — разом зі SQLite.

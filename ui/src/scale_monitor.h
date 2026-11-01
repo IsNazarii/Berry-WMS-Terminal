@@ -11,9 +11,9 @@
 
 namespace wms::ui {
 
-// Polls a scale driver and runs the readings through the stability detector.
+// Polls a scale driver and keeps its latest reading for the screens.
 // Knows the driver only as IScaleDriver, so the simulator and the serial-port
-// driver are interchangeable.
+// driver are interchangeable; stability is the driver's call.
 class ScaleMonitor : public QObject {
     Q_OBJECT
     QML_ELEMENT
@@ -30,14 +30,14 @@ public:
     explicit ScaleMonitor(IScaleDriver& driver, QObject* parent = nullptr);
 
     [[nodiscard]] QString display() const;
-    [[nodiscard]] bool isStable() const noexcept { return detector_.isStable(); }
+    [[nodiscard]] bool isStable() const noexcept { return reading_ && reading_->stable; }
     // An empty scale: the "zero" lamp of a real indicator.
-    [[nodiscard]] bool isZero() const noexcept;
+    [[nodiscard]] bool isZero() const noexcept { return reading_ && reading_->zero; }
     [[nodiscard]] QString driverName() const { return QString::fromStdString(driver_.name()); }
     // The only weight a weighing may be recorded with.
-    [[nodiscard]] std::optional<Weight> stableWeight() const noexcept { return detector_.stableWeight(); }
+    [[nodiscard]] std::optional<Weight> stableWeight() const noexcept;
     // What the scale shows now, settled or not: the operator may accept it anyway.
-    [[nodiscard]] std::optional<Weight> lastReading() const noexcept { return detector_.lastReading(); }
+    [[nodiscard]] std::optional<Weight> lastReading() const noexcept;
 
 signals:
     void readingChanged();
@@ -46,7 +46,7 @@ private:
     void poll();
 
     IScaleDriver& driver_;
-    StabilityDetector detector_;
+    std::optional<ScaleReading> reading_;
     QTimer timer_;
 };
 

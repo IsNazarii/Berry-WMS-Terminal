@@ -6,7 +6,17 @@
 
 namespace wms {
 
-SimulatedScaleDriver::SimulatedScaleDriver(std::vector<Weight> script) : script_{std::move(script)} {}
+namespace {
+
+// Industrial scales step by 200 or 500 g, so a settled weight repeats exactly:
+// three equal readings at 4 per second settle a pallet in under a second.
+constexpr std::size_t kStableReadings = 3;
+constexpr Weight kStableTolerance = grams(0);
+
+} // namespace
+
+SimulatedScaleDriver::SimulatedScaleDriver(std::vector<Weight> script)
+    : script_{std::move(script)}, detector_{kStableReadings, kStableTolerance} {}
 
 void SimulatedScaleDriver::setScript(std::vector<Weight> script) {
     script_ = std::move(script);
@@ -18,14 +28,18 @@ bool SimulatedScaleDriver::open() {
     return true;
 }
 
-void SimulatedScaleDriver::close() { open_ = false; }
+void SimulatedScaleDriver::close() {
+    open_ = false;
+    detector_.reset();
+}
 
-std::optional<Weight> SimulatedScaleDriver::read() {
+std::optional<ScaleReading> SimulatedScaleDriver::read() {
     if (!open_ || script_.empty()) return std::nullopt;
 
-    const Weight reading = script_[std::min(position_, script_.size() - 1)];
+    const Weight weight = script_[std::min(position_, script_.size() - 1)];
     if (position_ < script_.size()) ++position_;
-    return reading;
+    detector_.push(weight);
+    return ScaleReading{.weight = weight, .stable = detector_.isStable(), .zero = weight.isZero()};
 }
 
 StabilityDetector::StabilityDetector(std::size_t windowSize, Weight tolerance)

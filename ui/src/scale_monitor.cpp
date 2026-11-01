@@ -9,30 +9,29 @@ namespace {
 
 using namespace std::chrono_literals;
 
-// Industrial scales step by 200 or 500 g, so a settled weight repeats exactly:
-// three equal readings at 4 per second settle a pallet in under a second.
-// A weight that keeps flipping between two steps is confirmed by the operator instead.
-constexpr std::size_t kStableReadings = 3;
-constexpr Weight kStableTolerance = grams(0);
 constexpr auto kPollInterval = 250ms;
 
 } // namespace
 
 ScaleMonitor::ScaleMonitor(IScaleDriver& driver, QObject* parent)
-    : QObject{parent}, driver_{driver}, detector_{kStableReadings, kStableTolerance} {
+    : QObject{parent}, driver_{driver} {
     driver_.open();
     connect(&timer_, &QTimer::timeout, this, &ScaleMonitor::poll);
     timer_.start(kPollInterval);
 }
 
 QString ScaleMonitor::display() const {
-    const auto reading = detector_.lastReading();
-    return reading ? kilogramsText(*reading) : QStringLiteral("—");
+    return reading_ ? kilogramsText(reading_->weight) : QStringLiteral("—");
 }
 
-bool ScaleMonitor::isZero() const noexcept {
-    const auto reading = detector_.lastReading();
-    return reading && reading->isZero();
+std::optional<Weight> ScaleMonitor::stableWeight() const noexcept {
+    if (!isStable()) return std::nullopt;
+    return reading_->weight;
+}
+
+std::optional<Weight> ScaleMonitor::lastReading() const noexcept {
+    if (!reading_) return std::nullopt;
+    return reading_->weight;
 }
 
 void ScaleMonitor::poll() {
@@ -41,11 +40,10 @@ void ScaleMonitor::poll() {
     const auto reading = driver_.read();
     if (!reading) return;
 
-    const auto before = detector_.lastReading();
-    const bool wasStable = detector_.isStable();
-    detector_.push(*reading);
-    // Most ticks repeat the same weight; redraw only when something visible changed.
-    if (detector_.lastReading() != before || detector_.isStable() != wasStable) emit readingChanged();
+    // Most ticks repeat the same reading; redraw only when something visible changed.
+    if (reading == reading_) return;
+    reading_ = reading;
+    emit readingChanged();
 }
 
 } // namespace wms::ui

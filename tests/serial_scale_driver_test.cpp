@@ -115,6 +115,22 @@ TEST(SerialScaleDriver, ClosesWhenTheScaleFallsSilent) {
     EXPECT_EQ(readAfter(driver, 50ms), (ScaleReading{grams(0), true, true, false}));
 }
 
+TEST(SerialScaleDriver, ClosesWhenTheDisplayShowsNoNumber) {
+    FakeScale scale;
+    SerialScaleDriver driver{scale.portName(), 100ms};
+    ASSERT_TRUE(driver.open());
+    scale.send(kLoaded);
+    EXPECT_TRUE(readAfter(driver, 50ms));
+
+    // An error code on the display: frames keep coming, but none has a weight.
+    const std::string error{"<\x01 Err 1\x00>", 10};
+    for (int tick = 0; tick < 4; ++tick) {
+        scale.send(error);
+        EXPECT_FALSE(readAfter(driver, 40ms));
+    }
+    EXPECT_FALSE(driver.isOpen());
+}
+
 TEST(SerialScaleDriver, ClosesWhenUnplugged) {
     FakeScale scale;
     SerialScaleDriver driver{scale.portName()};

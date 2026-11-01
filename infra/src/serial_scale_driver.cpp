@@ -22,7 +22,7 @@ bool SerialScaleDriver::open() {
     if (!port_.open(QIODevice::ReadOnly)) return false;
     // Bytes left from before the reconnect belong to frames that are long gone.
     reader_ = {};
-    sinceData_.start();
+    sinceReading_.start();
     return true;
 }
 
@@ -35,18 +35,19 @@ std::optional<ScaleReading> SerialScaleDriver::read() {
     if (!port_.isOpen()) return std::nullopt;
 
     const QByteArray chunk = port_.readAll();
-    // An unplugged adapter shows up as an error; a switched-off scale only as silence,
-    // since it normally sends ten frames a second.
+    auto reading = reader_.push(std::string_view{chunk.constData(), static_cast<std::size_t>(chunk.size())});
+    if (reading) sinceReading_.restart();
+
+    // An unplugged adapter shows up as an error. A switched-off scale is silent, and
+    // one showing an error code sends frames without a weight: both are "no weight",
+    // since a working scale sends ten weights a second.
     const bool unplugged = port_.error() == QSerialPort::ResourceError;
-    const bool silent = chunk.isEmpty() && sinceData_.durationElapsed() > silenceLimit_;
-    if (unplugged || silent) {
+    const bool noWeight = !reading && sinceReading_.durationElapsed() > silenceLimit_;
+    if (unplugged || noWeight) {
         close();
         return std::nullopt;
     }
-    if (chunk.isEmpty()) return std::nullopt;
-
-    sinceData_.restart();
-    return reader_.push(std::string_view{chunk.constData(), static_cast<std::size_t>(chunk.size())});
+    return reading;
 }
 
 } // namespace wms

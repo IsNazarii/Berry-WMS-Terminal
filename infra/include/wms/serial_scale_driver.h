@@ -18,6 +18,8 @@ namespace wms {
 class SerialScaleDriver final : public IScaleDriver {
 public:
     // Prefer /dev/serial/by-id/...: /dev/ttyUSB0 may become ttyUSB1 after a replug.
+    // `silenceLimit`: how long the scale may go without a weight (silent, or an error
+    // code on the display) before the connection counts as lost.
     explicit SerialScaleDriver(const QString& portName,
                                std::chrono::milliseconds silenceLimit = std::chrono::seconds{2});
 
@@ -31,7 +33,7 @@ public:
 private:
     QSerialPort port_;
     Ie04FrameReader reader_;
-    QElapsedTimer sinceData_;
+    QElapsedTimer sinceReading_;
     std::chrono::milliseconds silenceLimit_;
 };
 

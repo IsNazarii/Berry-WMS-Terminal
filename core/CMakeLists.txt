@@ -12,6 +12,7 @@ add_library(wms_core
     src/open_receipt.cpp
     src/payment.cpp
     src/scale.cpp
+    src/ie04.cpp
     src/truck.cpp
     src/allocation.cpp
     src/shipment.cpp

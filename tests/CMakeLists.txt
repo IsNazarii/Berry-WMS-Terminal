@@ -14,6 +14,7 @@ add_executable(wms_core_tests
     crop_keys_test.cpp
     transaction_test.cpp
     scale_test.cpp
+    ie04_test.cpp
     truck_test.cpp
     allocation_test.cpp
     journal_test.cpp
@@ -25,6 +26,8 @@ add_executable(wms_core_tests
     session_summary_test.cpp
 )
 target_link_libraries(wms_core_tests PRIVATE wms_core GTest::gtest_main)
+# Raw bytes recorded from real devices.
+target_compile_definitions(wms_core_tests PRIVATE WMS_TEST_DATA_DIR="${CMAKE_CURRENT_SOURCE_DIR}/data")
 
 # Infrastructure tests run against real (in-memory or temporary) databases.
 add_executable(wms_infra_tests

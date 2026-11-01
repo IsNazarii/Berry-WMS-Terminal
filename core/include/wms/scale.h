@@ -10,6 +10,17 @@
 
 namespace wms {
 
+// What the scale shows, with the indicator lamps. `zero` is about the gross weight:
+// with a tare taken the display may read -65.6 while ZERO is lit.
+struct ScaleReading {
+    Weight weight;
+    bool stable = false;
+    bool zero = false;
+    bool tare = false;
+
+    bool operator==(const ScaleReading&) const = default;
+};
+
 // Source of weight readings. Real hardware (serial port) lives in the infra
 // layer; the core only knows this interface.
 class IScaleDriver {

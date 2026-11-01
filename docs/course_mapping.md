@@ -10,7 +10,7 @@
 | Сучасна ООП-мова | C++20 (concepts, `std::variant`, `<=>`, `std::format`, designated initializers, ranges) |
 | Одна програма, одна точка входу `main()` | `app/main.cpp` → `wms_terminal` |
 | Git з регулярними змістовними комітами | малі кроки, кожен — окремий коміт; `git log` |
-| Unit-тести (для «відмінно») | 284 тести GoogleTest у `tests/` (246 ядра + 38 infra на справжній SQLite), ядро пишеться тест-першим |
+| Unit-тести (для «відмінно») | 296 тестів GoogleTest у `tests/` (258 ядра + 38 infra на справжній SQLite; розбір кадрів ваг — на справжньому записі з пристрою), ядро пишеться тест-першим |
 | Декларація використання ШІ | розділ у [README](../README.md#використання-ші), домовленості в `CLAUDE.md` |
 | Аналіз конкурентів (для «відмінно») | ⏳ `docs/competitors.md` |
 
@@ -18,7 +18,7 @@
 
 | Вимога | Мінімум | Є |
 |---|---|---|
-| Класи / типи | 9 | 24 класи ядра + допоміжні структури (`Weighing`, `Cargo`, `TruckDetails`, `PriceChange`, `Amendment`, `AmendmentRecord`, `WorkDayRecord`, `CropPrice`, `PaidReceipt`, `ToWarehouse`) |
+| Класи / типи | 9 | 25 класів ядра + допоміжні структури (`ScaleReading`, `Weighing`, `Cargo`, `TruckDetails`, `PriceChange`, `Amendment`, `AmendmentRecord`, `WorkDayRecord`, `CropPrice`, `PaidReceipt`, `ToWarehouse`) |
 | Поля | 15 | значно більше (напр., лише `Weighing` — 9, `WorkDay` — 10, `Truck` — 5) |
 | Нетривіальні методи | 25 | значно більше (див. нижче) |
 | Ієрархії успадкування | 2, одна ≥ 3 класи | A: `Transaction` → 5 класів; B: `IScaleDriver` → `SimulatedScaleDriver`; C: `JournalStore` → `SqliteJournalStore`, D: `SessionStore` → `SqliteSessionStore`, E: `Repository<T>` → `SqliteRepository<T>` (infra) |
@@ -29,7 +29,7 @@
 
 `Quantity<Tag>` (`Money`, `Weight`), `Uuid`, `Supplier`, `Operator`, `Crop`, `CropKeys`, `Transaction`, `Receipt`,
 `Payment`, `Allocation`, `AllocationReversal`, `StockShipment`, `OpenReceipt`, `Truck`, `Journal`, `DayPrices`, `WorkDay`, `SessionSummary`,
-`IScaleDriver`, `SimulatedScaleDriver`, `StabilityDetector`, `JournalStore`, `SessionStore`, `Repository<T>` + infra-класи
+`IScaleDriver`, `SimulatedScaleDriver`, `StabilityDetector`, `Ie04FrameReader`, `JournalStore`, `SessionStore`, `Repository<T>` + infra-класи
 `sqlite::Database`, `sqlite::Statement`, `sqlite::ScopedTransaction`, `sqlite::Error`, `SqliteJournalStore`, `SqliteSessionStore`, `SqliteRepository<T>` (+ функція `backupDatabase`) + UI-класи `Terminal`, `SupplierListModel`,
 `ScaleMonitor`. Детально — [domain.md](domain.md).
 
@@ -68,7 +68,7 @@ classDiagram
 `Journal::balanceOf/historyOf/loadOf/stockOf/unallocatedOf/destinationOf/allocationOf/reversalOf/waitingForAllocation/validateAllocation/validateCancel/validateReversal/validateShipment/shipmentOf`,
 `Truck::depart/carryOver/boxesLeft/isOverloaded/fillPercent`, `DayPrices::priceAt`,
 `WorkDay::openReceipt/addWeighing/validateCancel/cancelWeighing/nextDestination/autoAllocation/closeReceipt/validatePay/payReceipt/validateClose/close/repeatTruck/adoptTruck/trucksForNextSession`,
-`Uuid::generateV7/parse/toString/timestamp`, `StabilityDetector::push/isStable/stableWeight`,
+`Uuid::generateV7/parse/toString/timestamp`, `StabilityDetector::push/isStable/stableWeight`, `parseIe04Frame`, `Ie04FrameReader::push`,
 `Supplier::matches`, `validateNewSupplier/nextSupplierId`, `validateNewCrop/cropCodeFor/validateRemoveCrop`,
 `CropKeys::use/fill`, `parseMoney/parseWeight`, `foldCase/squeezeSpaces`.
 

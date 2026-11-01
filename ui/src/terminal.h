@@ -48,7 +48,9 @@ class Terminal : public QObject {
     Q_PROPERTY(wms::ui::SupplierListModel* suppliers READ supplierModel CONSTANT)
     Q_PROPERTY(wms::ui::ScaleMonitor* scales READ scaleMonitor CONSTANT)
     // No scale port configured: the receiving screen offers the simulator's buttons.
-    Q_PROPERTY(bool scaleSimulated READ scaleSimulated CONSTANT)
+    Q_PROPERTY(bool scaleSimulated READ scaleSimulated NOTIFY scaleDriverChanged)
+    // The scale's serial port, empty for the simulator.
+    Q_PROPERTY(QString scalePort READ scalePort NOTIFY scaleDriverChanged)
     // The supplier of the active receipt: whose berries are on the scale.
     Q_PROPERTY(bool hasSupplier READ hasSupplier NOTIFY currentSupplierChanged)
     Q_PROPERTY(QString supplierName READ supplierName NOTIFY currentSupplierChanged)
@@ -147,6 +149,7 @@ public:
     [[nodiscard]] SupplierListModel* supplierModel() noexcept { return &supplierModel_; }
     [[nodiscard]] ScaleMonitor* scaleMonitor() noexcept { return &scaleMonitor_; }
     [[nodiscard]] bool scaleSimulated() const noexcept { return serialScale_ == nullptr; }
+    [[nodiscard]] QString scalePort() const { return scalePort_; }
     [[nodiscard]] bool hasSupplier() const noexcept { return currentSupplier() != nullptr; }
     [[nodiscard]] QString supplierName() const;
     // What we owe the current supplier, formatted; empty without a supplier.
@@ -237,6 +240,12 @@ public:
     Q_INVOKABLE void setReceivingTarget(const QString& destinationId);
     // Returns why the value is not a box tare; empty when it was saved.
     Q_INVOKABLE QString setDefaultBoxTare(const QString& kilograms);
+    // [{path, description}] of the serial ports present now; asked when the
+    // settings open, since adapters come and go.
+    Q_INVOKABLE QVariantList scalePorts() const;
+    // Switches to the scale on `path` (empty: the simulator) and remembers it for
+    // the terminal; no restart needed.
+    Q_INVOKABLE void setScalePort(const QString& path);
     // Closing the active receipt; afterwards the next open one becomes active.
     // "Pay" (retail): [{cropCode, crop, boxes, net, price}], one row per crop,
     // the price prefilled with the current day price as the operator types it.
@@ -303,6 +312,7 @@ signals:
     // The active receipt, the trucks or the target changed.
     void placementsChanged();
     void defaultBoxTareChanged();
+    void scaleDriverChanged();
 
 private:
     [[nodiscard]] const Supplier* currentSupplier() const noexcept;
@@ -375,6 +385,7 @@ private:
     // Declared after the data it reads, so it is constructed after it.
     SupplierListModel supplierModel_;
     SimulatedScaleDriver simulator_;
+    QString scalePort_;
     // Set when the terminal has a scale port configured; the simulator otherwise.
     std::unique_ptr<SerialScaleDriver> serialScale_;
     ScaleMonitor scaleMonitor_;

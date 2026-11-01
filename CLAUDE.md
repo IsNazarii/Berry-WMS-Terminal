@@ -190,11 +190,11 @@ $CM/cmake -S . -B build -G Ninja && $CM/cmake --build build && $CM/ctest --test-
 - GoogleTest у системі не встановлено — тягнеться FetchContent (потрібна мережа при першій конфігурації).
 
 ## Стан і наступні кроки (оновлено 01.11.2026)
-**Поточна робота (01.11) — драйвер ваг ІЕ-04, план із 5 кроків у `docs/hardware/scale-ie04.md` («План для термінала»).**
-Кроки 1–4 закомічено: `SerialScaleDriver` (`infra/include/wms/serial_scale_driver.h`, ціль `wms_serial`, тести
-`wms_serial_tests` на pty), `ScaleMonitor` забуває показ при втраті зв'язку, `Terminal` бере ваги з `WMS_SCALE_PORT` /
-`QSettings` `scale/port`. Жива перевірка 01.11 пройдена (вага, СТАБ, висмикнути/вставити кабель). **Далі — крок 5**
-(UI: вибір порту, лампа ТАРА, сховати кнопки симулятора, коли ваги справжні). Тара індикатора — на розсуд оператора,
+**Драйвер ваг ІЕ-04 (01.11) — усі 5 кроків плану `docs/hardware/scale-ie04.md` («План для термінала»).**
+`SerialScaleDriver` (`infra/include/wms/serial_scale_driver.h`, ціль `wms_serial`, тести `wms_serial_tests` на pty),
+`ScaleMonitor` забуває показ при втраті зв'язку; порт — `WMS_SCALE_PORT` / `QSettings` `scale/port`, вибір — меню ⋯ «Ваги…»
+(`Terminal::scalePorts`/`setScalePort`, `ScaleMonitor::setDriver`, без перезапуску). Лампи СТАБ/НУЛЬ/ТАРА, чіп ваг
+червоний без ваги, кнопки симулятора лише без справжніх ваг. Тара індикатора — на розсуд оператора,
 запис не блокує (рішення 01.11); біт НУЛЬ = нуль брутто (горить і при `−63,4` під тарою). Нечислове табло (помилка ваг) > 2 с = зв'язку нема (табло «—»).
 Ядро (`core/`): `Receipt` = постачальник + `Settlement` (`OnSite`/`HandedOver`) + `vector<Weighing>`
 (`priceSource`: `DayPrice`/`Manual`; `cancelled` — рядок лишається, не рахується); `Payment`;

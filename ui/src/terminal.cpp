@@ -264,13 +264,15 @@ std::vector<Weight> palletLanding(Weight target) {
     return {onScale(g / 5), onScale(g * 4 / 5), onScale(g + 3'000), onScale(g - 800), onScale(g + 200), target};
 }
 
-// The terminal's own scale port, e.g. /dev/serial/by-id/usb-FTDI_..., or nullptr for
+// The terminal's own scale port, e.g. /dev/serial/by-id/usb-FTDI_..., or empty for
 // the simulator. WMS_SCALE_PORT overrides the setting (tries without touching it).
-std::unique_ptr<SerialScaleDriver> serialScaleFromSettings() {
-    QString port = qEnvironmentVariable("WMS_SCALE_PORT");
-    if (port.isEmpty()) port = QSettings{}.value("scale/port").toString();
-    if (port.isEmpty()) return nullptr;
-    return std::make_unique<SerialScaleDriver>(port);
+QString scalePortFromSettings() {
+    const QString port = qEnvironmentVariable("WMS_SCALE_PORT");
+    return port.isEmpty() ? QSettings{}.value("scale/port").toString() : port;
+}
+
+std::unique_ptr<SerialScaleDriver> serialScaleOn(const QString& port) {
+    return port.isEmpty() ? nullptr : std::make_unique<SerialScaleDriver>(port);
 }
 
 } // namespace
@@ -291,7 +293,8 @@ Terminal::Terminal(QObject* parent)
       cropKeys_{loadCropKeys(crops_)},
       supplierModel_{suppliers_, journal_},
       simulator_{{grams(0)}},
-      serialScale_{serialScaleFromSettings()},
+      scalePort_{scalePortFromSettings()},
+      serialScale_{serialScaleOn(scalePort_)},
       scaleMonitor_{serialScale_ ? static_cast<IScaleDriver&>(*serialScale_) : simulator_},
       receivingTargetId_{QSettings{}.value("receiving/target").toString()},
       // The crates on the point weigh about this much; a terminal keeps its own.
@@ -994,6 +997,35 @@ QString Terminal::setDefaultBoxTare(const QString& kilograms) {
     QSettings{}.setValue("receiving/defaultBoxTare", defaultBoxTare_);
     emit defaultBoxTareChanged();
     return {};
+}
+
+QVariantList Terminal::scalePorts() const {
+    QVariantList list;
+    bool currentListed = scalePort_.isEmpty();
+    for (const auto& port : availableSerialPorts()) {
+        currentListed = currentListed || port.path == scalePort_;
+        list.append(QVariantMap{{"path", port.path}, {"description", port.description}});
+    }
+    // An unplugged adapter is still the terminal's choice: keep it pickable, not silently lost.
+    if (!currentListed) {
+        list.append(QVariantMap{{"path", scalePort_}, {"description", tr("не підключено")}});
+    }
+    return list;
+}
+
+void Terminal::setScalePort(const QString& path) {
+    if (path == scalePort_) return;
+    auto serial = serialScaleOn(path);
+    // The monitor lets go of the old driver before it is destroyed.
+    scaleMonitor_.setDriver(serial ? static_cast<IScaleDriver&>(*serial) : simulator_);
+    serialScale_ = std::move(serial);
+    scalePort_ = path;
+    if (path.isEmpty()) {
+        QSettings{}.remove("scale/port");
+    } else {
+        QSettings{}.setValue("scale/port", path);
+    }
+    emit scaleDriverChanged();
 }
 
 QVariantMap Terminal::nextPlacements() const {

@@ -8,6 +8,7 @@
 #include <QString>
 
 #include <chrono>
+#include <vector>
 
 namespace wms {
 
@@ -36,5 +37,15 @@ private:
     QElapsedTimer sinceReading_;
     std::chrono::milliseconds silenceLimit_;
 };
+
+// A serial port the scale may be on, for the operator to pick from.
+struct SerialPortChoice {
+    QString path;        // what SerialScaleDriver opens
+    QString description; // "FT232R USB UART (FTDI)"
+};
+
+// Ports present now. A USB adapter is listed under its /dev/serial/by-id/ name when
+// there is one: that name survives a replug, /dev/ttyUSB0 does not.
+[[nodiscard]] std::vector<SerialPortChoice> availableSerialPorts();
 
 } // namespace wms

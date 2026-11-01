@@ -14,8 +14,8 @@ constexpr auto kPollInterval = 250ms;
 } // namespace
 
 ScaleMonitor::ScaleMonitor(IScaleDriver& driver, QObject* parent)
-    : QObject{parent}, driver_{driver} {
-    driver_.open();
+    : QObject{parent}, driver_{&driver} {
+    driver_->open();
     connect(&timer_, &QTimer::timeout, this, &ScaleMonitor::poll);
     timer_.start(kPollInterval);
 }
@@ -34,14 +34,23 @@ std::optional<Weight> ScaleMonitor::lastReading() const noexcept {
     return reading_->weight;
 }
 
+void ScaleMonitor::setDriver(IScaleDriver& driver) {
+    if (&driver == driver_) return;
+    driver_->close();
+    driver_ = &driver;
+    driver_->open();
+    show(std::nullopt);
+    emit driverChanged();
+}
+
 void ScaleMonitor::poll() {
     // A driver that lost the connection gets reopened on the next tick.
-    if (!driver_.isOpen() && !driver_.open()) return show(std::nullopt);
-    const auto reading = driver_.read();
+    if (!driver_->isOpen() && !driver_->open()) return show(std::nullopt);
+    const auto reading = driver_->read();
     if (reading) return show(reading);
     // Nothing new keeps the last reading; a lost connection must not, or a pallet
     // could be recorded with the weight shown before the cable came out.
-    if (!driver_.isOpen()) show(std::nullopt);
+    if (!driver_->isOpen()) show(std::nullopt);
 }
 
 void ScaleMonitor::show(const std::optional<ScaleReading>& reading) {

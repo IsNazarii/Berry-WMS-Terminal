@@ -27,7 +27,7 @@ class ScaleMonitor : public QObject {
     Q_PROPERTY(bool tare READ isTare NOTIFY readingChanged)
     // There is a weight to show: the scale is connected and its display shows a number.
     Q_PROPERTY(bool online READ isOnline NOTIFY readingChanged)
-    Q_PROPERTY(QString driverName READ driverName CONSTANT)
+    Q_PROPERTY(QString driverName READ driverName NOTIFY driverChanged)
 
 public:
     // The driver must outlive the monitor.
@@ -39,20 +39,25 @@ public:
     [[nodiscard]] bool isZero() const noexcept { return reading_ && reading_->zero; }
     [[nodiscard]] bool isTare() const noexcept { return reading_ && reading_->tare; }
     [[nodiscard]] bool isOnline() const noexcept { return reading_.has_value(); }
-    [[nodiscard]] QString driverName() const { return QString::fromStdString(driver_.name()); }
+    [[nodiscard]] QString driverName() const { return QString::fromStdString(driver_->name()); }
     // The only weight a weighing may be recorded with.
     [[nodiscard]] std::optional<Weight> stableWeight() const noexcept;
     // What the scale shows now, settled or not: the operator may accept it anyway.
     [[nodiscard]] std::optional<Weight> lastReading() const noexcept;
 
+    // Closes the current driver and listens to `driver` instead, which must outlive
+    // the monitor or the next setDriver(). The old reading is forgotten at once.
+    void setDriver(IScaleDriver& driver);
+
 signals:
     void readingChanged();
+    void driverChanged();
 
 private:
     void poll();
     void show(const std::optional<ScaleReading>& reading);
 
-    IScaleDriver& driver_;
+    IScaleDriver* driver_;
     std::optional<ScaleReading> reading_;
     QTimer timer_;
 };

@@ -140,6 +140,60 @@ ToolBar {
         }
     }
 
+    // Which scale this terminal reads. Picking switches at once, so the live reading
+    // below confirms the port before the dialog is closed.
+    Dialog {
+        id: scaleDialog
+        parent: Overlay.overlay
+        anchors.centerIn: parent
+        width: 480
+        modal: true
+        title: qsTr("Ваги")
+        standardButtons: Dialog.Close
+
+        onOpened: {
+            portBox.model = [{ path: "", description: qsTr("Симулятор ваг") }].concat(Terminal.scalePorts())
+            portBox.currentIndex = portBox.indexOfValue(Terminal.scalePort)
+            portBox.forceActiveFocus()
+        }
+
+        ColumnLayout {
+            anchors.fill: parent
+            spacing: Theme.spacingS
+
+            Label {
+                text: qsTr("Порт, до якого під'єднано ваги (ІЕ-04, 4800 8N1). Без порту — симулятор.")
+                color: Theme.textMuted
+                wrapMode: Text.WordWrap
+                Layout.fillWidth: true
+            }
+            ComboBox {
+                id: portBox
+                textRole: "description"
+                valueRole: "path"
+                Layout.fillWidth: true
+                onActivated: Terminal.setScalePort(currentValue)
+            }
+            Label {
+                visible: text !== ""
+                text: Terminal.scalePort
+                font.pixelSize: Theme.fontSizeCaption
+                color: Theme.textMuted
+                elide: Text.ElideMiddle
+                Layout.fillWidth: true
+            }
+            Label {
+                text: Terminal.scales.online
+                      ? qsTr("Зараз: %1 кг%2").arg(Terminal.scales.display)
+                                             .arg(Terminal.scales.stable ? qsTr(", стабільно") : "")
+                      : qsTr("Немає ваги: перевірте кабель, живлення ваг і права на порт (група dialout).")
+                color: Terminal.scales.online ? Theme.ok : Theme.danger
+                wrapMode: Text.WordWrap
+                Layout.fillWidth: true
+            }
+        }
+    }
+
     RowLayout {
         anchors.fill: parent
         spacing: Theme.spacingXl
@@ -267,6 +321,10 @@ ToolBar {
                         ScaleItem { factor: 1.25 }
                         ScaleItem { factor: 1.5 }
                         ScaleItem { factor: 1.75 }
+                    }
+                    MenuItem {
+                        text: qsTr("Ваги: %1…").arg(Terminal.scales.driverName)
+                        onTriggered: scaleDialog.open()
                     }
                     // Crates differ between points, so the usual one is a setting of the terminal.
                     MenuItem {

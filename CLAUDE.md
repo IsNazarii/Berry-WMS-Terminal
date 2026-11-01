@@ -152,7 +152,7 @@ $CM/cmake -S . -B build -G Ninja && $CM/cmake --build build && $CM/ctest --test-
 Лаба 1: ≥9 класів, ≥15 полів, ≥25 нетривіальних методів, ≥2 ієрархії (одна ≥3 класи),
 ≥3 поліморфізми (≥1 статичний, ≥1 динамічний), інкапсуляція.
 - Ієрархія A: `Transaction` → `Receipt` ✅, `Payment` ✅, `Allocation` ✅, `AllocationReversal` ✅, `StockShipment` ✅
-- Ієрархія B: `IScaleDriver` → `SimulatedScaleDriver` ✅, `SerialScaleDriver` ⏳ (infra, Qt)
+- Ієрархія B: `IScaleDriver` → `SimulatedScaleDriver` ✅, `SerialScaleDriver` ✅ (infra, Qt)
 - Ієрархія C: `JournalStore` → `SqliteJournalStore` ✅, D: `SessionStore` → `SqliteSessionStore` ✅,
   E: `Repository<T>` → `SqliteRepository<T>` ✅ (infra)
 - Статичний поліморфізм: `Quantity<Tag>` (`Money`, `Weight`) ✅; `Destination` = `std::variant` + `std::visit` ✅;
@@ -184,11 +184,19 @@ $CM/cmake -S . -B build -G Ninja && $CM/cmake --build build && $CM/ctest --test-
 ## Оточення
 - Fedora, CLion (cmake у PATH відсутній — використовується вбудований у CLion).
 - Qt6 6.11: встановлені Gui/Quick/Qml/SerialPort/Sql/Test (+ драйвер QSQLITE). `sqlite-devel` не встановлено.
-- Порт ваг: `pc` додано в групу `dialout` 01.11 (діє після перелогіну; до того — `sudo setfacl -m u:pc:rw /dev/ttyUSB0`).
+- Порт ваг: права надаються **явно** (див. `docs/hardware/scale-ie04.md`, «Права на порт»). `pc` додано в групу `dialout` 01.11
+  (діє після перезавантаження; `setfacl` — тимчасово, зникає при перепідключенні адаптера). sudo через `!` не працює — окремий термінал.
 - Git: гілка `main`, remote `origin` = git@github.com:IsNazarii/Berry-WMS-Terminal.git (push можна робити з термінала).
 - GoogleTest у системі не встановлено — тягнеться FetchContent (потрібна мережа при першій конфігурації).
 
-## Стан і наступні кроки (оновлено 28.10.2026)
+## Стан і наступні кроки (оновлено 01.11.2026)
+**Поточна робота (01.11) — драйвер ваг ІЕ-04, план із 5 кроків у `docs/hardware/scale-ie04.md` («План для термінала»).**
+Кроки 1–4 закомічено: `SerialScaleDriver` (`infra/include/wms/serial_scale_driver.h`, ціль `wms_serial`, тести
+`wms_serial_tests` на pty), `ScaleMonitor` забуває показ при втраті зв'язку, `Terminal` бере ваги з `WMS_SCALE_PORT` /
+`QSettings` `scale/port`. Жива перевірка 01.11 пройдена (вага, СТАБ, висмикнути/вставити кабель). **Далі — крок 5**
+(UI: вибір порту, лампа ТАРА, сховати кнопки симулятора, коли ваги справжні). Тара індикатора — на розсуд оператора,
+запис не блокує (рішення 01.11); біт НУЛЬ = нуль брутто (горить і при `−63,4` під тарою). Відома дрібниця: нечислове
+табло (помилка ваг) драйвер віддає як «нічого нового» — монітор тримає попередній показ; вирішити на кроці 5.
 Ядро (`core/`): `Receipt` = постачальник + `Settlement` (`OnSite`/`HandedOver`) + `vector<Weighing>`
 (`priceSource`: `DayPrice`/`Manual`; `cancelled` — рядок лишається, не рахується); `Payment`;
 `OpenReceipt` (чек, що зважується: `add`/`cancel`, `validateClose`/`close(settlement)` → `Receipt` з тим самим

@@ -39,6 +39,13 @@ add_executable(wms_infra_tests
 )
 target_link_libraries(wms_infra_tests PRIVATE wms_infra GTest::gtest_main)
 
+# The serial scale driver against a pseudo-terminal playing the scale; own main()
+# because QSerialPort needs a QCoreApplication.
+add_executable(wms_serial_tests serial_scale_driver_test.cpp)
+target_link_libraries(wms_serial_tests PRIVATE wms_serial GTest::gtest)
+target_compile_definitions(wms_serial_tests PRIVATE WMS_TEST_DATA_DIR="${CMAKE_CURRENT_SOURCE_DIR}/data")
+
 include(GoogleTest)
 gtest_discover_tests(wms_core_tests)
 gtest_discover_tests(wms_infra_tests)
+gtest_discover_tests(wms_serial_tests)

@@ -264,6 +264,15 @@ std::vector<Weight> palletLanding(Weight target) {
     return {onScale(g / 5), onScale(g * 4 / 5), onScale(g + 3'000), onScale(g - 800), onScale(g + 200), target};
 }
 
+// The terminal's own scale port, e.g. /dev/serial/by-id/usb-FTDI_..., or nullptr for
+// the simulator. WMS_SCALE_PORT overrides the setting (tries without touching it).
+std::unique_ptr<SerialScaleDriver> serialScaleFromSettings() {
+    QString port = qEnvironmentVariable("WMS_SCALE_PORT");
+    if (port.isEmpty()) port = QSettings{}.value("scale/port").toString();
+    if (port.isEmpty()) return nullptr;
+    return std::make_unique<SerialScaleDriver>(port);
+}
+
 } // namespace
 
 Terminal::Terminal(QObject* parent)
@@ -282,7 +291,8 @@ Terminal::Terminal(QObject* parent)
       cropKeys_{loadCropKeys(crops_)},
       supplierModel_{suppliers_, journal_},
       simulator_{{grams(0)}},
-      scaleMonitor_{simulator_},
+      serialScale_{serialScaleFromSettings()},
+      scaleMonitor_{serialScale_ ? static_cast<IScaleDriver&>(*serialScale_) : simulator_},
       receivingTargetId_{QSettings{}.value("receiving/target").toString()},
       // The crates on the point weigh about this much; a terminal keeps its own.
       defaultBoxTare_{QSettings{}.value("receiving/defaultBoxTare", "1,2").toString()} {

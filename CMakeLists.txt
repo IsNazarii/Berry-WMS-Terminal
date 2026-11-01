@@ -8,12 +8,13 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 option(WMS_BUILD_TESTS "Build unit tests" ON)
 
+# Qt is used by the UI layer, the entry point and the scale's serial port (wms_serial);
+# core and the SQLite storage stay Qt-free.
+find_package(Qt6 6.8 REQUIRED COMPONENTS Quick QuickControls2 SerialPort)
+qt_standard_project_setup(REQUIRES 6.8)
+
 add_subdirectory(core)
 add_subdirectory(infra)
-
-# Qt is used only by the UI layer and the entry point; core stays Qt-free.
-find_package(Qt6 6.8 REQUIRED COMPONENTS Quick QuickControls2)
-qt_standard_project_setup(REQUIRES 6.8)
 # QML modules go to build/qml/<URI path>, where qmllint and the engine expect them.
 set(QT_QML_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/qml)
 

@@ -38,3 +38,10 @@ add_library(wms_infra
 target_include_directories(wms_infra PUBLIC include)
 target_link_libraries(wms_infra PUBLIC wms_core PRIVATE sqlite3)
 target_compile_options(wms_infra PRIVATE -Wall -Wextra -Wpedantic -Wshadow)
+
+# The scale's serial port is the only Qt piece of infra; a library of its own keeps
+# wms_infra (SQLite) and its tests free of Qt.
+add_library(wms_serial src/serial_scale_driver.cpp)
+target_include_directories(wms_serial PUBLIC include)
+target_link_libraries(wms_serial PUBLIC wms_core Qt6::SerialPort)
+target_compile_options(wms_serial PRIVATE -Wall -Wextra -Wpedantic -Wshadow)

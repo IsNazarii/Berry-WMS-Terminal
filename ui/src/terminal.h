@@ -7,6 +7,7 @@
 #include "wms/journal.h"
 #include "wms/operator.h"
 #include "wms/scale.h"
+#include "wms/serial_scale_driver.h"
 #include "wms/sqlite.h"
 #include "wms/sqlite_journal_store.h"
 #include "wms/sqlite_repository.h"
@@ -21,6 +22,8 @@
 #include <QVariantList>
 #include <QVariantMap>
 #include <QtQml/qqmlregistration.h>
+
+#include <memory>
 
 #include <filesystem>
 #include <optional>
@@ -369,6 +372,8 @@ private:
     // Declared after the data it reads, so it is constructed after it.
     SupplierListModel supplierModel_;
     SimulatedScaleDriver simulator_;
+    // Set when the terminal has a scale port configured; the simulator otherwise.
+    std::unique_ptr<SerialScaleDriver> serialScale_;
     ScaleMonitor scaleMonitor_;
     // An id, not a pointer: the open receipts live in a vector that reallocates.
     std::optional<Uuid> activeReceiptId_;

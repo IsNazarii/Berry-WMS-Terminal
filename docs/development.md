@@ -8,10 +8,10 @@
 | Компілятор | з повною підтримкою C++20 і `<format>`: GCC 13+ (перевірено на GCC 16), Clang 17+ |
 | CMake | ≥ 3.28 (у CLion — вбудований) |
 | Генератор | Ninja |
-| Qt | ≥ 6.8: Quick, QuickControls2, плагін SVG (`qt6-qtsvg` — іконки панелі), SerialPort (для драйвера ваг — ще не підключено); переклади `qt6-qttranslations` — необов'язково, для українських стандартних кнопок |
+| Qt | ≥ 6.8: Quick, QuickControls2, плагін SVG (`qt6-qtsvg` — іконки панелі), SerialPort (драйвер ваг, ціль `wms_serial`); переклади `qt6-qttranslations` — необов'язково, для українських стандартних кнопок |
 | SQLite | 3.51.2, амальгамація через `FetchContent` (системний `sqlite-devel` не потрібен); компілюється з `-w` — чужий код |
 | GoogleTest | 1.17, завантажується через `FetchContent` — потрібна мережа при першій конфігурації |
-| Порт ваг | USB↔RS-232 + 3-провідний null-modem DB9F–DB9F; користувач у групі `dialout`; для CH340 — без пакета `brltty`. Деталі — [hardware/scale-ie04.md](hardware/scale-ie04.md) |
+| Порт ваг | оригінальний кабель «Промприлад» USB↔DB9 (FTDI) або USB↔RS-232 + 3-провідний null-modem DB9F–DB9F. **Права на порт надати явно**: `sudo usermod -aG dialout $USER` і перелогінитись — інакше порт не відкриється, а на табло буде «—». Деталі — [hardware/scale-ie04.md](hardware/scale-ie04.md#права-на-порт--надати-явно) |
 
 ## 2. Збірка
 
@@ -36,8 +36,9 @@ $CM/cmake -S . -B build -G Ninja && $CM/cmake --build build && $CM/ctest --test-
 | `wms_style` | QML-модуль `BerryWms.Style`: власний стиль контролів, `Theme`, шрифт |
 | `wms_terminal` | виконуваний файл термінала |
 | `wms_infra` | інфраструктура: обгортка SQLite, схема, сховища журналу, сесій і довідників, бекап (статична бібліотека) |
+| `wms_serial` | драйвер ваг ІЕ-04 на `QSerialPort` — окремо, щоб `wms_infra` і його тести були без Qt |
 | `sqlite3` | SQLite з амальгамації |
-| `wms_core_tests`, `wms_infra_tests` | unit-тести ядра й інфраструктури |
+| `wms_core_tests`, `wms_infra_tests`, `wms_serial_tests` | unit-тести ядра, інфраструктури й драйвера ваг |
 | `wms_ui_qmllint` | перевірка QML-файлів `qmllint` |
 
 Опції CMake: `WMS_BUILD_TESTS` (за замовчуванням `ON`).
@@ -65,7 +66,8 @@ $CM/cmake -S . -B build -G Ninja && $CM/cmake --build build && $CM/ctest --test-
 | `transaction_test` | `Weighing`, `Receipt`, `Payment` (`paidBy`): нетто, суми, валідація, анулювання, опт |
 | `open_receipt_test` | додавання, анулювання, `crops` / `setPrice`, закриття з тим самим id і сесією |
 | `session_summary_test` | підсумок дня: лише записи своєї сесії + відкриті чеки, культури, де ящики, виплати за способом |
-| `scale_test` | симулятор, детектор стабільності |
+| `scale_test` | симулятор (стабільність після 3 однакових показів, скидання при закритті), детектор стабільності |
+| `ie04_test` | кадри ваг ІЕ-04: вага й лампи, кома з бітів статусу, мінус, нечислове табло, потік зі сміттям, увесь запис з пристрою |
 | `truck_test` | ліміт у ящиках, заповненість, переповнення, статуси |
 | `allocation_test` | ціла палета, ящики, пропорційний поділ ваги |
 | `shipment_test` | відвантаження зі складу |
@@ -77,6 +79,7 @@ $CM/cmake -S . -B build -G Ninja && $CM/cmake --build build && $CM/ctest --test-
 | `sqlite_session_store_test` *(infra)* | знімок сесії (ціни, фури, відкриті чеки, поправки), перезапис, `current` / `lastClosed`, спільна база з журналом |
 | `sqlite_repository_test` *(infra)* | довідники `Supplier` / `Operator` / `Crop`: upsert, порядок, `remove`, `archived` |
 | `backup_test` *(infra)* | копія через `VACUUM INTO` відкривається, ротація лишає `keep` останніх і не чіпає чужі файли |
+| `serial_scale_driver_test` *(serial)* | `SerialScaleDriver` на псевдотерміналі, що грає ваги: останній кадр, тиша й висмикнутий кабель закривають порт, повторне відкриття, увесь запис |
 
 Запустити один набір:
 
@@ -92,6 +95,14 @@ WMS_DATABASE=:memory: QT_FORCE_STDERR_LOGGING=1 QT_QPA_PLATFORM=offscreen timeou
 ```
 
 Без `QT_FORCE_STDERR_LOGGING` попередження Qt ідуть у journald.
+
+Зі справжніми вагами — порт через змінну (налаштування `scale/port` не чіпається):
+
+```bash
+WMS_SCALE_PORT=/dev/serial/by-id/usb-FTDI_FT232R_USB_UART_AN6UY90E-if00-port0 ./build/app/wms_terminal
+```
+
+Вивід термінала, якого вбиває `timeout`, писати у файл, а не в конвеєр (`| grep`) — інакше буфер губиться.
 
 ## 4. Стиль коду
 

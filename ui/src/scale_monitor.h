@@ -44,6 +44,7 @@ signals:
 
 private:
     void poll();
+    void show(const std::optional<ScaleReading>& reading);
 
     IScaleDriver& driver_;
     std::optional<ScaleReading> reading_;

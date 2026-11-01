@@ -209,8 +209,10 @@ ToolBar {
             spacing: Theme.spacingS
 
             Chip {
-                text: bar.compact ? "" : Terminal.scales.driverName
-                dotColor: Theme.ok
+                text: bar.compact ? "" : Terminal.scales.online ? Terminal.scales.driverName
+                                                                : qsTr("%1 — немає зв'язку").arg(Terminal.scales.driverName)
+                dotColor: Terminal.scales.online ? Theme.ok : Theme.danger
+                textColor: Terminal.scales.online ? Theme.textMuted : Theme.danger
                 hoverEnabled: false
                 focusPolicy: Qt.NoFocus
             }

@@ -47,6 +47,8 @@ class Terminal : public QObject {
     // Fully qualified: the QML type registrar does not resolve names inside the namespace.
     Q_PROPERTY(wms::ui::SupplierListModel* suppliers READ supplierModel CONSTANT)
     Q_PROPERTY(wms::ui::ScaleMonitor* scales READ scaleMonitor CONSTANT)
+    // No scale port configured: the receiving screen offers the simulator's buttons.
+    Q_PROPERTY(bool scaleSimulated READ scaleSimulated CONSTANT)
     // The supplier of the active receipt: whose berries are on the scale.
     Q_PROPERTY(bool hasSupplier READ hasSupplier NOTIFY currentSupplierChanged)
     Q_PROPERTY(QString supplierName READ supplierName NOTIFY currentSupplierChanged)
@@ -144,6 +146,7 @@ public:
     [[nodiscard]] int journalSize() const noexcept;
     [[nodiscard]] SupplierListModel* supplierModel() noexcept { return &supplierModel_; }
     [[nodiscard]] ScaleMonitor* scaleMonitor() noexcept { return &scaleMonitor_; }
+    [[nodiscard]] bool scaleSimulated() const noexcept { return serialScale_ == nullptr; }
     [[nodiscard]] bool hasSupplier() const noexcept { return currentSupplier() != nullptr; }
     [[nodiscard]] QString supplierName() const;
     // What we owe the current supplier, formatted; empty without a supplier.

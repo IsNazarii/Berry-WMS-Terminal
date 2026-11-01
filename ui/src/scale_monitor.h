@@ -23,6 +23,10 @@ class ScaleMonitor : public QObject {
     Q_PROPERTY(QString display READ display NOTIFY readingChanged)
     Q_PROPERTY(bool zero READ isZero NOTIFY readingChanged)
     Q_PROPERTY(bool stable READ isStable NOTIFY readingChanged)
+    // The indicator's own tare is on: the display shows net weight.
+    Q_PROPERTY(bool tare READ isTare NOTIFY readingChanged)
+    // There is a weight to show: the scale is connected and its display shows a number.
+    Q_PROPERTY(bool online READ isOnline NOTIFY readingChanged)
     Q_PROPERTY(QString driverName READ driverName CONSTANT)
 
 public:
@@ -33,6 +37,8 @@ public:
     [[nodiscard]] bool isStable() const noexcept { return reading_ && reading_->stable; }
     // An empty scale: the "zero" lamp of a real indicator.
     [[nodiscard]] bool isZero() const noexcept { return reading_ && reading_->zero; }
+    [[nodiscard]] bool isTare() const noexcept { return reading_ && reading_->tare; }
+    [[nodiscard]] bool isOnline() const noexcept { return reading_.has_value(); }
     [[nodiscard]] QString driverName() const { return QString::fromStdString(driver_.name()); }
     // The only weight a weighing may be recorded with.
     [[nodiscard]] std::optional<Weight> stableWeight() const noexcept;

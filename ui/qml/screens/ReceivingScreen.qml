@@ -66,7 +66,7 @@ Page {
         }
     }
 
-    // One lamp of the scale indicator: СТАБ, НУЛЬ, БРУТТО.
+    // One lamp of the scale indicator: СТАБ, НУЛЬ, ТАРА.
     component Lamp: RowLayout {
         id: lamp
         required property string caption
@@ -252,7 +252,8 @@ Page {
 
                             Lamp { caption: qsTr("СТАБ"); lit: screen.scales.stable }
                             Lamp { caption: qsTr("НУЛЬ"); lit: screen.scales.zero }
-                            Lamp { caption: qsTr("БРУТТО"); lit: true }
+                            // The indicator's tare is the operator's call; the display then shows net.
+                            Lamp { caption: qsTr("ТАРА"); lit: screen.scales.tare }
                         }
 
                         RowLayout {
@@ -526,13 +527,15 @@ Page {
                     }
                     Item { Layout.fillHeight: true }
 
-                    // Until real scales are connected: put a pallet on and take it off.
+                    // Only without real scales: put a pallet on and take it off.
                     Rectangle {
+                        visible: Terminal.scaleSimulated
                         Layout.fillWidth: true
                         implicitHeight: 1
                         color: Theme.surfaceAlt
                     }
                     RowLayout {
+                        visible: Terminal.scaleSimulated
                         Layout.fillWidth: true
                         Label {
                             text: screen.scales.driverName

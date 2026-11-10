@@ -345,6 +345,11 @@ Page {
                                     wrapMode: Text.WordWrap
                                     Layout.fillWidth: true
                                 }
+                                Button {
+                                    visible: record.modelData.receiptId !== ""
+                                    text: qsTr("Копія чека")
+                                    onClicked: Terminal.printReceiptCopy(record.modelData.receiptId)
+                                }
                             }
                             Label {
                                 text: record.modelData.effect

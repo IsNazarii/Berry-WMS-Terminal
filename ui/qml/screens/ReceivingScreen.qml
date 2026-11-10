@@ -857,6 +857,7 @@ Page {
                 prices[row.cropCode] = row.price
             typed = prices
             cash.checked = true
+            printPaid.checked = true
             payError.text = ""
         }
 
@@ -941,6 +942,7 @@ Page {
                 RadioButton { id: cash; text: qsTr("Готівка") }
                 RadioButton { id: transfer; text: qsTr("Переказ") }
             }
+            CheckBox { id: printPaid; text: qsTr("Друкувати чек") }
 
             Repeater {
                 model: payDialog.check.blockers ?? []
@@ -976,7 +978,7 @@ Page {
 
         // Kept open on an error, so the typed prices stay.
         onAccepted: {
-            payError.text = Terminal.payReceipt(typed, transfer.checked)
+            payError.text = Terminal.payReceipt(typed, transfer.checked, printPaid.checked)
             if (payError.text !== "")
                 open()
             else
@@ -999,7 +1001,7 @@ Page {
             anchors.fill: parent
 
             Label {
-                text: qsTr("Опт: %1 ящ., нетто %2 кг. Ціни в чеку не буде — його отримує відповідальна особа.")
+                text: qsTr("Опт: %1 ящ., нетто %2 кг. Ціни в чеку не буде: надрукований чек отримує відповідальна особа.")
                       .arg(Terminal.activeSummary.boxes ?? 0).arg(Terminal.activeSummary.net ?? "")
                 wrapMode: Text.WordWrap
                 Layout.fillWidth: true

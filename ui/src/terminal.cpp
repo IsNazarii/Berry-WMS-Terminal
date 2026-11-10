@@ -6,6 +6,7 @@
 #include "wms/backup.h"
 #include "wms/payment.h"
 #include "wms/receipt.h"
+#include "wms/receipt_document.h"
 #include "wms/session_summary.h"
 #include "wms/text.h"
 
@@ -298,7 +299,10 @@ Terminal::Terminal(QObject* parent)
       scaleMonitor_{serialScale_ ? static_cast<IScaleDriver&>(*serialScale_) : simulator_},
       receivingTargetId_{QSettings{}.value("receiving/target").toString()},
       // The crates on the point weigh about this much; a terminal keeps its own.
-      defaultBoxTare_{QSettings{}.value("receiving/defaultBoxTare", "1,2").toString()} {
+      defaultBoxTare_{QSettings{}.value("receiving/defaultBoxTare", "1,2").toString()},
+      // WMS_PRINT_PDF: PDF files in that folder instead of paper.
+      printer_{qEnvironmentVariable("WMS_PRINT_PDF")},
+      receiptPaper_{QSettings{}.value("print/paper").toString() == "A5" ? PaperSize::A5 : PaperSize::A4} {
     if (!sessionStore_.current() && !sessionStore_.lastClosed() && journalStore_.load().size() == 0) seedDemoData();
     // The supplier model reads balances only when asked, so loading after it is fine.
     journal_ = journalStore_.load();
@@ -664,11 +668,13 @@ QVariantList Terminal::cashHistory() const {
         const Money effect = record->balanceEffect();
         QString title;
         QString detail;
+        QString receiptId;
         if (const auto* payment = dynamic_cast<const Payment*>(record)) {
             title = payment->method() == PaymentMethod::Cash ? tr("Виплата готівкою") : tr("Виплата переказом");
             detail = tr("видав(ла): %1").arg(operatorNameOf(payment->paidBy()));
         } else if (const auto* receipt = dynamic_cast<const Receipt*>(record)) {
             std::tie(title, detail) = receiptStory(*receipt);
+            receiptId = QString::fromStdString(receipt->id().toString());
         }
         list.append(QVariantMap{
             {"at", localDateTime(record->createdAt())},
@@ -676,6 +682,7 @@ QVariantList Terminal::cashHistory() const {
             {"detail", detail},
             {"effect", effect.isNegative() ? hryvniasText(effect) : "+" + hryvniasText(effect)},
             {"payment", record->kind() == TransactionKind::Payment},
+            {"receiptId", receiptId},
         });
     }
     return list;
@@ -999,6 +1006,12 @@ QString Terminal::setDefaultBoxTare(const QString& kilograms) {
     return {};
 }
 
+void Terminal::setReceiptPaper(const QString& paper) {
+    receiptPaper_ = paper == "A5" ? PaperSize::A5 : PaperSize::A4;
+    QSettings{}.setValue("print/paper", receiptPaper());
+    emit receiptPaperChanged();
+}
+
 QVariantList Terminal::scalePorts() const {
     QVariantList list;
     bool currentListed = scalePort_.isEmpty();
@@ -1096,7 +1109,7 @@ QVariantMap Terminal::payCheck(const QVariantMap& prices) const {
     return {{"amounts", amounts}, {"total", total}, {"blockers", blockers}};
 }
 
-QString Terminal::payReceipt(const QVariantMap& prices, bool bankTransfer) {
+QString Terminal::payReceipt(const QVariantMap& prices, bool bankTransfer, bool print) {
     if (!currentOperatorId_) return tr("Увійдіть як оператор");
     if (!activeReceipt()) return tr("Немає відкритого чека");
     QStringList errors;
@@ -1108,7 +1121,7 @@ QString Terminal::payReceipt(const QVariantMap& prices, bool bankTransfer) {
     PaidReceipt paid = workDay_->payReceipt(*activeReceiptId_, typed,
                                             bankTransfer ? PaymentMethod::BankTransfer : PaymentMethod::Cash,
                                             *currentOperatorId_, now);
-    receiptClosed(std::move(paid.receipt), std::move(paid.payment));
+    receiptClosed(std::move(paid.receipt), std::move(paid.payment), print);
     return {};
 }
 
@@ -1123,10 +1136,34 @@ QStringList Terminal::handOverBlockers() const {
 
 void Terminal::handOverReceipt() {
     if (!activeReceipt() || !handOverBlockers().isEmpty()) return;
-    receiptClosed(workDay_->closeReceipt(*activeReceiptId_, Settlement::HandedOver), std::nullopt);
+    receiptClosed(workDay_->closeReceipt(*activeReceiptId_, Settlement::HandedOver), std::nullopt, true);
 }
 
-void Terminal::receiptClosed(Receipt receipt, std::optional<Payment> payment) {
+void Terminal::printReceiptCopy(const QString& receiptId) {
+    const auto id = Uuid::parse(receiptId.toStdString());
+    if (const Receipt* receipt = id ? journal_.findReceipt(*id) : nullptr) printClosedReceipt(*receipt, true);
+}
+
+void Terminal::printClosedReceipt(const Receipt& receipt, bool copy) {
+    std::optional<ReceiptPaymentInfo> paymentInfo;
+    if (const Payment* payment = journal_.paymentFor(receipt.id())) {
+        paymentInfo = ReceiptPaymentInfo{.method = payment->method(),
+                                         .amount = payment->amount(),
+                                         .at = payment->createdAt(),
+                                         .by = operatorNameOf(payment->paidBy()).toStdString()};
+    }
+    const ReceiptDocument document = makeReceiptDocument(
+        receipt, Supplier{receipt.supplierId(), supplierNameOf(receipt.supplierId()).toStdString()}, crops_, paymentInfo,
+        {.at = Clock::now(), .by = operatorName().toStdString(), .copy = copy});
+    if (const QString problem = printer_.print(document, receiptPaper_); !problem.isEmpty()) {
+        emit printProblem(tr("Чек збережено, але не надруковано: %1.\n"
+                             "Коли принтер запрацює, надрукуйте копію: «Каса» → постачальник → «Копія чека».")
+                              .arg(problem));
+    }
+}
+
+void Terminal::receiptClosed(Receipt receipt, std::optional<Payment> payment, bool print) {
+    const Uuid receiptId = receipt.id();
     {
         // Into the journal and out of the open list together: never both or neither after a crash.
         sqlite::ScopedTransaction transaction{db_};
@@ -1141,6 +1178,8 @@ void Terminal::receiptClosed(Receipt receipt, std::optional<Payment> payment) {
     setActiveReceipt(left.empty() ? std::nullopt : std::optional{left.front().id()});
     emit journalChanged();
     emit balanceChanged();
+    // After everything is stored: a printer problem must not touch the receipt.
+    if (print) printClosedReceipt(*journal_.findReceipt(receiptId), false);
 }
 
 void Terminal::selectAllocationReceipt(const QString& receiptId) {

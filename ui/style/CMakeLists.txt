@@ -22,6 +22,7 @@ qt_add_qml_module(wms_style
         Dialog.qml
         DialogButtonBox.qml
         RadioButton.qml
+        CheckBox.qml
         ProgressBar.qml
         ScrollBar.qml
         ToolTip.qml

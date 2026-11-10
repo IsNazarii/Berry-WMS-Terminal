@@ -82,6 +82,25 @@ ApplicationWindow {
     Connections {
         target: Terminal
         function onOperatorChanged() { appBar.currentIndex = 0 }
+        function onPrintProblem(message) {
+            printProblemText.text = message
+            printProblemDialog.open()
+        }
+    }
+
+    Dialog {
+        id: printProblemDialog
+        anchors.centerIn: parent
+        width: 460
+        modal: true
+        title: qsTr("Чек не надруковано")
+        standardButtons: Dialog.Ok
+
+        Label {
+            id: printProblemText
+            anchors.fill: parent
+            wrapMode: Text.WordWrap
+        }
     }
 
     LoginScreen {

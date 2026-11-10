@@ -326,6 +326,21 @@ ToolBar {
                         text: qsTr("Ваги: %1…").arg(Terminal.scales.driverName)
                         onTriggered: scaleDialog.open()
                     }
+                    Menu {
+                        title: qsTr("Папір чека: %1").arg(Terminal.receiptPaper)
+                        MenuItem {
+                            text: "A4"
+                            checkable: true
+                            checked: Terminal.receiptPaper === "A4"
+                            onTriggered: Terminal.setReceiptPaper("A4")
+                        }
+                        MenuItem {
+                            text: "A5"
+                            checkable: true
+                            checked: Terminal.receiptPaper === "A5"
+                            onTriggered: Terminal.setReceiptPaper("A5")
+                        }
+                    }
                     // Crates differ between points, so the usual one is a setting of the terminal.
                     MenuItem {
                         text: qsTr("Тара ящика: %1 кг…").arg(Terminal.defaultBoxTare)

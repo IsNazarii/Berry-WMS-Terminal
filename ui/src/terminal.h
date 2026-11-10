@@ -6,6 +6,7 @@
 #include "wms/crop_keys.h"
 #include "wms/journal.h"
 #include "wms/operator.h"
+#include "wms/receipt_printer.h"
 #include "wms/scale.h"
 #include "wms/serial_scale_driver.h"
 #include "wms/sqlite.h"
@@ -100,6 +101,8 @@ class Terminal : public QObject {
     // The box tare a new receiving form starts with, in kilograms as typed ("1,2");
     // set per terminal from the app bar menu, since crates differ between points.
     Q_PROPERTY(QString defaultBoxTare READ defaultBoxTare NOTIFY defaultBoxTareChanged)
+    // "A4" or "A5": depends on the printer and paper at the point, so set per terminal.
+    Q_PROPERTY(QString receiptPaper READ receiptPaper NOTIFY receiptPaperChanged)
     // Where weighed pallets go unless an earlier pallet of the crop in the receipt leads
     // (destinationId as in `destinations`); empty: none, they hang. Remembered per terminal.
     Q_PROPERTY(QString receivingTarget READ receivingTarget NOTIFY receivingTargetChanged)
@@ -138,7 +141,7 @@ class Terminal : public QObject {
     Q_PROPERTY(QString cashBalance READ cashBalance NOTIFY cashChanged)
     // The whole debt as the operator would type it ("1234,50"); empty when we owe nothing.
     Q_PROPERTY(QString cashDebtInput READ cashDebtInput NOTIFY cashChanged)
-    // [{at, title, detail, effect, payment}] of the chosen supplier, oldest first.
+    // [{at, title, detail, effect, payment, receiptId}] of the chosen supplier, oldest first; receiptId is empty for a payment.
     // Sums here and in debtors/cashBalance/balanceAfter are bare hryvnias ("8 823,00", "−50,00").
     Q_PROPERTY(QVariantList cashHistory READ cashHistory NOTIFY cashChanged)
 
@@ -175,6 +178,7 @@ public:
     [[nodiscard]] QVariantMap activeSummary() const;
     [[nodiscard]] QString receivingTarget() const;
     [[nodiscard]] QString defaultBoxTare() const { return defaultBoxTare_; }
+    [[nodiscard]] QString receiptPaper() const { return receiptPaper_ == PaperSize::A5 ? "A5" : "A4"; }
     [[nodiscard]] QVariantMap nextPlacements() const;
     [[nodiscard]] QVariantList allocationSources() const;
     [[nodiscard]] QString allocationReceiptId() const;
@@ -240,6 +244,7 @@ public:
     Q_INVOKABLE void setReceivingTarget(const QString& destinationId);
     // Returns why the value is not a box tare; empty when it was saved.
     Q_INVOKABLE QString setDefaultBoxTare(const QString& kilograms);
+    Q_INVOKABLE void setReceiptPaper(const QString& paper);
     // [{path, description}] of the serial ports present now; asked when the
     // settings open, since adapters come and go.
     Q_INVOKABLE QVariantList scalePorts() const;
@@ -253,11 +258,15 @@ public:
     // For typed prices {cropCode: text}: {amounts: {cropCode: "8 823,00"}, total, blockers}.
     [[nodiscard]] Q_INVOKABLE QVariantMap payCheck(const QVariantMap& prices) const;
     // Closes as retail and pays the whole amount at once. Returns an
-    // operator-facing error, empty on success.
-    Q_INVOKABLE QString payReceipt(const QVariantMap& prices, bool bankTransfer);
-    // "Issue receipt" (wholesale): weight only, priced outside the terminal.
+    // operator-facing error, empty on success; a failed print is not one of them,
+    // the receipt is closed by then (see printProblem).
+    Q_INVOKABLE QString payReceipt(const QVariantMap& prices, bool bankTransfer, bool print);
+    // "Issue receipt" (wholesale): weight only, priced outside the terminal. Always printed:
+    // the paper is how the receipt reaches the person who sets the price.
     [[nodiscard]] Q_INVOKABLE QStringList handOverBlockers() const;
     Q_INVOKABLE void handOverReceipt();
+    // Prints a closed receipt again, marked as a copy.
+    Q_INVOKABLE void printReceiptCopy(const QString& receiptId);
 
     // Allocation of the selected receipt into a truck or the warehouse
     // (destinationId as in `destinations`). Each returns an operator-facing
@@ -312,7 +321,10 @@ signals:
     // The active receipt, the trucks or the target changed.
     void placementsChanged();
     void defaultBoxTareChanged();
+    void receiptPaperChanged();
     void scaleDriverChanged();
+    // A receipt did not get printed; it is safe in the journal and a copy can be printed later.
+    void printProblem(const QString& message);
 
 private:
     [[nodiscard]] const Supplier* currentSupplier() const noexcept;
@@ -335,7 +347,8 @@ private:
     // parse is left out and named in `errors`.
     [[nodiscard]] std::vector<CropPrice> typedPrices(const QVariantMap& prices, QStringList& errors) const;
     // The receipt is closed: stored and journalled with what came with it, in one transaction.
-    void receiptClosed(Receipt receipt, std::optional<Payment> payment);
+    void receiptClosed(Receipt receipt, std::optional<Payment> payment, bool print);
+    void printClosedReceipt(const Receipt& receipt, bool copy);
     // In the journal or in a receipt still being weighed.
     [[nodiscard]] bool hasCropRecords(std::string_view code) const noexcept;
     void saveCropKeys() const;
@@ -396,6 +409,8 @@ private:
     std::optional<OperatorId> currentOperatorId_;
     QString receivingTargetId_;
     QString defaultBoxTare_;
+    ReceiptPrinter printer_;
+    PaperSize receiptPaper_;
 };
 
 } // namespace wms::ui

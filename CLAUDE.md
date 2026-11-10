@@ -161,9 +161,10 @@ $CM/cmake -S . -B build -G Ninja && $CM/cmake --build build && $CM/ctest --test-
   `Journal::validateAllocation`/`unallocatedOf`/`boxesOf` для `Receipt` і `OpenReceipt` ✅
 - Статичний поліморфізм (concept): `WeighedReceipt` + шаблонні `Allocation::wholeWeighing`/`boxesOf`
   (приймають `Receipt` і `OpenReceipt`) ✅
+- Лаба 3: `QrMatrix` (обгортка qrcodegen), `ReceiptPrinter`, `ReceiptDocument` ✅
 - Інші класи: `Uuid`, `Supplier`, `Crop`, `CropKeys`, `StabilityDetector`, `ScaleReading`, `Ie04FrameReader`, `Weighing`, `Truck`, `Cargo`, `Journal`, `DayPrices`,
   `WorkDay`, `Operator`, `OpenReceipt`, `SessionSummary` ✅
-- Стан на 26.09: 19 класів ядра, 2 ієрархії (A — 5 класів), 6+ поліморфізмів, 158 тестів (зараз 261 ядра + 38 infra) — лаба 1 закрита із запасом.
+- Стан на 26.09: 19 класів ядра, 2 ієрархії (A — 5 класів), 6+ поліморфізмів, 158 тестів (зараз 274 ядра + 39 infra + 12 друку + серійний порт) — лаба 1 закрита із запасом.
 
 Лаба 2: ≥4 екрани (Вхід, Прийом, Сесія, Розподіл, Склад, Каса, + Sync/Довідники),
 ≥20 контролів, ≥1 контейнер (ListView), ≥10 обробників, логіка відділена.
@@ -189,7 +190,15 @@ $CM/cmake -S . -B build -G Ninja && $CM/cmake --build build && $CM/ctest --test-
 - Git: гілка `main`, remote `origin` = git@github.com:IsNazarii/Berry-WMS-Terminal.git (push можна робити з термінала).
 - GoogleTest у системі не встановлено — тягнеться FetchContent (потрібна мережа при першій конфігурації).
 
-## Стан і наступні кроки (оновлено 01.11.2026)
+## Стан і наступні кроки (оновлено 02.11.2026)
+**Друк чека, лаба 3 (02.11):** `makeReceiptDocument` → `ReceiptDocument` (ядро, що на папері), `QrMatrix` + `paintReceipt` +
+`ReceiptPrinter` (ціль `wms_print`, тести `wms_print_tests` — зображення й PDF, принтера не чіпають), `Payment::receiptId`
+(міграція 11, `Journal::paymentFor`), `displayKilograms`/`displayHryvnias` переїхали в ядро. UI: опція в «Оплатити»,
+«Видати чек» друкує завжди, «Копія чека» на «Касі», діалог `printProblem`. Рішення 02.11: друк — після запису в базу; зупинена
+черга CUPS завдання не отримує (інакше чек вийде колись потім); довгий чек — на кілька аркушів; числа на чеку не обрізаються
+ніколи; без `tnum` на папері (ламає текстовий шар PDF); `WMS_PRINT_PDF=<тека>` — PDF замість паперу; папір A4/A5 — меню ⋯ (`print/paper`, типово A4, рішення 02.11).
+Проба на Canon E410 02.11: виглядає добре, але принтер дає смуги, тож дрібні деталі й QR на папері перевірені не повністю.
+**Лишилось:** особисті висновки в `docs/lab3_report.md`.
 **Драйвер ваг ІЕ-04 (01.11) — усі 5 кроків плану `docs/hardware/scale-ie04.md` («План для термінала»).**
 `SerialScaleDriver` (`infra/include/wms/serial_scale_driver.h`, ціль `wms_serial`, тести `wms_serial_tests` на pty),
 `ScaleMonitor` забуває показ при втраті зв'язку; порт — `WMS_SCALE_PORT` / `QSettings` `scale/port`, вибір — меню ⋯ «Ваги…»
@@ -324,10 +333,8 @@ F2 → `SupplierPicker`; по центру обраний `cashSupplierId` (ок
    (`sessionId` у `Receipt`/`OpenReceipt`/`Payment`, міграції 9–10, `SessionSummary`). Лаба 2 закрита; знімки — `docs/screenshots/`.
    Знімки екранів без вікна — тимчасовий патч `main.cpp` (`WMS_SHOTS=dir`, логін, демо-чеки, `grabWindow` по вкладках),
    не комітиться; `XDG_CONFIG_HOME=<scratch>` — щоб знімки не читали й не писали `QSettings` користувача.
-3. **Далі (наступна сесія): друк чека — лаба 3** (Qt PrintSupport, A4, QR — nayuki qrcodegen; принтер пункту ще не обрано,
-   для спроб — домашній Canon E410 автора через CUPS). Потім sync за рішеннями вище
-   (`docs/sync.md` → факти сесії → id сесії з дати → push/pull → FastAPI-заглушка), звіти; ваги RS-232 — доступ є (01.11), драйвер
-   (кроки — `docs/hardware/scale-ie04.md`).
+3. ✅ Друк чека — лаба 3 (див. вище; принтер пункту ще не обрано, для спроб — домашній Canon E410 автора через CUPS).
+   **Далі: sync** за рішеннями вище (`docs/sync.md` → факти сесії → id сесії з дати → push/pull → FastAPI-заглушка), звіти.
    Для sync: `sessionId` уже є в `Receipt`/`Payment`; підсумок сесії (`SessionSummary`) перебудовується на кожну зміну —
    O(чеки × розподіли), за потреби індексувати розподіли за чеком.
 - Історії руху складу (прихід/відвантаження) в UI нема — `Journal` не віддає записи; за потреби — запит у ядрі.
@@ -336,6 +343,9 @@ F2 → `SupplierPicker`; по центру обраний `cashSupplierId` (ок
   запропоновано, користувач ще не вирішив.
 - Пізні записи журналу (забутий чек) — у закриту сесію поправкою (рішення 28.10); модель — `sessionId`, UI поправки — пізніше.
 
+## Плани на майбутнє (поза курсом)
+- **Захист чека від підробки (запит автора 02.11):** підпис Ed25519 змісту чека в QR + перевірка за журналом проти ідентичних
+  копій. Не шифрування. Деталі — `docs/architecture.md`, розділ 8. Після sync; не робити без запиту.
+
 ## Відкриті питання
-- Формат чека: A4 чи A5 (і чи вміщається великий чек на одну сторінку) — на реальних спробах друку.
 - Зважування < Min 10 кг (поза повіреним діапазоном ваг) — попереджати оператора? Кнопка «→0←» з термінала?

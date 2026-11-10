@@ -225,12 +225,13 @@ docs/                     документація
 3. ✅ UX-зміни після огляду альфи: повноекранний режим, постачальник з «Прийому», довідник культур,
    ліміт фури в ящиках, авторозподіл, «Оплатити» / «Видати чек»; нова оболонка (панель з вкладками й станом точки),
    порожні стани, «Сесія» як зведення дня.
-4. Друк чека на звичайний принтер (сторінка A4, Qt PrintSupport) з QR-кодом UUID чека — лаба 3.
+4. ✅ Друк чека на звичайний принтер (сторінка A4, Qt PrintSupport) з QR-кодом UUID чека — лаба 3.
 5. Синхронізація з мінімальним сервером-заглушкою: outbox, батчі, retry з backoff.
 6. Драйвер реальних ваг ВН-2000-4 / ІЕ-04 через RS-232 (`SerialScaleDriver`, Qt SerialPort, протокол 0;
    стабільність — з біта індикатора). План — [docs/hardware/scale-ie04.md](docs/hardware/scale-ie04.md).
 
-Поза курсом: повноцінний бекенд (Go/FastAPI + PostgreSQL) і веб-кабінет логіста.
+Поза курсом: повноцінний бекенд (Go/FastAPI + PostgreSQL), веб-кабінет логіста, захист чека від підробки
+підписом у QR (Ed25519, див. [docs/architecture.md](docs/architecture.md)).
 
 ## Зовнішні бібліотеки
 
@@ -242,8 +243,9 @@ docs/                     документація
 | [SQLite 3.51](https://sqlite.org/) | локальна база термінала (офіційна амальгамація, завантажується CMake автоматично) |
 | [GoogleTest 1.17](https://github.com/google/googletest) | unit-тести (завантажується CMake автоматично) |
 
-Заплановано для лаби 3: [nayuki QR-Code-generator](https://github.com/nayuki/QR-Code-generator) — QR з UUID
-чека; сам чек верстає й друкує Qt (PrintSupport).
+Зовнішня бібліотека лаби 3 — [nayuki QR-Code-generator 1.8.0](https://github.com/nayuki/QR-Code-generator) (MIT,
+завантажується CMake автоматично): кодує UUID чека в QR — вибір версії, корекція помилок Ріда — Соломона, маска.
+Сам чек верстає й друкує Qt (PrintSupport). Звіт — [docs/lab3_report.md](docs/lab3_report.md).
 
 ## Використання ШІ
 

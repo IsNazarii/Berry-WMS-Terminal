@@ -96,6 +96,13 @@ WMS_DATABASE=:memory: QT_FORCE_STDERR_LOGGING=1 QT_QPA_PLATFORM=offscreen timeou
 
 Без `QT_FORCE_STDERR_LOGGING` попередження Qt ідуть у journald.
 
+Друк без паперу — чеки стають PDF-файлами в теці; так само тести друку (`wms_print_tests`) ніколи не чіпають принтер:
+
+```bash
+WMS_PRINT_PDF=/tmp/receipts build/app/wms_terminal
+WMS_RECEIPT_SAMPLES=/tmp/receipts build/tests/wms_print_tests   # лишає зразки чеків
+```
+
 Зі справжніми вагами — порт через змінну (налаштування `scale/port` не чіпається):
 
 ```bash

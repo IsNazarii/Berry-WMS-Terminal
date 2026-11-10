@@ -45,3 +45,25 @@ add_library(wms_serial src/serial_scale_driver.cpp)
 target_include_directories(wms_serial PUBLIC include)
 target_link_libraries(wms_serial PUBLIC wms_core Qt6::SerialPort)
 target_compile_options(wms_serial PRIVATE -Wall -Wextra -Wpedantic -Wshadow)
+
+# QR codes: nayuki's generator has no build files of its own, its two C++ files are the library.
+FetchContent_Declare(
+    qrcodegen
+    URL https://github.com/nayuki/QR-Code-generator/archive/refs/tags/v1.8.0.tar.gz
+    URL_HASH SHA256=2ec0a4d33d6f521c942eeaf473d42d5fe139abcfa57d2beffe10c5cf7d34ae60
+    DOWNLOAD_EXTRACT_TIMESTAMP TRUE
+)
+FetchContent_MakeAvailable(qrcodegen)
+
+add_library(qrcodegen STATIC ${qrcodegen_SOURCE_DIR}/cpp/qrcodegen.cpp)
+target_include_directories(qrcodegen SYSTEM PUBLIC ${qrcodegen_SOURCE_DIR}/cpp)
+target_compile_options(qrcodegen PRIVATE -w)
+
+# The printed receipt: Qt lays it out and prints it, qrcodegen makes its QR code.
+add_library(wms_print
+    src/qr_code.cpp
+    src/receipt_printer.cpp
+)
+target_include_directories(wms_print PUBLIC include)
+target_link_libraries(wms_print PUBLIC wms_core Qt6::PrintSupport PRIVATE qrcodegen)
+target_compile_options(wms_print PRIVATE -Wall -Wextra -Wpedantic -Wshadow)

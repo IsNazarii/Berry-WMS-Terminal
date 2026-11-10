@@ -46,7 +46,14 @@ add_executable(wms_serial_tests serial_scale_driver_test.cpp)
 target_link_libraries(wms_serial_tests PRIVATE wms_serial GTest::gtest)
 target_compile_definitions(wms_serial_tests PRIVATE WMS_TEST_DATA_DIR="${CMAKE_CURRENT_SOURCE_DIR}/data")
 
+# The receipt drawn on an image and printed to PDF; own main() because fonts need a
+# QGuiApplication. Never touches a real printer.
+add_executable(wms_print_tests receipt_printer_test.cpp)
+target_link_libraries(wms_print_tests PRIVATE wms_print GTest::gtest)
+target_compile_definitions(wms_print_tests PRIVATE WMS_FONT_DIR="${CMAKE_SOURCE_DIR}/ui/style/fonts")
+
 include(GoogleTest)
 gtest_discover_tests(wms_core_tests)
 gtest_discover_tests(wms_infra_tests)
 gtest_discover_tests(wms_serial_tests)
+gtest_discover_tests(wms_print_tests)

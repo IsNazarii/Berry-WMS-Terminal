@@ -18,7 +18,7 @@ namespace {
 // in kopecks (_kop), weight in grams (_g); enums are spelled out as text, so
 // reordering an enum in C++ cannot change what old rows mean. STRICT tables
 // reject a value of the wrong type instead of quietly storing it.
-constexpr std::array<std::string_view, 10> kMigrations{
+constexpr std::array<std::string_view, 11> kMigrations{
     R"sql(
     CREATE TABLE receipt (
         id            TEXT PRIMARY KEY,
@@ -260,6 +260,13 @@ constexpr std::array<std::string_view, 10> kMigrations{
           AND (s.closed_at_ns IS NULL OR payment.created_at_ns < s.closed_at_ns)
         ORDER BY s.opened_at_ns DESC LIMIT 1)
     WHERE session_id IS NULL;
+    )sql",
+
+    // The receipt a payment settled at closing, so a copy of the receipt can say
+    // how it was paid. NULL: an advance from the cash desk, or a payment from before
+    // this; such old rows cannot be matched reliably, so no guess is made.
+    R"sql(
+    ALTER TABLE payment ADD COLUMN receipt_id TEXT;
     )sql",
 };
 

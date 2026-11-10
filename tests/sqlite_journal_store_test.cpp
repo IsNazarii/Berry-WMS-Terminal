@@ -186,6 +186,22 @@ TEST(SqliteJournalStore, RefusesDatabaseFromNewerVersion) {
     EXPECT_THROW(SqliteJournalStore{db}, std::runtime_error);
 }
 
+TEST(SqliteJournalStore, PaymentKeepsItsReceipt) {
+    sqlite::Database db{":memory:"};
+    migrateSchema(db);
+    SqliteJournalStore store{db};
+    const Uuid receiptId = Uuid::generateV7(kAt, 1, 9);
+    store.save(Payment{Uuid::generateV7(kAt, 2, 8), kAt, 42, hryvnias(100), PaymentMethod::Cash, 1,
+                       SyncStatus::Pending, std::nullopt, receiptId});
+    store.save(Payment::create(42, hryvnias(50), PaymentMethod::Cash, 1)); // an advance from the cash desk
+
+    const Journal journal = store.load();
+    const auto history = journal.historyOf(42);
+    ASSERT_EQ(history.size(), 2U);
+    EXPECT_EQ(dynamic_cast<const Payment&>(*history[0]).receiptId(), receiptId);
+    EXPECT_FALSE(dynamic_cast<const Payment&>(*history[1]).receiptId().has_value());
+}
+
 TEST(SqliteJournalStore, ReceiptAndPaymentKeepTheirSession) {
     sqlite::Database db{":memory:"};
     SqliteJournalStore store{db};
@@ -220,7 +236,9 @@ TEST(SqliteJournalStore, OldRecordsGetTheSessionTheyFellInto) {
                "('0193a000-0000-7000-8000-0000000000a3', 3500000, 42, 'handed_over', 'pending')");
     db.execute("INSERT INTO payment (id, created_at_ns, supplier_id, amount_kop, method, paid_by, sync_status) "
                "VALUES ('0193a000-0000-7000-8000-0000000000b1', 3600000, 42, 100, 'cash', 1, 'pending')");
-    // Run the backfill step again, as an old database would on its first start.
+    // Run the backfill step again, as an old database would on its first start;
+    // the later steps run again too, so what they added has to go first.
+    db.execute("ALTER TABLE payment DROP COLUMN receipt_id");
     db.execute("PRAGMA user_version = 9");
     migrateSchema(db);
 

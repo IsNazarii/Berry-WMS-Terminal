@@ -41,6 +41,9 @@ public:
     [[nodiscard]] std::size_t size() const noexcept { return ids_.size(); }
     // A closed receipt; nullptr when it is not in the journal (still open or unknown).
     [[nodiscard]] const Receipt* findReceipt(const Uuid& id) const noexcept;
+    // The payment that settled the receipt at closing; nullptr when none did
+    // (wholesale, or a receipt from before payments named their receipts).
+    [[nodiscard]] const Payment* paymentFor(const Uuid& receiptId) const noexcept;
 
     // What we owe the supplier: positive = we owe them, negative = they were overpaid.
     [[nodiscard]] Money balanceOf(SupplierId supplierId) const noexcept;

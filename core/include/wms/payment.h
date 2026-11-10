@@ -17,10 +17,11 @@ public:
     // Throws std::invalid_argument for a non-positive paidBy: the UI passes
     // an operator it has already confirmed, so a missing one is a bug.
     // sessionId is empty for a payment made while no session is open:
-    // the cash desk works without one.
+    // the cash desk works without one. receiptId is set when the payment
+    // settles a receipt at closing; empty for an advance from the cash desk.
     Payment(Uuid id, TimePoint createdAt, SupplierId supplierId, Money amount, PaymentMethod method,
             OperatorId paidBy, SyncStatus syncStatus = SyncStatus::Pending,
-            std::optional<Uuid> sessionId = std::nullopt);
+            std::optional<Uuid> sessionId = std::nullopt, std::optional<Uuid> receiptId = std::nullopt);
 
     [[nodiscard]] static Payment create(SupplierId supplierId, Money amount, PaymentMethod method, OperatorId paidBy,
                                         std::optional<Uuid> sessionId = std::nullopt);
@@ -30,6 +31,8 @@ public:
     [[nodiscard]] PaymentMethod method() const noexcept { return method_; }
     [[nodiscard]] OperatorId paidBy() const noexcept { return paidBy_; }
     [[nodiscard]] const std::optional<Uuid>& sessionId() const noexcept { return sessionId_; }
+    // A copy of a receipt must say how it was paid; time and amount alone cannot tell.
+    [[nodiscard]] const std::optional<Uuid>& receiptId() const noexcept { return receiptId_; }
 
     [[nodiscard]] TransactionKind kind() const noexcept override { return TransactionKind::Payment; }
     [[nodiscard]] Money balanceEffect() const noexcept override { return -amount_; }
@@ -42,6 +45,7 @@ private:
     PaymentMethod method_;
     OperatorId paidBy_;
     std::optional<Uuid> sessionId_;
+    std::optional<Uuid> receiptId_;
 };
 
 } // namespace wms

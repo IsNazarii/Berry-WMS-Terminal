@@ -631,3 +631,17 @@ TEST(Journal, PlacementSplitsTrucksAndWarehouseWithoutReversed) {
     EXPECT_EQ(placement.inTrucks.weight, kilograms(20));
     EXPECT_EQ(placement.inWarehouse.boxes, 6);
 }
+
+TEST(Journal, FindsThePaymentOfAReceipt) {
+    const Uuid receiptId = Uuid::generateV7();
+    Journal journal;
+    journal.add(Payment::create(42, hryvnias(50), PaymentMethod::Cash, 1)); // an advance: no receipt
+    const Payment forReceipt{Uuid::generateV7(), Clock::now(), 42, hryvnias(100), PaymentMethod::Cash, 1,
+                             SyncStatus::Pending, std::nullopt, receiptId};
+    journal.add(forReceipt);
+
+    const Payment* found = journal.paymentFor(receiptId);
+    ASSERT_NE(found, nullptr);
+    EXPECT_EQ(found->id(), forReceipt.id());
+    EXPECT_EQ(journal.paymentFor(Uuid::generateV7()), nullptr);
+}

@@ -171,7 +171,7 @@ PaidReceipt WorkDay::payReceipt(const Uuid& receiptId, const std::vector<CropPri
     if (!validatePay(receiptId, prices, at).empty()) throw std::logic_error("Receipt cannot be paid yet");
     Receipt closed = priced(receiptId, prices, at).close(Settlement::OnSite);
     Payment payment{Uuid::generateV7(), at, closed.supplierId(), closed.amount(), method, paidBy, SyncStatus::Pending,
-                    id_};
+                    id_, closed.id()};
     openReceipts_.erase(receipt(receiptId));
     return {.receipt = std::move(closed), .payment = std::move(payment)};
 }

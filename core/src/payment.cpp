@@ -6,13 +6,15 @@
 namespace wms {
 
 Payment::Payment(Uuid id, TimePoint createdAt, SupplierId supplierId, Money amount, PaymentMethod method,
-                 OperatorId paidBy, SyncStatus syncStatus, std::optional<Uuid> sessionId)
+                 OperatorId paidBy, SyncStatus syncStatus, std::optional<Uuid> sessionId,
+                 std::optional<Uuid> receiptId)
     : Transaction{id, createdAt, syncStatus},
       supplierId_{supplierId},
       amount_{amount},
       method_{method},
       paidBy_{paidBy},
-      sessionId_{sessionId} {
+      sessionId_{sessionId},
+      receiptId_{receiptId} {
     if (paidBy_ <= 0) throw std::invalid_argument("Payment must name the operator who paid");
 }
 

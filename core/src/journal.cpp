@@ -134,6 +134,13 @@ const Receipt* Journal::findReceipt(const Uuid& id) const noexcept {
     return nullptr;
 }
 
+const Payment* Journal::paymentFor(const Uuid& receiptId) const noexcept {
+    for (const auto& p : payments_) {
+        if (p.receiptId() == receiptId) return &p;
+    }
+    return nullptr;
+}
+
 Cargo Journal::unallocatedOf(const Uuid& receiptId, std::string_view cropCode) const {
     const Receipt* receipt = findReceipt(receiptId);
     if (receipt == nullptr) throw std::invalid_argument("Receipt is not in the journal");

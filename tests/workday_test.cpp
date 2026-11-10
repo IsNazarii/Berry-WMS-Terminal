@@ -336,6 +336,16 @@ TEST(WorkDay, PaidPriceWithoutDayPriceIsManual) {
     EXPECT_EQ(paid.payment.amount(), hryvnias(80 * 160));
 }
 
+TEST(WorkDay, ThePaymentOfAPaidReceiptNamesIt) {
+    WorkDay day = openAtNoon();
+    const Uuid id = day.openReceipt(42).id();
+    day.addWeighing(id, raspberryPallet(), kMidnight + 13h);
+
+    const PaidReceipt paid = day.payReceipt(id, {{.cropCode = "raspberry", .pricePerKg = hryvnias(90)}},
+                                            PaymentMethod::Cash, kOksana, kMidnight + 14h);
+    EXPECT_EQ(paid.payment.receiptId(), id);
+}
+
 TEST(WorkDay, CannotPayWithoutAPriceForEveryCrop) {
     WorkDay day = dayWithRaspberryPrice();
     const Uuid id = day.openReceipt(42).id();

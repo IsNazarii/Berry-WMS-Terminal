@@ -24,6 +24,7 @@ add_executable(wms_core_tests
     operator_test.cpp
     open_receipt_test.cpp
     session_summary_test.cpp
+    receipt_document_test.cpp
 )
 target_link_libraries(wms_core_tests PRIVATE wms_core GTest::gtest_main)
 # Raw bytes recorded from real devices.

@@ -21,6 +21,7 @@ add_library(wms_core
     src/workday.cpp
     src/session_summary.cpp
     src/display_format.cpp
+    src/receipt_document.cpp
 )
 
 target_include_directories(wms_core PUBLIC include)

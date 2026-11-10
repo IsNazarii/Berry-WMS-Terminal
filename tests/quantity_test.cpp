@@ -1,3 +1,4 @@
+#include "wms/display_format.h"
 #include "wms/quantity.h"
 
 #include <gtest/gtest.h>
@@ -78,4 +79,20 @@ TEST(Quantity, ParseWeightRejectsWhatIsNotAWeight) {
     EXPECT_FALSE(parseWeight("1,"));
     EXPECT_FALSE(parseWeight("1a"));
     EXPECT_FALSE(parseWeight("99999999999999999999"));
+}
+
+TEST(DisplayFormat, KilogramsKeepAsManyDecimalsAsTheGramsNeed) {
+    EXPECT_EQ(displayKilograms(kilograms(142)), "142,0");
+    EXPECT_EQ(displayKilograms(grams(16450)), "16,45");
+    EXPECT_EQ(displayKilograms(grams(1)), "0,001");
+}
+
+TEST(DisplayFormat, HryvniasGroupThousandsWithANarrowSpace) {
+    EXPECT_EQ(displayHryvnias(kopecks(882300)), "8\u202F823,00");
+    EXPECT_EQ(displayHryvnias(kopecks(123456789)), "1\u202F234\u202F567,89");
+    EXPECT_EQ(displayHryvnias(kopecks(5)), "0,05");
+}
+
+TEST(DisplayFormat, NegativeUsesATrueMinusSign) {
+    EXPECT_EQ(displayHryvnias(kopecks(-5000)), "\u221250,00");
 }

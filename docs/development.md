@@ -8,9 +8,10 @@
 | Компілятор | з повною підтримкою C++20 і `<format>`: GCC 13+ (перевірено на GCC 16), Clang 17+ |
 | CMake | ≥ 3.28 (у CLion — вбудований) |
 | Генератор | Ninja |
-| Qt | ≥ 6.8: Quick, QuickControls2, плагін SVG (`qt6-qtsvg` — іконки панелі), SerialPort (драйвер ваг, ціль `wms_serial`); переклади `qt6-qttranslations` — необов'язково, для українських стандартних кнопок |
+| Qt | ≥ 6.8: Quick, QuickControls2, плагін SVG (`qt6-qtsvg` — іконки панелі), SerialPort (драйвер ваг, ціль `wms_serial`), PrintSupport (друк чека, ціль `wms_print`); переклади `qt6-qttranslations` — необов'язково, для українських стандартних кнопок |
 | SQLite | 3.51.2, амальгамація через `FetchContent` (системний `sqlite-devel` не потрібен); компілюється з `-w` — чужий код |
 | GoogleTest | 1.17, завантажується через `FetchContent` — потрібна мережа при першій конфігурації |
+| qrcodegen | nayuki QR-Code-generator 1.8.0 через `FetchContent` (архів з `URL_HASH`); власного CMake у бібліотеки нема — ціль `qrcodegen` з одного `.cpp`, з `-w` |
 | Порт ваг | оригінальний кабель «Промприлад» USB↔DB9 (FTDI) або USB↔RS-232 + 3-провідний null-modem DB9F–DB9F. **Права на порт надати явно**: `sudo usermod -aG dialout $USER` і перелогінитись — інакше порт не відкриється, а на табло буде «—». Деталі — [hardware/scale-ie04.md](hardware/scale-ie04.md#права-на-порт--надати-явно) |
 
 ## 2. Збірка
@@ -37,8 +38,9 @@ $CM/cmake -S . -B build -G Ninja && $CM/cmake --build build && $CM/ctest --test-
 | `wms_terminal` | виконуваний файл термінала |
 | `wms_infra` | інфраструктура: обгортка SQLite, схема, сховища журналу, сесій і довідників, бекап (статична бібліотека) |
 | `wms_serial` | драйвер ваг ІЕ-04 на `QSerialPort` — окремо, щоб `wms_infra` і його тести були без Qt |
-| `sqlite3` | SQLite з амальгамації |
-| `wms_core_tests`, `wms_infra_tests`, `wms_serial_tests` | unit-тести ядра, інфраструктури й драйвера ваг |
+| `wms_print` | друк чека: `QrMatrix` (qrcodegen), `paintReceipt`, `ReceiptPrinter` (Qt PrintSupport) |
+| `sqlite3`, `qrcodegen` | SQLite з амальгамації; генератор QR |
+| `wms_core_tests`, `wms_infra_tests`, `wms_serial_tests`, `wms_print_tests` | unit-тести ядра, інфраструктури, драйвера ваг і друку |
 | `wms_ui_qmllint` | перевірка QML-файлів `qmllint` |
 
 Опції CMake: `WMS_BUILD_TESTS` (за замовчуванням `ON`).
@@ -48,16 +50,17 @@ $CM/cmake -S . -B build -G Ninja && $CM/cmake --build build && $CM/ctest --test-
 
 ## 3. Тести
 
-- GoogleTest, файли `tests/<модуль>_test.cpp`, виконувані `wms_core_tests` і `wms_infra_tests`
-  (останній — на справжній SQLite: `:memory:` або тимчасовий файл);
+- GoogleTest, файли `tests/<модуль>_test.cpp`, виконувані `wms_core_tests`, `wms_infra_tests`
+  (на справжній SQLite: `:memory:` або тимчасовий файл), `wms_serial_tests` (псевдотермінал) і
+  `wms_print_tests` (власний `main()` з `QGuiApplication` — шрифтам він потрібен);
   `gtest_discover_tests` реєструє кожен тест у CTest окремо.
-- Покриваються ядро й infra (UI — тонкий шар без правил).
+- Покриваються ядро й infra (UI — тонкий шар без правил). Зараз 334 тести: 274 ядра, 39 infra, 7 порту ваг, 14 друку.
 - Детермінованість: `Uuid::generateV7(time, randA, randB)` і явні `TimePoint` замість
   `Clock::now()` там, де час важливий.
 
 | Файл | Що перевіряє |
 |---|---|
-| `quantity_test` | арифметика, округлення, форматування, `parseMoney` / `parseWeight` |
+| `quantity_test` | арифметика, округлення, форматування (і екранне `displayKilograms` / `displayHryvnias`), `parseMoney` / `parseWeight` |
 | `uuid_test` | структура v7, сортування за часом, `parse` / `toString` |
 | `supplier_test` | пошук за id і частиною імені (кирилиця, регістр), `validateNewSupplier`, `nextSupplierId` |
 | `crop_test` | `validateNewCrop` (дублі після нормалізації, назва прихованої вільна), `cropCodeFor`, `validateRemoveCrop` |
@@ -71,14 +74,16 @@ $CM/cmake -S . -B build -G Ninja && $CM/cmake --build build && $CM/ctest --test-
 | `truck_test` | ліміт у ящиках, заповненість, переповнення, статуси |
 | `allocation_test` | ціла палета, ящики, пропорційний поділ ваги |
 | `shipment_test` | відвантаження зі складу |
-| `journal_test` | баланс, завантаження, склад, ідемпотентність, сторно, `mentionsCrop`, усі `validate…` |
+| `journal_test` | баланс, завантаження, склад, ідемпотентність, сторно, `mentionsCrop`, `paymentFor`, усі `validate…` |
+| `receipt_document_test` | що на папері: назви культур, без анульованих і без дірок у нумерації, підсумки, опт без цін, виплата, копія |
 | `pricing_test` | історія цін, `priceAt` за часом |
 | `workday_test` | сесія: ціни, фури, перенесення, відкриті чеки, авторозподіл, «Оплатити», анулювання зі сторно, закриття, поправки, `restore` |
 | `sqlite_test` *(infra)* | обгортка: прив'язка й читання, `NULL`, помилки, зовнішні ключі, WAL, відкат і вкладені транзакції |
-| `sqlite_journal_store_test` *(infra)* | кожен тип запису туди й назад, повторний UUID, перевідкриття файлу, відмова від новішої версії схеми |
+| `sqlite_journal_store_test` *(infra)* | кожен тип запису туди й назад (виплата — зі своїм чеком), повторний UUID, перевідкриття файлу, відмова від новішої версії схеми |
 | `sqlite_session_store_test` *(infra)* | знімок сесії (ціни, фури, відкриті чеки, поправки), перезапис, `current` / `lastClosed`, спільна база з журналом |
 | `sqlite_repository_test` *(infra)* | довідники `Supplier` / `Operator` / `Crop`: upsert, порядок, `remove`, `archived` |
 | `backup_test` *(infra)* | копія через `VACUUM INTO` відкривається, ротація лишає `keep` останніх і не чіпає чужі файли |
+| `receipt_printer_test` *(print)* | QR (розмір символу, шукачі, різний текст — різний символ); чек на зображенні 1–90 палет у межах полів (A4 і A5), без порожніх аркушів, QR у правому верхньому куті; PDF у теку |
 | `serial_scale_driver_test` *(serial)* | `SerialScaleDriver` на псевдотерміналі, що грає ваги: останній кадр, тиша й висмикнутий кабель закривають порт, повторне відкриття, увесь запис |
 
 Запустити один набір:

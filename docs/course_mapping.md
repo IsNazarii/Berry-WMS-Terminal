@@ -10,7 +10,7 @@
 | Сучасна ООП-мова | C++20 (concepts, `std::variant`, `<=>`, `std::format`, designated initializers, ranges) |
 | Одна програма, одна точка входу `main()` | `app/main.cpp` → `wms_terminal` |
 | Git з регулярними змістовними комітами | малі кроки, кожен — окремий коміт; `git log` |
-| Unit-тести (для «відмінно») | 299 тестів GoogleTest у `tests/` (261 ядра + 38 infra на справжній SQLite; розбір кадрів ваг — на справжньому записі з пристрою), ядро пишеться тест-першим |
+| Unit-тести (для «відмінно») | 334 тести GoogleTest у `tests/` (274 ядра, 39 infra на справжній SQLite, 7 порту ваг на псевдотерміналі, 14 друку; розбір кадрів ваг — на справжньому записі з пристрою), ядро пишеться тест-першим |
 | Декларація використання ШІ | розділ у [README](../README.md#використання-ші), домовленості в `CLAUDE.md` |
 | Аналіз конкурентів (для «відмінно») | ⏳ `docs/competitors.md` |
 
@@ -18,10 +18,10 @@
 
 | Вимога | Мінімум | Є |
 |---|---|---|
-| Класи / типи | 9 | 25 класів ядра + допоміжні структури (`ScaleReading`, `Weighing`, `Cargo`, `TruckDetails`, `PriceChange`, `Amendment`, `AmendmentRecord`, `WorkDayRecord`, `CropPrice`, `PaidReceipt`, `ToWarehouse`) |
+| Класи / типи | 9 | 25 класів ядра + допоміжні структури (`ScaleReading`, `Weighing`, `Cargo`, `TruckDetails`, `PriceChange`, `Amendment`, `AmendmentRecord`, `WorkDayRecord`, `CropPrice`, `PaidReceipt`, `ToWarehouse`, `ReceiptDocument`, `ReceiptLine`) |
 | Поля | 15 | значно більше (напр., лише `Weighing` — 9, `WorkDay` — 10, `Truck` — 5) |
 | Нетривіальні методи | 25 | значно більше (див. нижче) |
-| Ієрархії успадкування | 2, одна ≥ 3 класи | A: `Transaction` → 5 класів; B: `IScaleDriver` → `SimulatedScaleDriver`; C: `JournalStore` → `SqliteJournalStore`, D: `SessionStore` → `SqliteSessionStore`, E: `Repository<T>` → `SqliteRepository<T>` (infra) |
+| Ієрархії успадкування | 2, одна ≥ 3 класи | A: `Transaction` → 5 класів; B: `IScaleDriver` → `SimulatedScaleDriver`, `SerialScaleDriver` (infra); C: `JournalStore` → `SqliteJournalStore`, D: `SessionStore` → `SqliteSessionStore`, E: `Repository<T>` → `SqliteRepository<T>` (infra) |
 | Поліморфізм | 3, ≥1 статичний, ≥1 динамічний | 7 випадків (таблиця нижче) |
 | Інкапсуляція | доцільні рівні доступу | див. нижче |
 
@@ -30,7 +30,8 @@
 `Quantity<Tag>` (`Money`, `Weight`), `Uuid`, `Supplier`, `Operator`, `Crop`, `CropKeys`, `Transaction`, `Receipt`,
 `Payment`, `Allocation`, `AllocationReversal`, `StockShipment`, `OpenReceipt`, `Truck`, `Journal`, `DayPrices`, `WorkDay`, `SessionSummary`,
 `IScaleDriver`, `SimulatedScaleDriver`, `StabilityDetector`, `Ie04FrameReader`, `JournalStore`, `SessionStore`, `Repository<T>` + infra-класи
-`sqlite::Database`, `sqlite::Statement`, `sqlite::ScopedTransaction`, `sqlite::Error`, `SqliteJournalStore`, `SqliteSessionStore`, `SqliteRepository<T>` (+ функція `backupDatabase`) + UI-класи `Terminal`, `SupplierListModel`,
+`sqlite::Database`, `sqlite::Statement`, `sqlite::ScopedTransaction`, `sqlite::Error`, `SqliteJournalStore`, `SqliteSessionStore`, `SqliteRepository<T>`, `SerialScaleDriver`, `QrMatrix`, `ReceiptPrinter`
+(+ функції `backupDatabase`, `paintReceipt`) + UI-класи `Terminal`, `SupplierListModel`,
 `ScaleMonitor`. Детально — [domain.md](domain.md).
 
 ### Ієрархії
@@ -43,7 +44,7 @@ classDiagram
     Transaction <|-- AllocationReversal
     Transaction <|-- StockShipment
     IScaleDriver <|-- SimulatedScaleDriver
-    IScaleDriver <|.. SerialScaleDriver : заплановано (infra, ІЕ-04)
+    IScaleDriver <|-- SerialScaleDriver
     JournalStore <|-- SqliteJournalStore
     SessionStore <|-- SqliteSessionStore
     Repository~T~ <|-- SqliteRepository~T~
@@ -65,12 +66,13 @@ classDiagram
 
 `Weighing::net/amount/validate`, `Receipt::total/cargoOf/amount/validate/describe`,
 `OpenReceipt::add/cancel/crops/setPrice/validateClose/close`, `Allocation::wholeWeighing/boxesOf`,
-`Journal::balanceOf/historyOf/loadOf/stockOf/unallocatedOf/destinationOf/allocationOf/reversalOf/waitingForAllocation/validateAllocation/validateCancel/validateReversal/validateShipment/shipmentOf`,
+`Journal::balanceOf/historyOf/paymentFor/loadOf/stockOf/unallocatedOf/destinationOf/allocationOf/reversalOf/waitingForAllocation/validateAllocation/validateCancel/validateReversal/validateShipment/shipmentOf`,
 `Truck::depart/carryOver/boxesLeft/isOverloaded/fillPercent`, `DayPrices::priceAt`,
 `WorkDay::openReceipt/addWeighing/validateCancel/cancelWeighing/nextDestination/autoAllocation/closeReceipt/validatePay/payReceipt/validateClose/close/repeatTruck/adoptTruck/trucksForNextSession`,
 `Uuid::generateV7/parse/toString/timestamp`, `StabilityDetector::push/isStable/stableWeight`, `parseIe04Frame`, `Ie04FrameReader::push`,
 `Supplier::matches`, `validateNewSupplier/nextSupplierId`, `validateNewCrop/cropCodeFor/validateRemoveCrop`,
-`CropKeys::use/fill`, `parseMoney/parseWeight`, `foldCase/squeezeSpaces`.
+`CropKeys::use/fill`, `parseMoney/parseWeight`, `foldCase/squeezeSpaces`, `makeReceiptDocument`,
+`displayKilograms/displayHryvnias`, `QrMatrix` (конструктор кодує, `dark`; infra).
 
 ### Інкапсуляція
 
@@ -88,7 +90,7 @@ classDiagram
 |---|---|---|
 | Логіка відділена від GUI | так | ядро без Qt; `Terminal` — тонкий міст, правила лише в `core/` ([ui.md](ui.md)) |
 | Вікна / екрани | 4 | Вхід, Сесія, Прийом, Розподіл, Склад, Каса, пошук і додавання постачальника (+ діалоги «Додати фуру…», «Додати культуру…», прибрати культуру, закриття сесії, «Оплатити…», «Видати чек…», підтвердження виплати) |
-| Елементи керування | 20 | > 20: `Button`, `TextField`, `ComboBox`, `RadioButton`, `TabButton`, `ToolButton`, `Menu`, `Dialog`… |
+| Елементи керування | 20 | > 20: `Button`, `TextField`, `ComboBox`, `RadioButton`, `CheckBox`, `TabButton`, `ToolButton`, `Menu`, `Dialog`… |
 | Контейнер | 1 | `ListView` (постачальники, відкриті чеки, рядки чека, чеки до розподілу, фури/склад), `ListView` (борги, історія розрахунків), `Repeater` (ціни, фури, культури із залишком, залишок складу) |
 | Обробники подій | 10 | > 30 (`onClicked`, `onAccepted`, `Shortcut` F2 / F5–F9 / F11, `Connections`…) |
 
@@ -96,10 +98,11 @@ classDiagram
 порожні стани; стан термінала й довідники (постачальники, оператори, культури) зберігаються в SQLite.
 Як виглядає — знімки в [README](../README.md#як-це-виглядає). Подальші зміни інтерфейсу — точкові.
 
-## Лабораторна 3 — зовнішня бібліотека ✅ (лишилась проба на папері)
+## Лабораторна 3 — зовнішня бібліотека ✅
 
 Друк чека постачальнику на звичайний принтер, один чек на сторінку A4 (рішення 30.10). Зовнішня бібліотека —
 **nayuki qrcodegen**: кодує UUID чека в QR (версія, корекція помилок, маска) — `infra/src/qr_code.cpp`; модулі QR
 малює термінал (`infra/src/receipt_printer.cpp`, `Sheet::drawQr`). Сам чек верстає й друкує Qt (`QPrinter` + `QPainter`) —
 Qt уже був у курсі, тому лабу він не закриває, а лише несе друк.
+Проба на папері (Canon E410, A4): телефон читає QR з надрукованого чека.
 Звіт-ретроспектива — [lab3_report.md](lab3_report.md), список бібліотек — у README.

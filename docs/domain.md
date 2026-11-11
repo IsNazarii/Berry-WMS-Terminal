@@ -13,7 +13,7 @@
 3. [Базові типи: `Quantity`, `Cargo`, `Uuid`](#3-базові-типи)
 4. [Довідники: `Supplier`, `Operator`, `Crop`, `CropKeys`](#4-довідники)
 5. [Транзакції: `Transaction` і нащадки](#5-транзакції)
-6. [Чек: `Weighing`, `OpenReceipt`, `Receipt`](#6-чек)
+6. [Чек: `Weighing`, `OpenReceipt`, `Receipt`, `ReceiptDocument`](#6-чек)
 7. [Розподіл: `Allocation`, `Destination`, `StockShipment`](#7-розподіл-і-склад)
 8. [Фура: `Truck`](#8-фура)
 9. [Журнал: `Journal`](#9-журнал)
@@ -74,6 +74,9 @@ classDiagram
         -SupplierId supplierId_
         -Money amount_
         -PaymentMethod method_
+        -OperatorId paidBy_
+        -optional~Uuid~ sessionId_
+        -optional~Uuid~ receiptId_
     }
     class Allocation {
         -Uuid receiptId_
@@ -105,10 +108,14 @@ classDiagram
         +open()* bool
         +close()*
         +isOpen()* bool
-        +read()* optional~Weight~
+        +read()* optional~ScaleReading~
     }
     class SimulatedScaleDriver
+    class SerialScaleDriver {
+        <<infra, Qt>>
+    }
     IScaleDriver <|-- SimulatedScaleDriver
+    IScaleDriver <|-- SerialScaleDriver
 
     class OpenReceipt {
         -Uuid id_
@@ -134,6 +141,7 @@ classDiagram
         +loadOf(truck) Cargo
         +stockOf(crop) Cargo
         +findReceipt(id) Receipt*
+        +paymentFor(receiptId) Payment*
         +unallocatedOf(...) Cargo
         +destinationOf(receipt, i) Destination?
         +allocationOf(receipt, i) Allocation*
@@ -181,7 +189,7 @@ classDiagram
 
 Файли: кожен клас має пару `core/include/wms/<name>.h` / `core/src/<name>.cpp`
 (`Weighing` і `Receipt` — в `receipt.h`, `DayPrices` — в `pricing.h`, `StockShipment` — в `shipment.h`,
-ваги — в `scale.h`, кадри індикатора ІЕ-04 — в `ie04.h`).
+ваги — в `scale.h`, кадри індикатора ІЕ-04 — в `ie04.h`). `SerialScaleDriver` — в `infra/` (Qt SerialPort).
 
 ---
 
@@ -213,6 +221,7 @@ using Weight = Quantity<WeightTag>;  // грами
 | `costOf(weight, pricePerKg)` | `грами × коп/кг ÷ 1000`, округлено до копійки |
 | `formatMoney(m)` | `"1234.50 грн"` |
 | `formatWeight(w)` | `"12.345 кг"` |
+| `displayKilograms(w)`, `displayHryvnias(m)` (`display_format.h`) | як на екрані й чеку: `"142,6"`, `"8 823,00"` — кома, вузькі пробіли між тисячами, мінус U+2212, без одиниці |
 | `parseMoney("85,50")` | ввід оператора: `85`, `85.5`, `85,50`; кома або крапка; від'ємні й сміття → `nullopt` |
 | `parseWeight("185,4")` | те саме в кілограмах, до грама (3 знаки) |
 
@@ -335,8 +344,7 @@ PIN — **підтвердження «хто»**, не захист: 4–6 ци
 `paidBy` — оператор, що видав гроші (коли в касі не сходиться, це перше питання).
 Зменшує борг: `balanceEffect() = −amount`. Фабрика `Payment::create(...)` видає свіжий UUIDv7.
 `receiptId` — чек, який виплата закрила («Оплатити»); порожній для авансу з «Каси». `Journal::paymentFor(receiptId)`
-знаходить її для копії чека. Друкований чек описує `ReceiptDocument` (`receipt_document.h`): назви культур замість кодів,
-анульовані рядки не друкуються й не лишають дірки в нумерації, походження ціни на папері не видно, в опту цін нема.
+знаходить її для копії чека (див. [§6.5](#65-receiptdocument--чек-на-папері-receipt_documenth)).
 `paidBy <= 0` — `std::invalid_argument`: UI передає вже підтвердженого оператора, тож його відсутність — баг.
 `sessionId` — робочий день, у якому видано гроші; порожній, якщо сесію не відкрито («Каса» працює й без неї).
 
@@ -423,6 +431,17 @@ stateDiagram-v2
 - роздріб: ціна > 0 у кожному рядку; опт: ціна **має бути** 0.
 
 Помилки рядків префіксуються номером: «Зважування 2: Ціна за кг має бути більшою за нуль».
+
+### 6.5 `ReceiptDocument` — чек на папері (`receipt_document.h`)
+
+Що саме друкується, вирішує ядро, а малює infra (`paintReceipt`, ціль `wms_print`). `makeReceiptDocument(receipt, supplier, crops, payment, printed)` → `ReceiptDocument`:
+
+- назви культур замість кодів (з довідника, приховані теж; культура не з довідника — кодом);
+- анульовані рядки не друкуються й не лишають дірки в нумерації (`ReceiptLine::number`);
+- підсумки за культурами (`ReceiptCropTotal`) і загальний;
+- походження ціни (`DayPrice`/`Manual`) на папері не видно; в опту цін нема (`priced()`);
+- `payment` (`ReceiptPaymentInfo`: спосіб, сума, коли, хто) — з `Journal::paymentFor`; у старих чеків і опту — нема;
+- `printed` (`ReceiptPrintInfo`: коли, хто, `copy`) — передрук позначається «КОПІЯ», щоб один чек не виглядав як два.
 
 ### 6.4 Концепт `WeighedReceipt`
 
@@ -545,6 +564,7 @@ Append-only сховище фактів. Для кожного типу — ок
 | `allocationOf(receiptId, i)` | розподіл цілої палети `i` або `nullptr`; `destinationOf` — його місце |
 | `reversalOf(receiptId, i)` | сторно, що звільняє цілу палету; `nullopt`, якщо вона вільна |
 | `findReceipt(id)` | закритий чек з журналу або `nullptr` |
+| `paymentFor(receiptId)` | виплата, що закрила чек («Оплатити»), або `nullptr` (опт, старі виплати) — для копії чека |
 | `waitingForAllocation()` | закриті чеки, у яких лишились нерозподілені ящики (екран «Розподіл») |
 | `mentionsCrop(crop)` | чи називає культуру хоч один запис (рядки чеків, розподіли, відвантаження) |
 | `receiptsOf(session)`, `paymentsOf(session)` | закриті чеки й виплати робочого дня — за їхнім `sessionId`, не за часом |
@@ -692,7 +712,7 @@ Append-only сховище фактів. Для кожного типу — ок
 
 Інтерфейс джерела показів: `name`, `open`, `close`, `isOpen`, `read() → optional<ScaleReading>`.
 **Стабільність вирішує драйвер**: справжній індикатор повідомляє її сам, симулятор — через `StabilityDetector`.
-Ядро знає лише інтерфейс; реальний драйвер (`SerialScaleDriver`) з'явиться в `infra/`.
+Ядро знає лише інтерфейс; реальний драйвер — `SerialScaleDriver` в `infra/` (ціль `wms_serial`, Qt SerialPort).
 
 Ваги на пункті — ВН-2000-4 з індикатором ІЕ-04 (Max 2000 кг, Min 10 кг, фактичний крок 200 г), RS-232,
 протокол 1 — ваги самі шлють показ ~10 разів на секунду ([hardware/scale-ie04.md](hardware/scale-ie04.md)). Індикатор сам повідомляє, що вага

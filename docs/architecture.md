@@ -24,18 +24,17 @@ flowchart LR
 ```
 
 На пункті працює 1–2 термінали, але архітектура не повинна ламатися при N: кожен термінал
-самостійний, а сервер лише зводить факти. Суцільні лінії вже існують (крім ваг і принтера —
-лише симулятор), пунктир — заплановано.
+самостійний, а сервер лише зводить факти. Суцільні лінії вже існують, пунктир — заплановано.
 
 ## 2. Шари
 
 | Шар | Каталог | Ціль CMake | Залежить від | Що містить |
 |---|---|---|---|---|
 | Ядро | `core/` | `wms_core` (статична бібліотека) | лише стандартна бібліотека C++20 | доменні класи, правила, валідація, обчислення |
-| Інфраструктура | `infra/` | `wms_infra` + `sqlite3` (амальгамація) | core; Qt — лише для пристроїв | обгортка SQLite (`sqlite::Database`/`Statement`/`ScopedTransaction`) ✅; схема з версіями (`migrateSchema`, 11 міграцій) + `SqliteJournalStore` + `SqliteSessionStore` + `SqliteRepository<T>` + `backupDatabase` ✅; ваги RS-232 (`wms_serial`) ✅; друк чека (`wms_print`) ✅; HTTP-sync — далі |
-| Інтерфейс | `ui/` | `wms_ui` + `wms_uiplugin` (QML-модуль `BerryWms.Ui`) | core, Qt Quick | QML-екрани і тонкі адаптери |
+| Інфраструктура | `infra/` | `wms_infra` + `sqlite3` (амальгамація) | core; Qt — лише для ваг і друку | обгортка SQLite (`sqlite::Database`/`Statement`/`ScopedTransaction`) ✅; схема з версіями (`migrateSchema`, 11 міграцій) + `SqliteJournalStore` + `SqliteSessionStore` + `SqliteRepository<T>` + `backupDatabase` ✅; ваги RS-232 (`wms_serial`) ✅; друк чека (`wms_print`) ✅; HTTP-sync — далі |
+| Інтерфейс | `ui/` | `wms_ui` + `wms_uiplugin` (QML-модуль `BerryWms.Ui`) | core, infra, Qt Quick | QML-екрани і тонкі адаптери |
 | Точка входу | `app/` | `wms_terminal` (виконуваний) | ui | `main()`: створює `QGuiApplication`, завантажує `Main.qml` |
-| Тести | `tests/` | `wms_core_tests`, `wms_infra_tests` | core / infra, GoogleTest | 246 тестів ядра + 38 тестів infra на справжній SQLite |
+| Тести | `tests/` | `wms_core_tests`, `wms_infra_tests`, `wms_serial_tests`, `wms_print_tests` | core / infra, GoogleTest | 274 тести ядра, 39 infra на справжній SQLite, 7 порту ваг на псевдотерміналі, 14 друку (зображення й PDF) |
 
 **Правило залежностей:** лише вниз (`app → ui → infra → core`). Ядро не підключає жодного
 заголовка Qt — це перевіряється тим, що `wms_core` лінкується без Qt і тестується окремо.
@@ -64,15 +63,28 @@ flowchart BT
     infra[wms_infra]
     sqlite[sqlite3]
     style[wms_style]
+    serial[wms_serial]
+    print[wms_print]
+    qr[qrcodegen]
     tests[wms_core_tests]
     itests[wms_infra_tests]
+    stests[wms_serial_tests]
+    ptests[wms_print_tests]
     gtest[GTest::gtest_main]
     qt[Qt6::Quick / QuickControls2]
+    qtdev[Qt6::SerialPort / PrintSupport]
 
     infra --> core
     infra --> sqlite
+    serial --> core
+    serial --> qtdev
+    print --> core
+    print --> qr
+    print --> qtdev
     ui --> core
     ui --> infra
+    ui --> serial
+    ui --> print
     ui --> style
     ui --> qt
     style --> qt
@@ -83,6 +95,8 @@ flowchart BT
     tests --> gtest
     itests --> infra
     itests --> gtest
+    stests --> serial
+    ptests --> print
 ```
 
 - `wms_ui` — статична бібліотека, тому QML-плагін імпортується явно:
@@ -113,6 +127,8 @@ loadOf(truck)       = Σ allocation(→truck).cargo + Σ shipment(→truck).carg
 stockOf(crop)       = Σ allocation(→склад).cargo − Σ shipment(crop).cargo
 unallocatedOf(r, c) = receipt.cargoOf(c) − Σ allocation(r, c).cargo
 ```
+
+Розподіли зі сторно (`AllocationReversal`) у цих сумах не рахуються.
 
 Чому так:
 
@@ -163,12 +179,14 @@ sequenceDiagram
     T-->>Q: "" або текст помилки
     T--)Q: receiptsChanged → перемальовка рядків
 
-    Q->>T: payReceipt({crop: ціна}, bankTransfer)
+    Q->>T: payReceipt({crop: ціна}, bankTransfer, print)
     T->>T: parseMoney для кожної культури
     T->>W: payReceipt(id, prices, method, operator, now)
     W-->>T: PaidReceipt {Receipt (незмінний), Payment на всю суму}
     T->>J: add(receipt), add(payment) — одна транзакція SQLite
     T--)Q: journalChanged → trucksChanged, cashChanged, summaryChanged
+    T->>T: друк чека (якщо обрано) — уже після запису
+    T--)Q: printProblem(текст), якщо не надруковано
 ```
 
 Методи `Terminal`, які може зламати ввід оператора, повертають `QString` з помилкою
@@ -182,7 +200,7 @@ sequenceDiagram
 - Ціна, що діє на момент зважування, визначається **за часом**, а не за порядком запису
   (`DayPrices::priceAt`), бо зміни цін можуть прийти пізніше через sync.
 
-## 8. Що буде далі в архітектурі
+## 8. Інфраструктура і що далі
 
 - **`infra/` + SQLite** (`journal_mode=WAL`, бекап — див. нижче). Етап закрито. Доступ — прямий C API
   `sqlite3` (амальгамація через `FetchContent`, без Qt Sql): сховища тестуються без `QCoreApplication`,

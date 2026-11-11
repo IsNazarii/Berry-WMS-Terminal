@@ -11,7 +11,7 @@ UI — QML-модуль `BerryWms.Ui` (статична бібліотека `wm
 | `ui/src/terminal.h/.cpp` | `Terminal` — єдиний міст QML → ядро; тримає стан термінала в пам'яті й одразу пише кожну зміну в SQLite |
 | `ui/src/supplier_list_model.h/.cpp` | `SupplierListModel` — список постачальників з пошуком для `ListView` |
 | `ui/src/scale_monitor.h/.cpp` | `ScaleMonitor` — опитує `IScaleDriver` таймером, тримає останній показ (`ScaleReading`) |
-| `ui/src/display_format.h/.cpp` | числа для екрана: `kilogramsText` (`142,6`), `hryvniasText` (`8 823,00`) — кома, вузькі пробіли між тисячами, без одиниці |
+| `ui/src/display_format.h/.cpp` | числа для екрана: `kilogramsText` (`142,6`), `hryvniasText` (`8 823,00`) — `QString`-обгортки ядрових `displayKilograms`/`displayHryvnias` (той самий формат і на чеку); `palletsText` |
 | `ui/qml/Main.qml` | вікно: панель `AppBar`, клавіші F5–F9, перемикання між входом і робочими екранами |
 | `ui/qml/AppBar.qml` | панель над екранами: знак і назва, вкладки, чіпи ваг і сесії, оператор, меню ⋯ |
 | `ui/style/` | модуль `BerryWms.Style`: власний стиль Qt Quick Controls + `Theme.qml` (токени) + шрифт |
@@ -55,7 +55,7 @@ UI — QML-модуль `BerryWms.Ui` (статична бібліотека `wm
 - **Панель `AppBar`** (замість вкладок і футера, макет «нова оболонка» 28.10): ліворуч знак (три ягоди
   з кольорів теми) і «Berry WMS»; вкладки-«пігулки»; праворуч чіп ваг (`driverName` із зеленою точкою; без ваги — `online` = false — червоний «… — немає зв'язку»), чіп сесії
   (назва або «Сесію не відкрито» червоним; клік — на «Сесію»), аватар з першою літерою й ім'я оператора, меню ⋯
-  (ваги, масштаб, типова тара ящика, повний екран, тема, «Вийти»). «Ваги…» — діалог вибору порту
+  (ваги, масштаб, папір чека, типова тара ящика, повний екран, тема, «Вийти»). «Ваги…» — діалог вибору порту
   (`Terminal.scalePorts()`: USB-адаптери під іменем `/dev/serial/by-id/…`, без порожніх `ttyS*`; першим — «Симулятор ваг»);
   вибір одразу перемикає драйвер (`setScalePort` → `ScaleMonitor::setDriver`, `QSettings` `scale/port`), а живий показ
   у діалозі підтверджує, що порт той. Налаштування вікна панель отримує властивостями (`uiScale`,
@@ -112,7 +112,7 @@ UI — QML-модуль `BerryWms.Ui` (статична бібліотека `wm
 | `Frame`, `Popup`, `Dialog` | поверхня, рамка, радіус 8; діалог — жирний заголовок, затемнення під ним |
 | `DialogButtonBox` | кнопки праворуч; стандартна кнопка «прийняти» — `highlighted` |
 | `WarningButton` | обведена бурштиновим — свідома ризикована дія поруч із головною («Прийняти нестабільну») |
-| `RadioButton`, `ProgressBar`, `ScrollBar`, `ToolTip` | акцентні індикатори; тонкий скролбар; підказка інвертованими кольорами |
+| `RadioButton`, `CheckBox`, `ProgressBar`, `ScrollBar`, `ToolTip` | акцентні індикатори; тонкий скролбар; підказка інвертованими кольорами |
 
 Фокус клавіатури скрізь видно (рамка акцентом): оператор працює Tab/Enter.
 Модуль залежить лише від Qt (не від `BerryWms.Ui`); `BerryWms.Ui` імпортує його (`IMPORTS`),
@@ -321,12 +321,14 @@ UI — QML-модуль `BerryWms.Ui` (статична бібліотека `wm
 | `previousTrucks_` | фури останньої закритої сесії (`SessionStore::lastClosed`) — для «повторити» і перенесення |
 | `workDay_` | `std::optional<WorkDay>` — відкрита сесія (`SessionStore::current`) |
 | `journal_` | `Journal` (`JournalStore::load`) |
-| `supplierModel_`, `simulator_`, `scaleMonitor_` | модель списку, симулятор ваг і монітор |
+| `supplierModel_`, `simulator_`, `serialScale_`, `scaleMonitor_` | модель списку, симулятор ваг, справжні ваги (є лише з налаштованим портом `scalePort_`) і монітор |
 | `activeReceiptId_` | UUID активного чека — **не вказівник**, бо відкриті чеки живуть у векторі, що перевиділяє пам'ять |
 | `allocationReceiptId_` | UUID чека, обраного на екрані «Розподіл» (відкритого або закритого) |
 | `cashSupplierId_` | постачальник, обраний на «Касі» |
 | `currentOperatorId_` | хто увійшов |
 | `receivingTargetId_` | ціль авторозподілу на «Прийомі» (з `QSettings`) |
+| `defaultBoxTare_` | типова тара ящика термінала (з `QSettings`) |
+| `printer_`, `receiptPaper_` | `ReceiptPrinter` (CUPS або PDF з `WMS_PRINT_PDF`) і папір A4/A5 (з `QSettings`) |
 
 Порядок оголошення полів важливий: модель і монітор оголошені після даних, які читають, тож
 конструюються після них.
@@ -365,6 +367,7 @@ UI — QML-модуль `BerryWms.Ui` (статична бібліотека `wm
 | `closeBlockers` | `closeBlockersChanged` (← `trucksChanged`, `receiptsChanged`) | `WorkDay::validateClose()`: відкриті чеки й фури, що вантажаться |
 | `openReceipts`, `activeReceiptId`, `activeLines`, `activeSummary` | `receiptsChanged` | прийом; вага й гроші — голі числа для таблиці (`display_format.h`); рядок має `placedIn`/`hanging`; відкритий чек — `pallets` («2 палети», `palletsText`) |
 | `receivingTarget` | `receivingTargetChanged` | ціль авторозподілу (`destinationId`, порожньо — без цілі; фура, що вже не вантажиться, — теж порожньо) |
+| `receiptPaper` | `receiptPaperChanged` | `"A4"` або `"A5"`; `setReceiptPaper(paper)` |
 | `defaultBoxTare` | `defaultBoxTareChanged` | типова тара ящика, кг як на екрані («1,2»); `setDefaultBoxTare(text)` → помилка або "" |
 | `nextPlacements` | `placementsChanged` | `{cropCode: {text, plate, follows, hangs, boxesLeft}}` — куди піде наступна палета (`WorkDay::nextDestination`); `plate` порожній для складу |
 | `allocationSources`, `allocationReceiptId`, `allocationSupplierName`, `allocationLines`, `allocationCrops`, `destinations` | `allocationChanged` | розподіл |
@@ -376,6 +379,7 @@ UI — QML-модуль `BerryWms.Ui` (статична бібліотека `wm
 | `journalSize` | `journalChanged` | записів у журналі |
 | `suppliers` | CONSTANT | `SupplierListModel*` |
 | `scales` | CONSTANT | `ScaleMonitor*` |
+| `scaleSimulated`, `scalePort` | `scaleDriverChanged` | працює симулятор (кнопки «Поставити палету» / «Зняти»); обраний порт ваг |
 
 ### 4.2 Методи (дії)
 
@@ -398,14 +402,19 @@ UI — QML-модуль `BerryWms.Ui` (статична бібліотека `wm
 | `setReceivingTarget(destinationId)` | ціль авторозподілу на «Прийомі» |
 | `setDefaultBoxTare(text)` | типова тара ящика термінала (меню ⋯) → помилка або "" |
 | `cancelWeighing(i)` | анулювати рядок (палета у фурі — разом зі сторно розподілу, одна транзакція) або повернути причину |
-| `payRows()`, `payCheck(prices)`, `payReceipt(prices, bankTransfer)` | «Оплатити»: ціна на культуру, сума, закриття + виплата |
-| `handOverBlockers()`, `handOverReceipt()` | «Видати чек» (опт) |
+| `payRows()`, `payCheck(prices)`, `payReceipt(prices, bankTransfer, print)` | «Оплатити»: ціна на культуру, сума, закриття + виплата, друк за бажанням |
+| `handOverBlockers()`, `handOverReceipt()` | «Видати чек» (опт), друкує завжди |
+| `printReceiptCopy(receiptId)` | «Копія чека» з «Каси» |
+| `setReceiptPaper(paper)` | папір чека A4/A5 (меню ⋯) |
+| `scalePorts()`, `setScalePort(path)` | діалог «Ваги…»: порти й симулятор; перемикання без перезапуску |
 | `selectAllocationReceipt(id)` | обрати чек для розподілу |
 | `allocateWeighing(i, destinationId)`, `allocateBoxes(crop, boxes, destinationId)` | палету / N ящиків — у фуру (UUID) або на склад (`"warehouse"`) |
 | `shipFromStock(crop, boxes, truckId)` | N ящиків зі складу у фуру сесії |
 | `selectCashSupplier(id)`, `balanceAfter(amount)` | каса: обрати постачальника / борг після виплати |
 | `pay(amount, bankTransfer)` | виплата `Payment` обраному постачальнику |
 | `simulatePallet()`, `simulateEmptyScale()` | керування симулятором ваг |
+
+Сигнал `printProblem(message)` — чек не надруковано (принтера нема, черга зупинена); `Main.qml` показує діалог.
 
 ### 4.3 Каскад сигналів
 
@@ -471,7 +480,8 @@ flowchart LR
 Сигнал `readingChanged` випускається лише коли показ змінився — більшість тіків повторює той самий.
 
 Властивості для QML: `display` (лише число, `"12,4"`, або `"—"`; «кг» — окремий підпис на табло),
-`stable`, `zero` (порожні ваги — лампа НУЛЬ), `driverName`.
+`stable`, `zero` (порожні ваги — лампа НУЛЬ), `tare` (тара індикатора), `online` (є показ), `driverName`.
+`setDriver` перемикає драйвер без перезапуску (діалог «Ваги…»).
 Для C++: `stableWeight()` (єдина вага, з якою можна записати зважування без підтвердження) і
 `lastReading()` (для «Прийняти нестабільну»).
 

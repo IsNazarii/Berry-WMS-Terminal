@@ -18,7 +18,7 @@
 
 | Вимога | Мінімум | Є |
 |---|---|---|
-| Класи / типи | 9 | 25 класів ядра + допоміжні структури (`ScaleReading`, `Weighing`, `Cargo`, `TruckDetails`, `PriceChange`, `Amendment`, `AmendmentRecord`, `WorkDayRecord`, `CropPrice`, `PaidReceipt`, `ToWarehouse`, `ReceiptDocument`, `ReceiptLine`) |
+| Класи / типи | 9 | 26 класів ядра + допоміжні структури (`ScaleReading`, `Weighing`, `Cargo`, `TruckDetails`, `PriceChange`, `Amendment`, `AmendmentRecord`, `WorkDayRecord`, `CropPrice`, `PaidReceipt`, `ToWarehouse`, `ReceiptDocument`, `ReceiptLine`, `LoadingEntry`, `ClosedSessionInfo`) |
 | Поля | 15 | значно більше (напр., лише `Weighing` — 9, `WorkDay` — 10, `Truck` — 5) |
 | Нетривіальні методи | 25 | значно більше (див. нижче) |
 | Ієрархії успадкування | 2, одна ≥ 3 класи | A: `Transaction` → 5 класів; B: `IScaleDriver` → `SimulatedScaleDriver`, `SerialScaleDriver` (infra); C: `JournalStore` → `SqliteJournalStore`, D: `SessionStore` → `SqliteSessionStore`, E: `Repository<T>` → `SqliteRepository<T>` (infra) |
@@ -28,7 +28,7 @@
 ### Класи ядра
 
 `Quantity<Tag>` (`Money`, `Weight`), `Uuid`, `Supplier`, `Operator`, `Crop`, `CropKeys`, `Transaction`, `Receipt`,
-`Payment`, `Allocation`, `AllocationReversal`, `StockShipment`, `OpenReceipt`, `Truck`, `Journal`, `DayPrices`, `WorkDay`, `SessionSummary`,
+`Payment`, `Allocation`, `AllocationReversal`, `StockShipment`, `OpenReceipt`, `Truck`, `Journal`, `DayPrices`, `WorkDay`, `SessionSummary`, `LoadingHistory`,
 `IScaleDriver`, `SimulatedScaleDriver`, `StabilityDetector`, `Ie04FrameReader`, `JournalStore`, `SessionStore`, `Repository<T>` + infra-класи
 `sqlite::Database`, `sqlite::Statement`, `sqlite::ScopedTransaction`, `sqlite::Error`, `SqliteJournalStore`, `SqliteSessionStore`, `SqliteRepository<T>`, `SerialScaleDriver`, `QrMatrix`, `ReceiptPrinter`
 (+ функції `backupDatabase`, `paintReceipt`) + UI-класи `Terminal`, `SupplierListModel`,
@@ -89,10 +89,10 @@ classDiagram
 | Вимога | Мінімум | Стан |
 |---|---|---|
 | Логіка відділена від GUI | так | ядро без Qt; `Terminal` — тонкий міст, правила лише в `core/` ([ui.md](ui.md)) |
-| Вікна / екрани | 4 | Вхід, Сесія, Прийом, Розподіл, Склад, Каса, пошук і додавання постачальника (+ діалоги «Додати фуру…», «Додати культуру…», прибрати культуру, закриття сесії, «Оплатити…», «Видати чек…», підтвердження виплати) |
+| Вікна / екрани | 4 | Вхід, Сесія, Прийом, Розподіл, Склад, Каса, Історія, пошук і додавання постачальника (+ діалоги «Додати фуру…», «Додати культуру…», прибрати культуру, закриття сесії, «Оплатити…», «Видати чек…», підтвердження виплати) |
 | Елементи керування | 20 | > 20: `Button`, `TextField`, `ComboBox`, `RadioButton`, `CheckBox`, `TabButton`, `ToolButton`, `Menu`, `Dialog`… |
-| Контейнер | 1 | `ListView` (постачальники, відкриті чеки, рядки чека, чеки до розподілу, фури/склад), `ListView` (борги, історія розрахунків), `Repeater` (ціни, фури, культури із залишком, залишок складу) |
-| Обробники подій | 10 | > 30 (`onClicked`, `onAccepted`, `Shortcut` F2 / F5–F9 / F11, `Connections`…) |
+| Контейнер | 1 | `ListView` (постачальники, відкриті чеки, рядки чека, чеки до розподілу, фури/склад), `ListView` (борги, історія розрахунків), `ListView` (дні й місця, історія вантаження), `Repeater` (ціни, фури, культури із залишком, залишок складу) |
+| Обробники подій | 10 | > 30 (`onClicked`, `onAccepted`, `Shortcut` F2 / F5–F10 / F11, `Connections`…) |
 
 Лабораторну закрито: шість екранів у власному стилі (`BerryWms.Style`), оболонка з вкладками й станом точки,
 порожні стани; стан термінала й довідники (постачальники, оператори, культури) зберігаються в SQLite.

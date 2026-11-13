@@ -18,7 +18,7 @@
 8. [Фура: `Truck`](#8-фура)
 9. [Журнал: `Journal`](#9-журнал)
 10. [Ціни: `DayPrices`](#10-ціни)
-11. [Сесія: `WorkDay`, `Amendment`](#11-сесія)
+11. [Сесія: `WorkDay`, `Amendment`, `SessionSummary`, `LoadingHistory`](#11-сесія)
 12. [Ваги: `IScaleDriver`, `SimulatedScaleDriver`, `StabilityDetector`, кадри ІЕ-04](#12-ваги)
 13. [Утиліти тексту](#13-утиліти-тексту)
 14. [Наскрізні сценарії](#14-наскрізні-сценарії)
@@ -84,17 +84,20 @@ classDiagram
         -string cropCode_
         -Cargo cargo_
         -optional~size_t~ weighingIndex_
-        +wholeWeighing(receipt, i, dest)$
-        +boxesOf(receipt, crop, n, dest)$
+        -optional~OperatorId~ allocatedBy_
+        +wholeWeighing(receipt, i, dest, by)$
+        +boxesOf(receipt, crop, n, dest, by)$
     }
     class AllocationReversal {
         -Uuid allocationId_
-        +of(allocation)$
+        -optional~OperatorId~ reversedBy_
+        +of(allocation, by)$
     }
     class StockShipment {
         -string cropCode_
         -Cargo cargo_
         -TruckId truckId_
+        -optional~OperatorId~ shippedBy_
     }
     Transaction <|-- Receipt
     Transaction <|-- Payment
@@ -476,7 +479,7 @@ using Destination = std::variant<TruckId, ToWarehouse>;
 ### 7.2 `Allocation`
 
 Факт: частина чека пішла у фуру або на склад. Поля: `receiptId`, `destination`, `cropCode`,
-`cargo`, `weighingIndex` (є лише для цілої палети).
+`cargo`, `weighingIndex` (є лише для цілої палети), `allocatedBy` — хто вантажив.
 
 Два способи створення (шаблонні, приймають будь-який `WeighedReceipt`):
 
@@ -493,21 +496,29 @@ using Destination = std::variant<TruckId, ToWarehouse>;
 
 `balanceEffect() = 0`: переміщення ягоди не змінює борг.
 
+**Хто вантажив** (`allocatedBy`, як і `reversedBy`, `shippedBy` нижче) — `std::optional<OperatorId>`: `nullopt` лише
+у записів, зроблених до міграції 12; оператора їм не вигадують (на відміну від `Payment::paidBy`, де всі старі
+виплати справді видав єдиний оператор альфи). Id ≤ 0 — `std::invalid_argument`. У фабриках це останній параметр
+зі значенням `std::nullopt` за замовчуванням — щоб не переписувати сотню викликів у тестах; ціна — компілятор не
+нагадає його передати, тож кожне місце в `Terminal`, де ці записи створюються, передає `currentOperatorId_`.
+
 **Чому розподіл — окремий запис, а не лічильник у фурі:** два офлайн-термінали, що вантажать
 одну фуру, не перезапишуть дані один одного (див. [architecture.md §4](architecture.md#4-модель-даних-журнал-фактів)).
 
 ### 7.3 `AllocationReversal` (`allocation.h`)
 
-Сторно розподілу: лише `allocationId`. Сам розподіл лишається в журналі (слід помилки видно),
+Сторно розподілу: `allocationId` і `reversedBy` (хто зняв). Сам розподіл лишається в журналі (слід помилки видно),
 але `Journal` його більше не рахує — ягода знову вільна, палету можна розподілити заново.
 Потрібне, щоб анулювати помилкову палету, яку авторозподіл уже поклав у фуру.
 Порядок не важливий: якщо sync привезе сторно раніше за розподіл, розподіл просто не рахуватиметься.
 
 ### 7.4 `StockShipment` (`shipment.h`)
 
-Зі складу у фуру поточної сесії: `cropCode`, `cargo`, `truckId`. Без посилання на чек — на складі
+Зі складу у фуру поточної сесії: `cropCode`, `cargo`, `truckId`, `shippedBy`. Без посилання на чек — на складі
 ящики однієї культури вже не розрізняються за постачальником. Рекомендоване створення —
-`Journal::shipmentOf(crop, n, truck)` (вага пропорційно від складського залишку).
+`Journal::shipmentOf(crop, n, truck, by)` (вага пропорційно від складського залишку). Без `sessionId` —
+належність до дня історія складу визначає за часом закриття сесії (див. `LoadingHistory`); `sessionId`, як у чека
+й виплати, варто додати разом із sync.
 
 ---
 
@@ -562,7 +573,9 @@ Append-only сховище фактів. Для кожного типу — ок
 | `unallocatedOf(receiptId, crop)` | скільки культури з закритого чека ще не розподілено |
 | `unallocatedOf(openReceipt, crop)` | те саме для відкритого чека |
 | `allocationOf(receiptId, i)` | розподіл цілої палети `i` або `nullptr`; `destinationOf` — його місце |
-| `reversalOf(receiptId, i)` | сторно, що звільняє цілу палету; `nullopt`, якщо вона вільна |
+| `reversalOf(receiptId, i, by)` | сторно, що звільняє цілу палету; `nullopt`, якщо вона вільна |
+| `allocations()`, `shipments()` | сирі записи для історії (`std::span`, у порядку додавання), сторновані розподіли теж |
+| `reversalFor(allocationId)` | сторно, що зняло розподіл, або `nullptr` |
 | `findReceipt(id)` | закритий чек з журналу або `nullptr` |
 | `paymentFor(receiptId)` | виплата, що закрила чек («Оплатити»), або `nullptr` (опт, старі виплати) — для копії чека |
 | `waitingForAllocation()` | закриті чеки, у яких лишились нерозподілені ящики (екран «Розподіл») |
@@ -652,9 +665,9 @@ Append-only сховище фактів. Для кожного типу — ок
 | `openReceipt(supplier)` | повертає відкритий чек постачальника або створює новий — у постачальника не більше одного |
 | `addWeighing(id, w, at)` | якщо ціна `DayPrice` — підставляє `prices.priceAt(crop, at)`; ручну не чіпає; без денної ціни рядок лишається без ціни (для опту норм, роздрібний не закриється) |
 | `validateCancel(id, i, journal)` | `journal.validateCancel` + фура, куди пішла палета, ще завантажується (поїхала — ягоду не повернеш) |
-| `cancelWeighing(id, i, journal)` | анулює рядок і повертає `optional<AllocationReversal>` — сторно її розподілу; викликач кладе його в журнал разом зі збереженням сесії (`[[nodiscard]]`, щоб не загубити) |
+| `cancelWeighing(id, i, journal, by)` | анулює рядок і повертає `optional<AllocationReversal>` — сторно її розподілу; викликач кладе його в журнал разом зі збереженням сесії (`[[nodiscard]]`, щоб не загубити) |
 | `nextDestination(id, crop, target, journal)` | куди піде наступна палета культури: туди, куди пішла остання *розподілена* палета цієї культури **в цьому чеку**; якщо її фура вже не завантажується — в `target`; `nullopt`, якщо нікуди |
-| `autoAllocation(id, i, target, journal)` | розподіл щойно зваженої палети в `nextDestination`; `nullopt` — палета «підвішена»: нікуди, або у фурі не вистачає місця на всі її ящики (у іншу фуру не перекидається — це вирішує оператор на «Розподілі») |
+| `autoAllocation(id, i, target, journal, by)` | розподіл щойно зваженої палети в `nextDestination`; `nullopt` — палета «підвішена»: нікуди, або у фурі не вистачає місця на всі її ящики (у іншу фуру не перекидається — це вирішує оператор на «Розподілі») |
 | `closeReceipt(id, settlement)` | повертає `Receipt` і прибирає чек зі списку; у журнал кладе викликач («Видати чек» — `HandedOver`) |
 | `validatePay(id, prices, at)` | «Оплатити»: культура чека без додатної ціни в `prices` (`CropPrice {cropCode, pricePerKg}`), далі `validateClose(OnSite)` |
 | `payReceipt(id, prices, method, by, at)` | одна ціна на культуру (дорівнює денній на `at` → `DayPrice`, інакше `Manual`), закриває як роздріб і повертає `PaidReceipt {receipt, payment}` — виплата всієї суми одразу; обидва в журнал кладе викликач |
@@ -689,11 +702,36 @@ Append-only сховище фактів. Для кожного типу — ок
 
 Приватний шаблон `count<WeighedReceipt R>` рахує і `Receipt`, і `OpenReceipt` (той самий концепт, що в `Allocation`).
 
+### `LoadingHistory` (`loading_history.h`)
+
+Що робочий день завантажив і звідки — для екрана «Історія». Будується з `WorkDay` і `Journal`, як `SessionSummary`
+(знімок). Кожен рядок — `LoadingEntry`: час, куди (`Destination`), культура, `cargo`, чек і постачальник
+(`nullopt` — зі складу), № палети (`weighingIndex`; `nullopt` — ящиками з культури), хто вантажив (`by`), коли й хто
+зняв сторно (`reversedAt`, `reversedBy` — такий рядок лишається, щоб помилку було видно). Від старих до нових.
+
+| Метод | Що |
+|---|---|
+| `entries()` | усе: у фури дня, на склад і зі складу |
+| `intoTruck(id)` | у одну фуру дня; для фури іншого дня — порожньо |
+| `intoTrucks()` | у всі фури дня |
+| `warehouse()` | на склад з чеків дня і зі складу у фури дня |
+
+Правила відбору:
+
+- **Фура — за весь рейс.** Перенесена з учора фура показує й учорашні палети: вони поїдуть разом з нею.
+- **Склад — лише свій день.** Прихід — розподіли з чеків, чий `sessionId` — цей день; відвантаження — у фури дня,
+  а в закритого дня — лише зроблені до закриття (перенесена фура належить обом дням, а `StockShipment` не знає сесії).
+- **Постачальник** шукається серед закритих чеків журналу, відкритих чеків дня і, для архівного дня, відкритих чеків
+  поточної сесії (`otherOpenReceipts`) — інакше палета, покладена сьогодні в перенесену з учора фуру, лишилася б без
+  постачальника в учорашній історії.
+
 ### `SessionStore` (`session_store.h`)
 
 Інтерфейс сховища сесій: `save(WorkDay)` перезаписує збережений стан сесії (викликається після кожної
 зміни — перезапуск нічого не губить, навіть незакритий чек); `current()` — відкрита сесія (продовжити
-після перезапуску); `lastClosed()` — остання закрита, її фури повторюють або приймають перенесені. Реалізація — `SqliteSessionStore` в `infra/`.
+після перезапуску); `lastClosed()` — остання закрита, її фури повторюють або приймають перенесені;
+`closedSessions()` — архів як `ClosedSessionInfo {id, date, openedAt, closedAt}`, новіші першими (без фур і цін —
+для вибору дня); `find(id)` — будь-яка сесія, відкрита чи закрита. Реалізація — `SqliteSessionStore` в `infra/`.
 
 ### `Repository<T>` (`repository.h`)
 

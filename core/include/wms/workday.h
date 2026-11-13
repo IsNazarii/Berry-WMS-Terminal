@@ -125,7 +125,8 @@ public:
     // caller puts it into the journal together with saving the session.
     // Throws std::logic_error when validateCancel() is not empty.
     [[nodiscard]] std::optional<AllocationReversal> cancelWeighing(const Uuid& receiptId, std::size_t index,
-                                                                   const Journal& journal);
+                                                                   const Journal& journal,
+                                                                   std::optional<OperatorId> by = std::nullopt);
 
     // Auto-allocation from the receiving screen. A pallet goes where the last
     // allocated pallet of its crop in this receipt went, so one supplier's
@@ -138,8 +139,8 @@ public:
     // the allocation screen: nowhere to go, or the truck has no room for all
     // its boxes. Never spills into another truck: the operator decides that.
     [[nodiscard]] std::optional<Allocation> autoAllocation(const Uuid& receiptId, std::size_t index,
-                                                           std::optional<Destination> target,
-                                                           const Journal& journal) const;
+                                                           std::optional<Destination> target, const Journal& journal,
+                                                           std::optional<OperatorId> by = std::nullopt) const;
     // The receipt leaves the open list; the caller puts it into the journal.
     // Throws std::logic_error when OpenReceipt::validateClose() is not empty.
     [[nodiscard]] Receipt closeReceipt(const Uuid& receiptId, Settlement settlement);

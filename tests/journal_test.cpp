@@ -645,3 +645,19 @@ TEST(Journal, FindsThePaymentOfAReceipt) {
     EXPECT_EQ(found->id(), forReceipt.id());
     EXPECT_EQ(journal.paymentFor(Uuid::generateV7()), nullptr);
 }
+
+TEST(Journal, HelpersPassTheOperatorOn) {
+    Journal journal = journalWithStock();
+    EXPECT_EQ(journal.shipmentOf("raspberry", 5, kTruck, 3).shippedBy(), 3);
+
+    const Receipt receipt = mixedReceipt();
+    journal.add(receipt);
+    EXPECT_EQ(journal.boxesOf(receipt.id(), "raspberry", 5, kTruck, 3).allocatedBy(), 3);
+    const OpenReceipt open = unloading();
+    EXPECT_EQ(journal.boxesOf(open, "raspberry", 5, kTruck, 3).allocatedBy(), 3);
+
+    journal.add(Allocation::wholeWeighing(receipt, 0, kTruck, 3));
+    const auto reversal = journal.reversalOf(receipt.id(), 0, 4);
+    ASSERT_TRUE(reversal.has_value());
+    EXPECT_EQ(reversal->reversedBy(), 4);
+}

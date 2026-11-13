@@ -58,6 +58,7 @@ std::int64_t toNanoseconds(TimePoint at);
 TimePoint fromNanoseconds(std::int64_t ns);
 std::optional<std::int64_t> toNanoseconds(std::optional<TimePoint> at);
 std::optional<TimePoint> optionalTime(const sqlite::Statement& row, int column);
+std::optional<std::int64_t> optionalInt(const sqlite::Statement& row, int column);
 
 // Throws std::runtime_error for text that is not a UUID.
 Uuid uuidColumn(const sqlite::Statement& row, int column);

@@ -20,6 +20,10 @@ std::optional<TimePoint> optionalTime(const sqlite::Statement& row, int column) 
     return row.isNull(column) ? std::nullopt : std::optional{fromNanoseconds(row.columnInt(column))};
 }
 
+std::optional<std::int64_t> optionalInt(const sqlite::Statement& row, int column) {
+    return row.isNull(column) ? std::nullopt : std::optional{row.columnInt(column)};
+}
+
 Uuid uuidColumn(const sqlite::Statement& row, int column) {
     const std::string text = row.columnText(column);
     const std::optional<Uuid> id = Uuid::parse(text);

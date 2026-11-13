@@ -1,6 +1,7 @@
 #pragma once
 
 #include "wms/cargo.h"
+#include "wms/operator.h"
 #include "wms/receipt.h"
 #include "wms/transaction.h"
 #include "wms/truck.h"
@@ -30,30 +31,34 @@ using Destination = std::variant<TruckId, ToWarehouse>;
 // so two offline terminals loading the same truck never lose each other's data.
 class Allocation final : public Transaction {
 public:
+    // allocatedBy: the operator who loaded the berries; nullopt only for records
+    // from before operators were kept. Throws std::invalid_argument for an id <= 0.
     Allocation(Uuid id, TimePoint createdAt, Uuid receiptId, Destination destination, std::string cropCode,
                Cargo cargo, std::optional<std::size_t> weighingIndex,
-               SyncStatus syncStatus = SyncStatus::Pending);
+               SyncStatus syncStatus = SyncStatus::Pending, std::optional<OperatorId> allocatedBy = std::nullopt);
 
-    // The factories take a closed Receipt or an OpenReceipt alike.
+    // The factories take a closed Receipt or an OpenReceipt alike. The terminal
+    // always passes the operator; the default is there for tests.
 
     // A whole weighing (usually a pallet) goes to the destination unchanged.
     // Throws std::out_of_range for an index outside the receipt.
     template <WeighedReceipt R>
     [[nodiscard]] static Allocation wholeWeighing(const R& receipt, std::size_t weighingIndex,
-                                                  Destination destination);
+                                                  Destination destination, std::optional<OperatorId> by = std::nullopt);
     // `boxes` boxes of a crop from anywhere in the receipt; their weight is the
     // crop's net weight split proportionally by boxes.
     // Throws std::invalid_argument when the receipt has no such crop.
     template <WeighedReceipt R>
     [[nodiscard]] static Allocation boxesOf(const R& receipt, std::string_view cropCode, int boxes,
-                                            Destination destination);
+                                            Destination destination, std::optional<OperatorId> by = std::nullopt);
     // Same, but the weight is split from what is still `available` of the crop
     // (see Journal::unallocatedOf), so taking the last boxes takes exactly the
     // remaining weight and rounding never loses or invents grams.
     // With nothing available the weight is zero and validate() reports it.
     template <WeighedReceipt R>
     [[nodiscard]] static Allocation boxesOf(const R& receipt, std::string_view cropCode, int boxes,
-                                            Destination destination, const Cargo& available);
+                                            Destination destination, const Cargo& available,
+                                            std::optional<OperatorId> by = std::nullopt);
 
     [[nodiscard]] const Uuid& receiptId() const noexcept { return receiptId_; }
     [[nodiscard]] const Destination& destination() const noexcept { return destination_; }
@@ -61,6 +66,7 @@ public:
     [[nodiscard]] const Cargo& cargo() const noexcept { return cargo_; }
     // Set only when a whole weighing was allocated.
     [[nodiscard]] std::optional<std::size_t> weighingIndex() const noexcept { return weighingIndex_; }
+    [[nodiscard]] std::optional<OperatorId> allocatedBy() const noexcept { return allocatedBy_; }
 
     [[nodiscard]] TransactionKind kind() const noexcept override { return TransactionKind::Allocation; }
     // Moving berries does not change what we owe the supplier.
@@ -74,6 +80,7 @@ private:
     std::string cropCode_;
     Cargo cargo_;
     std::optional<std::size_t> weighingIndex_;
+    std::optional<OperatorId> allocatedBy_;
 };
 
 // Takes an allocation back: the berries are free again, as if never allocated.
@@ -81,11 +88,15 @@ private:
 // Made when a weighing that already went into a truck turns out to be wrong.
 class AllocationReversal final : public Transaction {
 public:
-    AllocationReversal(Uuid id, TimePoint createdAt, Uuid allocationId, SyncStatus syncStatus = SyncStatus::Pending);
+    // reversedBy: as Allocation's allocatedBy.
+    AllocationReversal(Uuid id, TimePoint createdAt, Uuid allocationId, SyncStatus syncStatus = SyncStatus::Pending,
+                       std::optional<OperatorId> reversedBy = std::nullopt);
 
-    [[nodiscard]] static AllocationReversal of(const Allocation& allocation);
+    [[nodiscard]] static AllocationReversal of(const Allocation& allocation,
+                                               std::optional<OperatorId> by = std::nullopt);
 
     [[nodiscard]] const Uuid& allocationId() const noexcept { return allocationId_; }
+    [[nodiscard]] std::optional<OperatorId> reversedBy() const noexcept { return reversedBy_; }
 
     [[nodiscard]] TransactionKind kind() const noexcept override { return TransactionKind::AllocationReversal; }
     [[nodiscard]] Money balanceEffect() const noexcept override { return Money{}; }
@@ -94,31 +105,34 @@ public:
 
 private:
     Uuid allocationId_;
+    std::optional<OperatorId> reversedBy_;
 };
 
 // Templates live in the header: they are instantiated for each receipt type.
 
 template <WeighedReceipt R>
-Allocation Allocation::wholeWeighing(const R& receipt, std::size_t weighingIndex, Destination destination) {
+Allocation Allocation::wholeWeighing(const R& receipt, std::size_t weighingIndex, Destination destination,
+                                     std::optional<OperatorId> by) {
     const Weighing& weighing = receipt.weighings().at(weighingIndex);
-    return Allocation{Uuid::generateV7(), Clock::now(), receipt.id(), destination,
-                      weighing.cropCode,  weighing.cargo(), weighingIndex};
-}
-
-template <WeighedReceipt R>
-Allocation Allocation::boxesOf(const R& receipt, std::string_view cropCode, int boxes, Destination destination) {
-    return boxesOf(receipt, cropCode, boxes, destination, receipt.cargoOf(cropCode));
+    return Allocation{Uuid::generateV7(), Clock::now(), receipt.id(),       destination, weighing.cropCode,
+                      weighing.cargo(),   weighingIndex, SyncStatus::Pending, by};
 }
 
 template <WeighedReceipt R>
 Allocation Allocation::boxesOf(const R& receipt, std::string_view cropCode, int boxes, Destination destination,
-                               const Cargo& available) {
+                               std::optional<OperatorId> by) {
+    return boxesOf(receipt, cropCode, boxes, destination, receipt.cargoOf(cropCode), by);
+}
+
+template <WeighedReceipt R>
+Allocation Allocation::boxesOf(const R& receipt, std::string_view cropCode, int boxes, Destination destination,
+                               const Cargo& available, std::optional<OperatorId> by) {
     if (receipt.cargoOf(cropCode).boxes <= 0) throw std::invalid_argument("Receipt has no boxes of the requested crop");
 
     const Weight weight =
         available.boxes > 0 ? grams(divideRounded(available.weight.raw() * boxes, available.boxes)) : Weight{};
     return Allocation{Uuid::generateV7(), Clock::now(), receipt.id(), destination, std::string{cropCode},
-                      {.boxes = boxes, .weight = weight}, std::nullopt};
+                      {.boxes = boxes, .weight = weight}, std::nullopt, SyncStatus::Pending, by};
 }
 
 } // namespace wms

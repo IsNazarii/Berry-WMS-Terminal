@@ -125,3 +125,23 @@ TEST(AllocationReversal, NeedsAnAllocation) {
     const AllocationReversal r{Uuid::generateV7(), Clock::now(), Uuid{}};
     EXPECT_FALSE(r.isValid());
 }
+
+TEST(Allocation, RemembersWhoLoaded) {
+    const Receipt receipt = sampleReceipt();
+    EXPECT_EQ(Allocation::wholeWeighing(receipt, 0, kTruck, 3).allocatedBy(), 3);
+    EXPECT_EQ(Allocation::boxesOf(receipt, "raspberry", 5, kTruck, 3).allocatedBy(), 3);
+    // Records from before operators were kept: unknown, not invented.
+    EXPECT_EQ(Allocation::wholeWeighing(receipt, 0, kTruck).allocatedBy(), std::nullopt);
+}
+
+TEST(Allocation, OperatorIdMustBePositive) {
+    const Receipt receipt = sampleReceipt();
+    EXPECT_THROW((void)Allocation::wholeWeighing(receipt, 0, kTruck, 0), std::invalid_argument);
+}
+
+TEST(AllocationReversal, RemembersWhoTookItBack) {
+    const auto a = Allocation::wholeWeighing(sampleReceipt(), 0, kTruck, 3);
+    EXPECT_EQ(AllocationReversal::of(a, 4).reversedBy(), 4);
+    EXPECT_EQ(AllocationReversal::of(a).reversedBy(), std::nullopt);
+    EXPECT_THROW((void)AllocationReversal::of(a, -1), std::invalid_argument);
+}

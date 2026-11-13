@@ -143,7 +143,7 @@ void addDemoHistory(JournalStore& journal, const WorkDay& day, const TruckId& ca
         .pricePerKg = hryvnias(85),
     }}, SyncStatus::Pending, day.id()};
     journal.save(receipt);
-    journal.save(Allocation::wholeWeighing(receipt, 0, carriedOverTruck));
+    journal.save(Allocation::wholeWeighing(receipt, 0, carriedOverTruck, day.openedBy()));
     journal.save(Payment{Uuid::generateV7(), day.openedAt(), 42, hryvnias(3'000), PaymentMethod::Cash, day.openedBy(),
                          SyncStatus::Pending, day.id()});
 
@@ -157,7 +157,7 @@ void addDemoHistory(JournalStore& journal, const WorkDay& day, const TruckId& ca
         .pricePerKg = hryvnias(60),
     }}, SyncStatus::Pending, day.id()};
     journal.save(stored);
-    journal.save(Allocation::wholeWeighing(stored, 0, ToWarehouse{}));
+    journal.save(Allocation::wholeWeighing(stored, 0, ToWarehouse{}, day.openedBy()));
 }
 
 QString localTime(TimePoint at) {
@@ -949,7 +949,8 @@ QString Terminal::recordWeighing(const QString& cropCode, const QString& boxes, 
 
     if (const auto errors = weighing.validate(); !errors.empty()) return joined(errors);
     const std::size_t index = workDay_->addWeighing(*activeReceiptId_, std::move(weighing), Clock::now());
-    auto allocation = workDay_->autoAllocation(*activeReceiptId_, index, receivingDestination(), journal_);
+    auto allocation =
+        workDay_->autoAllocation(*activeReceiptId_, index, receivingDestination(), journal_, currentOperatorId_);
     // The rule only picks the place; a pallet the journal would refuse just hangs.
     if (allocation && !journal_.validateAllocation(*allocation, *activeReceipt()).empty()) allocation.reset();
     {
@@ -974,7 +975,7 @@ QString Terminal::cancelWeighing(int index) {
     const auto i = static_cast<std::size_t>(index);
     if (const auto errors = workDay_->validateCancel(*activeReceiptId_, i, journal_); !errors.empty())
         return joined(errors);
-    const auto reversal = workDay_->cancelWeighing(*activeReceiptId_, i, journal_);
+    const auto reversal = workDay_->cancelWeighing(*activeReceiptId_, i, journal_, currentOperatorId_);
     {
         // The cancelled line and its freed allocation together, or neither after a crash.
         sqlite::ScopedTransaction transaction{db_};
@@ -1199,7 +1200,7 @@ QString Terminal::allocateWeighing(int index, const QString& destinationId) {
         [&](const auto* receipt) {
             if (index < 0 || index >= static_cast<int>(receipt->weighings().size())) return tr("Немає такого рядка");
             return allocate(*source, Allocation::wholeWeighing(*receipt, static_cast<std::size_t>(index),
-                                                               std::get<Destination>(destination)));
+                                                               std::get<Destination>(destination), currentOperatorId_));
         },
         *source);
 }
@@ -1219,7 +1220,7 @@ QString Terminal::allocateBoxes(const QString& cropCode, const QString& boxesTex
             // Allocation::boxesOf() throws for a crop the receipt does not have.
             if (receipt->cargoOf(crop).boxes <= 0) return tr("У чеку немає цієї культури");
             return allocate(*source, Allocation::boxesOf(*receipt, crop, boxes, std::get<Destination>(destination),
-                                                         unallocated(journal_, *receipt, crop)));
+                                                         unallocated(journal_, *receipt, crop), currentOperatorId_));
         },
         *source);
 }
@@ -1234,7 +1235,8 @@ QString Terminal::shipFromStock(const QString& cropCode, const QString& boxesTex
     if (const auto* error = std::get_if<QString>(&destination)) return *error;
 
     const StockShipment shipment =
-        journal_.shipmentOf(cropCode.toStdString(), boxes, std::get<TruckId>(std::get<Destination>(destination)));
+        journal_.shipmentOf(cropCode.toStdString(), boxes, std::get<TruckId>(std::get<Destination>(destination)),
+                            currentOperatorId_);
     if (const auto errors = journal_.validateShipment(shipment); !errors.empty()) return joined(errors);
     record(shipment);
     emit journalChanged();

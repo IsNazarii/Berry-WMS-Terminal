@@ -192,16 +192,16 @@ std::vector<const Receipt*> Journal::waitingForAllocation() const {
     return waiting;
 }
 
-Allocation Journal::boxesOf(const Uuid& receiptId, std::string_view cropCode, int boxes,
-                            Destination destination) const {
+Allocation Journal::boxesOf(const Uuid& receiptId, std::string_view cropCode, int boxes, Destination destination,
+                            std::optional<OperatorId> by) const {
     const Receipt* receipt = findReceipt(receiptId);
     if (receipt == nullptr) throw std::invalid_argument("Receipt is not in the journal");
-    return Allocation::boxesOf(*receipt, cropCode, boxes, destination, unallocatedOf(receiptId, cropCode));
+    return Allocation::boxesOf(*receipt, cropCode, boxes, destination, unallocatedOf(receiptId, cropCode), by);
 }
 
-Allocation Journal::boxesOf(const OpenReceipt& receipt, std::string_view cropCode, int boxes,
-                            Destination destination) const {
-    return Allocation::boxesOf(receipt, cropCode, boxes, destination, unallocatedOf(receipt, cropCode));
+Allocation Journal::boxesOf(const OpenReceipt& receipt, std::string_view cropCode, int boxes, Destination destination,
+                            std::optional<OperatorId> by) const {
+    return Allocation::boxesOf(receipt, cropCode, boxes, destination, unallocatedOf(receipt, cropCode), by);
 }
 
 std::vector<std::string> Journal::validateAllocation(const Allocation& allocation) const {
@@ -240,9 +240,10 @@ std::vector<std::string> Journal::validateCancel(const OpenReceipt& receipt, std
     return {};
 }
 
-std::optional<AllocationReversal> Journal::reversalOf(const Uuid& receiptId, std::size_t weighingIndex) const {
+std::optional<AllocationReversal> Journal::reversalOf(const Uuid& receiptId, std::size_t weighingIndex,
+                                                      std::optional<OperatorId> by) const {
     const Allocation* allocation = allocationOf(receiptId, weighingIndex);
-    return allocation ? std::optional{AllocationReversal::of(*allocation)} : std::nullopt;
+    return allocation ? std::optional{AllocationReversal::of(*allocation, by)} : std::nullopt;
 }
 
 // Defined here and only used here, so the header does not need it.
@@ -289,10 +290,11 @@ std::vector<std::string> Journal::validateReversal(const AllocationReversal& rev
     return errors;
 }
 
-StockShipment Journal::shipmentOf(std::string_view cropCode, int boxes, const TruckId& truckId) const {
+StockShipment Journal::shipmentOf(std::string_view cropCode, int boxes, const TruckId& truckId,
+                                  std::optional<OperatorId> by) const {
     const Cargo stock = stockOf(cropCode);
     const Weight weight = stock.boxes > 0 ? grams(divideRounded(stock.weight.raw() * boxes, stock.boxes)) : Weight{};
-    return StockShipment::create(std::string{cropCode}, {.boxes = boxes, .weight = weight}, truckId);
+    return StockShipment::create(std::string{cropCode}, {.boxes = boxes, .weight = weight}, truckId, by);
 }
 
 std::vector<std::string> Journal::validateShipment(const StockShipment& shipment) const {

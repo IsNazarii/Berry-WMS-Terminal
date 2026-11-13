@@ -7,6 +7,12 @@
 namespace wms {
 namespace {
 
+// An operator id comes from a confirmed login, so a bad one is a bug.
+std::optional<OperatorId> checkedOperator(std::optional<OperatorId> by) {
+    if (by && *by <= 0) throw std::invalid_argument("Operator id must be positive");
+    return by;
+}
+
 // Builds one visitor out of several lambdas, one per variant alternative.
 template <class... Lambdas>
 struct Overloaded : Lambdas... {
@@ -17,9 +23,11 @@ struct Overloaded : Lambdas... {
 
 Allocation::Allocation(Uuid id, TimePoint createdAt, Uuid receiptId, Destination destination,
                        std::string cropCode, Cargo cargo,
-                       std::optional<std::size_t> weighingIndex, SyncStatus syncStatus)
+                       std::optional<std::size_t> weighingIndex, SyncStatus syncStatus,
+                       std::optional<OperatorId> allocatedBy)
     : Transaction{id, createdAt, syncStatus}, receiptId_{receiptId}, destination_{destination},
-      cropCode_{std::move(cropCode)}, cargo_{cargo}, weighingIndex_{weighingIndex} {}
+      cropCode_{std::move(cropCode)}, cargo_{cargo}, weighingIndex_{weighingIndex},
+      allocatedBy_{checkedOperator(allocatedBy)} {}
 
 std::vector<std::string> Allocation::validate() const {
     std::vector<std::string> errors;
@@ -43,11 +51,12 @@ std::string Allocation::describe() const {
                        weighingIndex_ ? std::format(" (зважування {})", *weighingIndex_ + 1) : "");
 }
 
-AllocationReversal::AllocationReversal(Uuid id, TimePoint createdAt, Uuid allocationId, SyncStatus syncStatus)
-    : Transaction{id, createdAt, syncStatus}, allocationId_{allocationId} {}
+AllocationReversal::AllocationReversal(Uuid id, TimePoint createdAt, Uuid allocationId, SyncStatus syncStatus,
+                                       std::optional<OperatorId> reversedBy)
+    : Transaction{id, createdAt, syncStatus}, allocationId_{allocationId}, reversedBy_{checkedOperator(reversedBy)} {}
 
-AllocationReversal AllocationReversal::of(const Allocation& allocation) {
-    return AllocationReversal{Uuid::generateV7(), Clock::now(), allocation.id()};
+AllocationReversal AllocationReversal::of(const Allocation& allocation, std::optional<OperatorId> by) {
+    return AllocationReversal{Uuid::generateV7(), Clock::now(), allocation.id(), SyncStatus::Pending, by};
 }
 
 std::vector<std::string> AllocationReversal::validate() const {

@@ -4,6 +4,7 @@
 #include "wms/cargo.h"
 #include "wms/journal.h"
 #include "wms/open_receipt.h"
+#include "wms/operator.h"
 #include "wms/supplier.h"
 #include "wms/workday.h"
 
@@ -30,8 +31,11 @@ struct LoadingEntry {
     std::optional<SupplierId> supplierId;
     // A whole pallet; nullopt: boxes counted out of the receipt's crop.
     std::optional<std::size_t> weighingIndex;
+    // Who loaded it; nullopt for records from before operators were kept.
+    std::optional<OperatorId> by;
     // Taken back by a reversal (a cancelled pallet): still listed, so the mistake can be seen.
     std::optional<TimePoint> reversedAt;
+    std::optional<OperatorId> reversedBy;
 
     [[nodiscard]] bool fromWarehouse() const noexcept { return !receiptId.has_value(); }
     [[nodiscard]] bool reversed() const noexcept { return reversedAt.has_value(); }

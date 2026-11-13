@@ -55,7 +55,9 @@ LoadingHistory::LoadingHistory(const WorkDay& day, const Journal& journal,
             .receiptId = a.receiptId(),
             .supplierId = source ? std::optional{source->supplierId} : std::nullopt,
             .weighingIndex = a.weighingIndex(),
+            .by = a.allocatedBy(),
             .reversedAt = reversal ? std::optional{reversal->createdAt()} : std::nullopt,
+            .reversedBy = reversal ? reversal->reversedBy() : std::nullopt,
         });
     }
     for (const StockShipment& s : journal.shipments()) {
@@ -69,7 +71,9 @@ LoadingHistory::LoadingHistory(const WorkDay& day, const Journal& journal,
             .receiptId = std::nullopt,
             .supplierId = std::nullopt,
             .weighingIndex = std::nullopt,
+            .by = s.shippedBy(),
             .reversedAt = std::nullopt,
+            .reversedBy = std::nullopt,
         });
     }
     // Stable: records of the same instant keep the journal's order.

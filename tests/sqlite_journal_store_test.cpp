@@ -151,6 +151,27 @@ TEST(SqliteJournalStore, ReversalTakesTheAllocationBackAfterLoading) {
     EXPECT_EQ(journal.allocationOf(receipt.id(), 0), nullptr);
 }
 
+TEST(SqliteJournalStore, LoadingRecordsKeepTheirOperator) {
+    sqlite::Database db{":memory:"};
+    SqliteJournalStore store{db};
+    const Receipt receipt = sampleReceipt();
+    store.save(receipt);
+    const Allocation allocation = Allocation::wholeWeighing(receipt, 0, ToWarehouse{}, 3);
+    store.save(allocation);
+    store.save(Allocation::boxesOf(receipt, "raspberry", 5, kTruck)); // operator unknown
+    store.save(AllocationReversal::of(allocation, 4));
+    store.save(StockShipment::create("raspberry", {.boxes = 1, .weight = kilograms(2)}, kTruck, 5));
+
+    const Journal journal = store.load();
+    ASSERT_EQ(journal.allocations().size(), 2U);
+    EXPECT_EQ(journal.allocations()[0].allocatedBy(), 3);
+    EXPECT_EQ(journal.allocations()[1].allocatedBy(), std::nullopt);
+    ASSERT_NE(journal.reversalFor(allocation.id()), nullptr);
+    EXPECT_EQ(journal.reversalFor(allocation.id())->reversedBy(), 4);
+    ASSERT_EQ(journal.shipments().size(), 1U);
+    EXPECT_EQ(journal.shipments()[0].shippedBy(), 5);
+}
+
 TEST(SqliteJournalStore, SameIdIsSavedOnce) {
     sqlite::Database db{":memory:"};
     SqliteJournalStore store{db};
@@ -239,6 +260,9 @@ TEST(SqliteJournalStore, OldRecordsGetTheSessionTheyFellInto) {
     // Run the backfill step again, as an old database would on its first start;
     // the later steps run again too, so what they added has to go first.
     db.execute("ALTER TABLE payment DROP COLUMN receipt_id");
+    db.execute("ALTER TABLE allocation DROP COLUMN allocated_by");
+    db.execute("ALTER TABLE allocation_reversal DROP COLUMN reversed_by");
+    db.execute("ALTER TABLE stock_shipment DROP COLUMN shipped_by");
     db.execute("PRAGMA user_version = 9");
     migrateSchema(db);
 

@@ -25,3 +25,11 @@ TEST(StockShipment, ValidatesOperatorInput) {
     EXPECT_FALSE(StockShipment::create("raspberry", {.boxes = 1, .weight = {}}, kTruck).isValid());
     EXPECT_FALSE(StockShipment::create("raspberry", {.boxes = 1, .weight = kilograms(2)}, TruckId{}).isValid());
 }
+
+TEST(StockShipment, RemembersWhoShipped) {
+    EXPECT_EQ(StockShipment::create("raspberry", {.boxes = 2, .weight = kilograms(4)}, kTruck, 3).shippedBy(), 3);
+    EXPECT_EQ(StockShipment::create("raspberry", {.boxes = 2, .weight = kilograms(4)}, kTruck).shippedBy(),
+              std::nullopt);
+    EXPECT_THROW((void)StockShipment::create("raspberry", {.boxes = 2, .weight = kilograms(4)}, kTruck, 0),
+                 std::invalid_argument);
+}

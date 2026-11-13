@@ -18,7 +18,7 @@ namespace {
 // in kopecks (_kop), weight in grams (_g); enums are spelled out as text, so
 // reordering an enum in C++ cannot change what old rows mean. STRICT tables
 // reject a value of the wrong type instead of quietly storing it.
-constexpr std::array<std::string_view, 11> kMigrations{
+constexpr std::array<std::string_view, 12> kMigrations{
     R"sql(
     CREATE TABLE receipt (
         id            TEXT PRIMARY KEY,
@@ -267,6 +267,15 @@ constexpr std::array<std::string_view, 11> kMigrations{
     // this; such old rows cannot be matched reliably, so no guess is made.
     R"sql(
     ALTER TABLE payment ADD COLUMN receipt_id TEXT;
+    )sql",
+
+    // Who loaded or took back the berries, for the loading history. NULL: a
+    // record from before this; the operator is not guessed, unlike paid_by,
+    // whose old rows all came from the single operator of the alpha.
+    R"sql(
+    ALTER TABLE allocation ADD COLUMN allocated_by INTEGER CHECK (allocated_by > 0);
+    ALTER TABLE allocation_reversal ADD COLUMN reversed_by INTEGER CHECK (reversed_by > 0);
+    ALTER TABLE stock_shipment ADD COLUMN shipped_by INTEGER CHECK (shipped_by > 0);
     )sql",
 };
 

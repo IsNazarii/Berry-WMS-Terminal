@@ -1,16 +1,22 @@
 #include "wms/shipment.h"
 
 #include <format>
+#include <stdexcept>
 #include <utility>
 
 namespace wms {
 
 StockShipment::StockShipment(Uuid id, TimePoint createdAt, std::string cropCode, Cargo cargo, TruckId truckId,
-                             SyncStatus syncStatus)
-    : Transaction{id, createdAt, syncStatus}, cropCode_{std::move(cropCode)}, cargo_{cargo}, truckId_{truckId} {}
+                             SyncStatus syncStatus, std::optional<OperatorId> shippedBy)
+    : Transaction{id, createdAt, syncStatus}, cropCode_{std::move(cropCode)}, cargo_{cargo}, truckId_{truckId},
+      shippedBy_{shippedBy} {
+    if (shippedBy_ && *shippedBy_ <= 0) throw std::invalid_argument("Operator id must be positive");
+}
 
-StockShipment StockShipment::create(std::string cropCode, Cargo cargo, TruckId truckId) {
-    return StockShipment{Uuid::generateV7(), Clock::now(), std::move(cropCode), cargo, truckId};
+StockShipment StockShipment::create(std::string cropCode, Cargo cargo, TruckId truckId,
+                                    std::optional<OperatorId> by) {
+    return StockShipment{Uuid::generateV7(), Clock::now(), std::move(cropCode), cargo, truckId,
+                         SyncStatus::Pending, by};
 }
 
 std::vector<std::string> StockShipment::validate() const {

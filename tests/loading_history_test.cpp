@@ -17,6 +17,7 @@ namespace {
 constexpr year_month_day kDate = November / 12 / 2026;
 const TimePoint kMidnight = TimePoint{sys_days{kDate}};
 constexpr OperatorId kOksana = 1;
+constexpr OperatorId kPetro = 2;
 constexpr SupplierId kShevchenko = 1001;
 constexpr SupplierId kMelnyk = 1002;
 
@@ -207,6 +208,24 @@ TEST(LoadingHistory, ArchivedDayFindsSupplierOfAReceiptStillOpenToday) {
     const auto rows = LoadingHistory{yesterday, journal, day.openReceipts()}.intoTruck(truck.id());
     ASSERT_EQ(rows.size(), 1U);
     EXPECT_EQ(rows[0].supplierId, kShevchenko);
+}
+
+TEST(LoadingHistory, SaysWhoLoadedAndWhoTookItBack) {
+    WorkDay day = openDay();
+    const TruckId truck = day.addTruck("BI1111AA", 60).id();
+    const Uuid receipt = weigh(day, kShevchenko, {pallet("raspberry", 10, kilograms(20))});
+    Journal journal;
+    const Allocation allocation = Allocation::wholeWeighing(*day.findReceipt(receipt), 0, truck, kOksana);
+    journal.add(allocation);
+    journal.add(AllocationReversal::of(allocation, kPetro));
+    journal.add(StockShipment::create("raspberry", {.boxes = 2, .weight = kilograms(4)}, truck, kPetro));
+
+    const auto rows = LoadingHistory{day, journal}.intoTruck(truck);
+    ASSERT_EQ(rows.size(), 2U);
+    EXPECT_EQ(rows[0].by, kOksana);
+    EXPECT_EQ(rows[0].reversedBy, kPetro);
+    EXPECT_EQ(rows[1].by, kPetro);
+    EXPECT_EQ(rows[1].reversedBy, std::nullopt);
 }
 
 TEST(LoadingHistory, OldestFirstAcrossRecordKinds) {

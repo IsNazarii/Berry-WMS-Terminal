@@ -97,9 +97,9 @@ public:
     // not from the whole crop. Still check it with validateAllocation().
     // Throws std::invalid_argument when the receipt is not in the journal.
     [[nodiscard]] Allocation boxesOf(const Uuid& receiptId, std::string_view cropCode, int boxes,
-                                     Destination destination) const;
+                                     Destination destination, std::optional<OperatorId> by = std::nullopt) const;
     [[nodiscard]] Allocation boxesOf(const OpenReceipt& receipt, std::string_view cropCode, int boxes,
-                                     Destination destination) const;
+                                     Destination destination, std::optional<OperatorId> by = std::nullopt) const;
 
     // Operator-facing check before a reversal is added: the allocation is known
     // and not taken back yet, and warehouse stock still holds its boxes.
@@ -121,11 +121,13 @@ public:
     // Throws std::out_of_range for an index outside the receipt.
     [[nodiscard]] std::vector<std::string> validateCancel(const OpenReceipt& receipt, std::size_t index) const;
     // What frees a whole pallet again; nullopt while it is not allocated.
-    [[nodiscard]] std::optional<AllocationReversal> reversalOf(const Uuid& receiptId, std::size_t weighingIndex) const;
+    [[nodiscard]] std::optional<AllocationReversal> reversalOf(const Uuid& receiptId, std::size_t weighingIndex,
+                                                               std::optional<OperatorId> by = std::nullopt) const;
 
     // Preferred way to ship from the warehouse: the weight is split from the
     // stock, so shipping the last boxes takes exactly the remaining weight.
-    [[nodiscard]] StockShipment shipmentOf(std::string_view cropCode, int boxes, const TruckId& truckId) const;
+    [[nodiscard]] StockShipment shipmentOf(std::string_view cropCode, int boxes, const TruckId& truckId,
+                                           std::optional<OperatorId> by = std::nullopt) const;
     // Operator-facing check, like validateAllocation(): not more than is in stock.
     [[nodiscard]] std::vector<std::string> validateShipment(const StockShipment& shipment) const;
 

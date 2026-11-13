@@ -109,10 +109,10 @@ std::vector<std::string> WorkDay::validateCancel(const Uuid& receiptId, std::siz
 }
 
 std::optional<AllocationReversal> WorkDay::cancelWeighing(const Uuid& receiptId, std::size_t index,
-                                                          const Journal& journal) {
+                                                          const Journal& journal, std::optional<OperatorId> by) {
     if (!validateCancel(receiptId, index, journal).empty()) throw std::logic_error("Weighing cannot be cancelled");
     receipt(receiptId)->cancel(index);
-    return journal.reversalOf(receiptId, index);
+    return journal.reversalOf(receiptId, index, by);
 }
 
 std::optional<Destination> WorkDay::nextDestination(const Uuid& receiptId, std::string_view cropCode,
@@ -131,7 +131,8 @@ std::optional<Destination> WorkDay::nextDestination(const Uuid& receiptId, std::
 }
 
 std::optional<Allocation> WorkDay::autoAllocation(const Uuid& receiptId, std::size_t index,
-                                                  std::optional<Destination> target, const Journal& journal) const {
+                                                  std::optional<Destination> target, const Journal& journal,
+                                                  std::optional<OperatorId> by) const {
     const OpenReceipt& open = receipt(receiptId);
     const Weighing& pallet = open.weighings().at(index);
     if (pallet.cancelled || journal.allocationOf(receiptId, index) != nullptr) return std::nullopt;
@@ -141,7 +142,7 @@ std::optional<Allocation> WorkDay::autoAllocation(const Uuid& receiptId, std::si
     if (const auto* truckId = std::get_if<TruckId>(&*destination)) {
         if (findTruck(*truckId)->boxesLeft(journal.loadOf(*truckId)) < pallet.boxCount) return std::nullopt;
     }
-    return Allocation::wholeWeighing(open, index, *destination);
+    return Allocation::wholeWeighing(open, index, *destination, by);
 }
 
 Receipt WorkDay::closeReceipt(const Uuid& receiptId, Settlement settlement) {

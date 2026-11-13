@@ -625,3 +625,19 @@ TEST(WorkDay, ReceiptsAndPaymentsBelongToTheSession) {
     EXPECT_EQ(paid.receipt.sessionId(), day.id());
     EXPECT_EQ(paid.payment.sessionId(), day.id());
 }
+
+TEST(WorkDay, AutoAllocationAndCancelRememberTheOperator) {
+    WorkDay day = dayWithRaspberryPrice();
+    const TruckId truck = day.addTruck("BI1234AA", kBigTruck).id();
+    const Uuid id = day.openReceipt(42).id();
+    const std::size_t index = day.addWeighing(id, raspberryPallet(), kMidnight + 13h);
+    Journal journal;
+    const auto allocation = day.autoAllocation(id, index, truck, journal, kPetro);
+    ASSERT_TRUE(allocation.has_value());
+    EXPECT_EQ(allocation->allocatedBy(), kPetro);
+    journal.add(*allocation);
+
+    const auto reversal = day.cancelWeighing(id, index, journal, kOksana);
+    ASSERT_TRUE(reversal.has_value());
+    EXPECT_EQ(reversal->reversedBy(), kOksana);
+}

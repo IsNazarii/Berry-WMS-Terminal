@@ -134,6 +134,11 @@ const Receipt* Journal::findReceipt(const Uuid& id) const noexcept {
     return nullptr;
 }
 
+const AllocationReversal* Journal::reversalFor(const Uuid& allocationId) const noexcept {
+    const auto found = std::ranges::find(reversals_, allocationId, &AllocationReversal::allocationId);
+    return found == reversals_.end() ? nullptr : &*found;
+}
+
 const Payment* Journal::paymentFor(const Uuid& receiptId) const noexcept {
     for (const auto& p : payments_) {
         if (p.receiptId() == receiptId) return &p;

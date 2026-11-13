@@ -11,6 +11,7 @@
 #include <optional>
 #include <ranges>
 #include <set>
+#include <span>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -62,6 +63,13 @@ public:
     [[nodiscard]] std::vector<const Payment*> paymentsOf(const Uuid& sessionId) const;
     // What allocations still in force took from the receipt (closed or open), by kind of place.
     [[nodiscard]] Placement placementOf(const Uuid& receiptId) const noexcept;
+
+    // Raw records for histories, in the order added: every allocation, taken
+    // back or not, and every shipment from the warehouse. Valid until the next add().
+    [[nodiscard]] std::span<const Allocation> allocations() const noexcept { return allocations_; }
+    [[nodiscard]] std::span<const StockShipment> shipments() const noexcept { return shipments_; }
+    // The reversal that took the allocation back; nullptr while it is in force.
+    [[nodiscard]] const AllocationReversal* reversalFor(const Uuid& allocationId) const noexcept;
 
     // Whether any record names the crop, cancelled receipt lines included.
     [[nodiscard]] bool mentionsCrop(std::string_view cropCode) const noexcept;

@@ -20,6 +20,7 @@ add_library(wms_core
     src/pricing.cpp
     src/workday.cpp
     src/session_summary.cpp
+    src/loading_history.cpp
     src/display_format.cpp
     src/receipt_document.cpp
 )

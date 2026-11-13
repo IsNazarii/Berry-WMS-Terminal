@@ -19,8 +19,10 @@ ToolBar {
     required property bool fullScreen
     // The scale this run was started with (set by main.cpp), to tell the operator a restart is pending.
     required property real startScale
-    // The minimum window is 1024 wide: there the bar keeps icons and names only.
-    readonly property bool compact: width < 1360
+    // Six tabs: below this the bar keeps icons and names only (measured, with a long operator name).
+    readonly property bool compact: width < 1480
+    // Down to the minimum window (1024) the brand keeps only its mark, or the menu falls off the edge.
+    readonly property bool tight: width < 1180
 
     signal scalePicked(real factor)
     signal fullScreenToggled()
@@ -203,6 +205,7 @@ ToolBar {
 
             BrandMark {}
             ColumnLayout {
+                visible: !bar.tight
                 spacing: 0
 
                 Label {
@@ -255,6 +258,13 @@ ToolBar {
                 hint: "F9"
                 compact: bar.compact
             }
+            // Not a step of the day: looking back at what was loaded where.
+            TabButton {
+                text: qsTr("Історія")
+                icon.source: Theme.icon("history")
+                hint: "F10"
+                compact: bar.compact
+            }
         }
 
         Item { Layout.fillWidth: true }
@@ -296,6 +306,9 @@ ToolBar {
                     visible: !bar.compact
                     text: Terminal.operatorName
                     font.weight: Font.Medium
+                    // A long name must not push the menu off the bar.
+                    elide: Text.ElideRight
+                    Layout.maximumWidth: 140
                 }
             }
 

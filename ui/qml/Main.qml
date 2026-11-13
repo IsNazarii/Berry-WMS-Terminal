@@ -77,6 +77,7 @@ ApplicationWindow {
     Shortcut { sequence: "F7"; enabled: Terminal.loggedIn; onActivated: appBar.currentIndex = 2 }
     Shortcut { sequence: "F8"; enabled: Terminal.loggedIn; onActivated: appBar.currentIndex = 3 }
     Shortcut { sequence: "F9"; enabled: Terminal.loggedIn; onActivated: appBar.currentIndex = 4 }
+    Shortcut { sequence: "F10"; enabled: Terminal.loggedIn; onActivated: appBar.currentIndex = 5 }
 
     // Nothing is recorded without knowing who did it, so the screens wait for a login.
     Connections {
@@ -118,5 +119,6 @@ ApplicationWindow {
         AllocationScreen { onSessionRequested: appBar.currentIndex = 0 }
         WarehouseScreen {}
         CashScreen {}
+        HistoryScreen {}
     }
 }

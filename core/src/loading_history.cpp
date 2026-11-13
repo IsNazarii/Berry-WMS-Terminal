@@ -23,7 +23,8 @@ Source sourceOf(const R& receipt) {
 } // namespace
 
 LoadingHistory::LoadingHistory(const WorkDay& day, const Journal& journal,
-                               std::span<const OpenReceipt> otherOpenReceipts) {
+                               std::span<const OpenReceipt> otherOpenReceipts)
+    : closedAt_{day.closedAt()} {
     const auto isDayTruck = [&day](const Destination& to) {
         const TruckId* truck = std::get_if<TruckId>(&to);
         return truck != nullptr && day.findTruck(*truck) != nullptr;
@@ -97,8 +98,9 @@ std::vector<LoadingEntry> LoadingHistory::intoTrucks() const {
 std::vector<LoadingEntry> LoadingHistory::warehouse() const {
     // In: allocations to the warehouse. Out: shipments, the only entries without a receipt.
     std::vector<LoadingEntry> found;
-    std::ranges::copy_if(entries_, std::back_inserter(found), [](const LoadingEntry& e) {
-        return std::holds_alternative<ToWarehouse>(e.to) || e.fromWarehouse();
+    std::ranges::copy_if(entries_, std::back_inserter(found), [this](const LoadingEntry& e) {
+        if (std::holds_alternative<ToWarehouse>(e.to)) return true;
+        return e.fromWarehouse() && (!closedAt_ || e.at <= *closedAt_);
     });
     return found;
 }

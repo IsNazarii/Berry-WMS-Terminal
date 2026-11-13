@@ -186,3 +186,45 @@ TEST(SqliteSessionStore, SharesTheDatabaseWithTheJournal) {
     EXPECT_TRUE(sessions.current().has_value());
     EXPECT_EQ(journal.load().size(), 0U);
 }
+
+TEST(SqliteSessionStore, ArchiveListsClosedSessionsNewestFirst) {
+    sqlite::Database db{":memory:"};
+    SqliteSessionStore store{db};
+    EXPECT_TRUE(store.closedSessions().empty());
+
+    WorkDay first{kDate, kMidnight + 12h, kOksana};
+    first.close(kMidnight + 20h, kOksana);
+    store.save(first);
+    const year_month_day nextDate{sys_days{kDate} + days{1}};
+    WorkDay second{nextDate, kMidnight + 36h, kPetro};
+    second.close(kMidnight + 44h, kPetro);
+    store.save(second);
+    store.save(WorkDay{year_month_day{sys_days{kDate} + days{2}}, kMidnight + 60h, kOksana}); // open: not archive
+
+    const auto archive = store.closedSessions();
+    ASSERT_EQ(archive.size(), 2U);
+    EXPECT_EQ(archive[0].id, second.id());
+    EXPECT_EQ(archive[0].date, nextDate);
+    EXPECT_EQ(archive[0].openedAt, kMidnight + 36h);
+    EXPECT_EQ(archive[0].closedAt, kMidnight + 44h);
+    EXPECT_EQ(archive[1].id, first.id());
+}
+
+TEST(SqliteSessionStore, FindsAnySessionById) {
+    sqlite::Database db{":memory:"};
+    SqliteSessionStore store{db};
+    WorkDay closed{kDate, kMidnight + 12h, kOksana};
+    closed.departTruck(closed.addTruck("BI1234AA", 300).id());
+    closed.close(kMidnight + 20h, kOksana);
+    store.save(closed);
+    const WorkDay open = busyDay();
+    store.save(open);
+
+    const auto found = store.find(closed.id());
+    ASSERT_TRUE(found.has_value());
+    EXPECT_FALSE(found->isOpen());
+    ASSERT_EQ(found->trucks().size(), 1U);
+    EXPECT_EQ(found->trucks()[0].plate(), "BI1234AA");
+    EXPECT_EQ(store.find(open.id())->openReceipts().size(), 2U);
+    EXPECT_FALSE(store.find(Uuid::generateV7()).has_value());
+}

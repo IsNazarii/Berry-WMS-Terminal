@@ -7,6 +7,7 @@ qt_add_qml_module(wms_ui
     SOURCES
         src/terminal.h
         src/terminal.cpp
+        src/terminal_history.cpp
         src/supplier_list_model.h
         src/supplier_list_model.cpp
         src/scale_monitor.h

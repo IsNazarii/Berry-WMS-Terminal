@@ -17,6 +17,8 @@ public:
     void save(const WorkDay& day) override;
     [[nodiscard]] std::optional<WorkDay> current() const override;
     [[nodiscard]] std::optional<WorkDay> lastClosed() const override;
+    [[nodiscard]] std::vector<ClosedSessionInfo> closedSessions() const override;
+    [[nodiscard]] std::optional<WorkDay> find(const Uuid& id) const override;
 
 private:
     sqlite::Database& db_;

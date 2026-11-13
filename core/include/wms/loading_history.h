@@ -47,7 +47,8 @@ struct LoadingEntry {
 // A truck is listed for its whole trip: a truck carried over from yesterday
 // shows yesterday's pallets too, because they leave with it. The warehouse is
 // listed for the day only: what the day's receipts put in and what the day's
-// trucks took out.
+// trucks took out before the day closed. A shipment has no sessionId, and a
+// carried-over truck belongs to two days, so the closing time tells them apart.
 class LoadingHistory {
 public:
     // `otherOpenReceipts`: receipts still being weighed in another session
@@ -66,6 +67,8 @@ public:
 
 private:
     std::vector<LoadingEntry> entries_;
+    // When the day closed; nullopt while it is open.
+    std::optional<TimePoint> closedAt_;
 };
 
 } // namespace wms

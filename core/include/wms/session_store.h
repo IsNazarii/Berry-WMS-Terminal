@@ -2,9 +2,19 @@
 
 #include "wms/workday.h"
 
+#include <chrono>
 #include <optional>
+#include <vector>
 
 namespace wms {
+
+// A closed session as the archive lists it, without its trucks and prices.
+struct ClosedSessionInfo {
+    Uuid id;
+    std::chrono::year_month_day date;
+    TimePoint openedAt;
+    TimePoint closedAt;
+};
 
 // Where sessions live between runs, the open one and the closed archive.
 // A session changes all day (prices, trucks, open receipts), so it is kept
@@ -22,6 +32,10 @@ public:
     // The session closed last: its trucks are the ones to repeat or carry over.
     // Nullopt before the first session is closed.
     [[nodiscard]] virtual std::optional<WorkDay> lastClosed() const = 0;
+    // The archive, newest first, for picking a past day to look at.
+    [[nodiscard]] virtual std::vector<ClosedSessionInfo> closedSessions() const = 0;
+    // Any session, open or closed; nullopt for an unknown id.
+    [[nodiscard]] virtual std::optional<WorkDay> find(const Uuid& id) const = 0;
 
 protected:
     SessionStore() = default;

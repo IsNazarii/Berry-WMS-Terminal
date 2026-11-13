@@ -5,6 +5,7 @@
 #include "wms/crop.h"
 #include "wms/crop_keys.h"
 #include "wms/journal.h"
+#include "wms/loading_history.h"
 #include "wms/operator.h"
 #include "wms/receipt_printer.h"
 #include "wms/scale.h"
@@ -145,6 +146,20 @@ class Terminal : public QObject {
     // Sums here and in debtors/cashBalance/balanceAfter are bare hryvnias ("8 823,00", "−50,00").
     Q_PROPERTY(QVariantList cashHistory READ cashHistory NOTIFY cashChanged)
 
+    // History screen: what a work day loaded and where from (LoadingHistory).
+    // [{sessionId, title, detail}]: the open session first, then the archive, newest first.
+    Q_PROPERTY(QVariantList historySessions READ historySessions NOTIFY historyChanged)
+    // The day shown: the chosen one, by default the open session or else the last closed.
+    Q_PROPERTY(QString historySessionId READ historySessionId NOTIFY historyChanged)
+    // [{placeId, title, detail, rows}]: "all" (every truck), each truck of the day, "warehouse".
+    Q_PROPERTY(QVariantList historyPlaces READ historyPlaces NOTIFY historyChanged)
+    Q_PROPERTY(QString historyPlace READ historyPlace NOTIFY historyChanged)
+    // [{time, place, from, crop, pallet, boxes, kg, by, reversed, reversedNote, out}], oldest first.
+    // `place` is a plate or "склад"; `out` marks a row leaving the warehouse.
+    Q_PROPERTY(QVariantList historyRows READ historyRows NOTIFY historyChanged)
+    // One line of totals for the rows shown, reversed rows left out.
+    Q_PROPERTY(QString historySummary READ historySummary NOTIFY historyChanged)
+
 public:
     explicit Terminal(QObject* parent = nullptr);
 
@@ -193,6 +208,12 @@ public:
     [[nodiscard]] QString cashBalance() const;
     [[nodiscard]] QString cashDebtInput() const;
     [[nodiscard]] QVariantList cashHistory() const;
+    [[nodiscard]] QVariantList historySessions() const;
+    [[nodiscard]] QString historySessionId() const;
+    [[nodiscard]] QVariantList historyPlaces() const;
+    [[nodiscard]] QString historyPlace() const;
+    [[nodiscard]] QVariantList historyRows() const;
+    [[nodiscard]] QString historySummary() const;
 
     // Returns false for an unknown operator or a wrong PIN.
     Q_INVOKABLE bool login(qint64 operatorId, const QString& pin);
@@ -287,6 +308,11 @@ public:
     // Returns an operator-facing error, empty on success.
     Q_INVOKABLE QString pay(const QString& amount, bool bankTransfer);
 
+    // History. An unknown session id goes back to the default day; an unknown
+    // place to "all".
+    Q_INVOKABLE void selectHistorySession(const QString& sessionId);
+    Q_INVOKABLE void selectHistoryPlace(const QString& placeId);
+
     // Scale simulator controls, until real scales are connected.
     Q_INVOKABLE void simulatePallet();
     Q_INVOKABLE void simulateEmptyScale();
@@ -325,6 +351,8 @@ signals:
     void scaleDriverChanged();
     // A receipt did not get printed; it is safe in the journal and a copy can be printed later.
     void printProblem(const QString& message);
+    // The chosen day or place, or anything they show.
+    void historyChanged();
 
 private:
     [[nodiscard]] const Supplier* currentSupplier() const noexcept;
@@ -376,6 +404,14 @@ private:
     void seedDemoData();
     // A copy of the database into backupFolder_; a failure is only logged.
     void backup();
+    // The history day: the open session, or the archived one in historyArchive_.
+    [[nodiscard]] const WorkDay* historyDay() const noexcept;
+    // Reads the chosen archived day from the store when it is not the open one.
+    void refreshHistoryDay();
+    // The rows of the chosen place, as LoadingHistory gives them.
+    [[nodiscard]] std::vector<LoadingEntry> historyEntries() const;
+    // A plate of the history day, the open session or the last closed one.
+    [[nodiscard]] QString historyPlateOf(const TruckId& id) const;
 
     const std::string databasePath_;
     // Empty for an in-memory database: nothing to keep.
@@ -411,6 +447,11 @@ private:
     QString defaultBoxTare_;
     ReceiptPrinter printer_;
     PaperSize receiptPaper_;
+    // nullopt: follow the default day (see historySessionId).
+    std::optional<Uuid> historySessionId_;
+    // The chosen day when it is from the archive; the open one is workDay_.
+    std::optional<WorkDay> historyArchive_;
+    QString historyPlace_ = "all";
 };
 
 } // namespace wms::ui

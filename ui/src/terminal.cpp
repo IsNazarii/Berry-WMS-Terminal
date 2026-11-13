@@ -327,6 +327,11 @@ Terminal::Terminal(QObject* parent)
     connect(this, &Terminal::receivingTargetChanged, this, &Terminal::placementsChanged);
     connect(this, &Terminal::receiptsChanged, this, &Terminal::placementsChanged);
     connect(this, &Terminal::cropsChanged, this, &Terminal::placementsChanged);
+    // A session opened or closed may change which day the history shows.
+    connect(this, &Terminal::sessionChanged, this, &Terminal::refreshHistoryDay);
+    connect(this, &Terminal::trucksChanged, this, &Terminal::historyChanged);
+    connect(this, &Terminal::cropsChanged, this, &Terminal::historyChanged);
+    refreshHistoryDay();
     // The state as the last run left it, before anyone changes anything.
     backup();
 }

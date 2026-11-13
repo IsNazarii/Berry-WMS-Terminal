@@ -136,12 +136,11 @@ void SqliteSessionStore::save(const WorkDay& day) {
 
 namespace {
 
-// `where` and `newestBy` are fixed SQL from this file, never operator input.
-std::optional<WorkDay> loadSession(sqlite::Database& db, std::string_view where, std::string_view newestBy) {
-    sqlite::Statement session = db.prepare(
-        std::format("SELECT id, date, opened_at_ns, opened_by, closed_at_ns, closed_by FROM session "
-                    "WHERE {} ORDER BY {} DESC, rowid DESC LIMIT 1",
-                    where, newestBy));
+constexpr std::string_view kSessionColumns = "SELECT id, date, opened_at_ns, opened_by, closed_at_ns, closed_by "
+                                             "FROM session ";
+
+// `session` selects kSessionColumns; the first row it gives is read with its lists.
+std::optional<WorkDay> loadSession(sqlite::Database& db, sqlite::Statement& session) {
     if (!session.step()) return std::nullopt;
 
     const std::string id = session.columnText(0);
@@ -211,11 +210,38 @@ std::optional<WorkDay> loadSession(sqlite::Database& db, std::string_view where,
 } // namespace
 
 std::optional<WorkDay> SqliteSessionStore::current() const {
-    return loadSession(db_, "closed_at_ns IS NULL", "opened_at_ns");
+    sqlite::Statement session = db_.prepare(std::string{kSessionColumns} +
+                                            "WHERE closed_at_ns IS NULL ORDER BY opened_at_ns DESC, rowid DESC LIMIT 1");
+    return loadSession(db_, session);
 }
 
 std::optional<WorkDay> SqliteSessionStore::lastClosed() const {
-    return loadSession(db_, "closed_at_ns IS NOT NULL", "closed_at_ns");
+    sqlite::Statement session = db_.prepare(
+        std::string{kSessionColumns} +
+        "WHERE closed_at_ns IS NOT NULL ORDER BY closed_at_ns DESC, rowid DESC LIMIT 1");
+    return loadSession(db_, session);
+}
+
+std::vector<ClosedSessionInfo> SqliteSessionStore::closedSessions() const {
+    sqlite::Statement rows = db_.prepare(
+        "SELECT id, date, opened_at_ns, closed_at_ns FROM session "
+        "WHERE closed_at_ns IS NOT NULL ORDER BY closed_at_ns DESC, rowid DESC");
+    std::vector<ClosedSessionInfo> archive;
+    while (rows.step()) {
+        archive.push_back({
+            .id = uuidColumn(rows, 0),
+            .date = parseDate(rows.columnText(1)),
+            .openedAt = fromNanoseconds(rows.columnInt(2)),
+            .closedAt = fromNanoseconds(rows.columnInt(3)),
+        });
+    }
+    return archive;
+}
+
+std::optional<WorkDay> SqliteSessionStore::find(const Uuid& id) const {
+    sqlite::Statement session = db_.prepare(std::string{kSessionColumns} + "WHERE id = ?1");
+    session.bind(1, id.toString());
+    return loadSession(db_, session);
 }
 
 } // namespace wms

@@ -243,3 +243,21 @@ TEST(LoadingHistory, OldestFirstAcrossRecordKinds) {
     ASSERT_EQ(all.size(), 3U);
     EXPECT_TRUE(std::ranges::is_sorted(all, {}, &LoadingEntry::at));
 }
+
+TEST(LoadingHistory, WarehouseOfAClosedDayLeavesOutShipmentsMadeAfterIt) {
+    // A carried-over truck belongs to both days; a shipment into it today is not yesterday's.
+    WorkDay yesterday = openDay(November / 11 / 2026);
+    const Truck truck = yesterday.addTruck("BI5678BB", 60);
+    yesterday.carryOverTruck(truck.id());
+    yesterday.close(kMidnight - 1h, kOksana);
+    Journal journal;
+    journal.add(StockShipment{Uuid::generateV7(), kMidnight - 2h, "raspberry",
+                              {.boxes = 3, .weight = kilograms(6)}, truck.id()});
+    journal.add(StockShipment{Uuid::generateV7(), kMidnight + 14h, "raspberry",
+                              {.boxes = 5, .weight = kilograms(10)}, truck.id()});
+
+    const LoadingHistory history{yesterday, journal};
+    ASSERT_EQ(history.warehouse().size(), 1U);
+    EXPECT_EQ(history.warehouse()[0].cargo.boxes, 3);
+    EXPECT_EQ(history.intoTruck(truck.id()).size(), 2U); // the trip keeps both
+}

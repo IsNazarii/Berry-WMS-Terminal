@@ -15,13 +15,15 @@ EmptyState::EmptyState(QString icon, QWidget* parent)
     for (QLabel* label : {badge_, title_, text_}) label->setAlignment(Qt::AlignHCenter);
     title_->setWordWrap(true);
     text_->setWordWrap(true);
-    text_->setMaximumWidth(520 - kSpacingXl * 4);
+    // A wrapped QLabel needs a width to know its height; a maximum alone leaves it one line high.
+    title_->setFixedWidth(520);
+    text_->setFixedWidth(520 - kSpacingXl * 4);
 
     auto* layout = new QVBoxLayout{this};
     layout->setSpacing(kSpacingM);
     layout->addStretch();
     layout->addWidget(badge_, 0, Qt::AlignHCenter);
-    layout->addWidget(title_);
+    layout->addWidget(title_, 0, Qt::AlignHCenter);
     layout->addWidget(text_, 0, Qt::AlignHCenter);
     layout->addStretch();
     paintBadge();
@@ -30,6 +32,8 @@ EmptyState::EmptyState(QString icon, QWidget* parent)
 void EmptyState::setTexts(const QString& title, const QString& text) {
     title_->setText(title);
     text_->setText(text);
+    // QStackedWidget does not pass height-for-width down: the labels get their height by hand.
+    for (QLabel* label : {title_, text_}) label->setFixedHeight(label->heightForWidth(label->width()));
 }
 
 void EmptyState::changeEvent(QEvent* event) {

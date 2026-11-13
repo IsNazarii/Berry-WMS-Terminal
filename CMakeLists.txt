@@ -20,6 +20,7 @@ set(QT_QML_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/qml)
 
 add_subdirectory(ui)
 add_subdirectory(app)
+add_subdirectory(spike)
 
 if(WMS_BUILD_TESTS)
     enable_testing()

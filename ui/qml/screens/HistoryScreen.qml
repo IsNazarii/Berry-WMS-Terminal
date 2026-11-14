@@ -63,7 +63,8 @@ Page {
                         title: modelData.title
                         detail: modelData.detail
                         trailing: modelData.rows
-                        trailingMuted: modelData.rows === 0
+                        // A zero count reads as "nothing here" when it is quieter than the rest.
+                        trailingColor: modelData.rows === 0 ? Theme.textMuted : Theme.text
                         highlighted: modelData.placeId === Terminal.historyPlace
                         onClicked: Terminal.selectHistoryPlace(modelData.placeId)
                     }

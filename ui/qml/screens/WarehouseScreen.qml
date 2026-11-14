@@ -175,11 +175,9 @@ Page {
                     spacing: Theme.spacingXs
                     model: screen.trucks
 
-                    Label {
-                        anchors.centerIn: parent
+                    ListPlaceholder {
                         visible: truckList.count === 0
                         text: qsTr("Немає фур, що завантажуються")
-                        color: Theme.textMuted
                     }
 
                     delegate: DestinationCard {

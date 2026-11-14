@@ -64,34 +64,20 @@ Page {
                     spacing: Theme.spacingXs
                     model: Terminal.debtors
 
-                    Label {
-                        anchors.centerIn: parent
+                    ListPlaceholder {
                         visible: debtorList.count === 0
                         text: qsTr("Ми нікому не винні")
-                        color: Theme.textMuted
                     }
 
-                    delegate: ItemDelegate {
-                        id: debtor
+                    delegate: ListRow {
                         required property var modelData
-                        width: ListView.view.width
+                        title: modelData.name
+                        trailing: modelData.balance
+                        trailingSize: Theme.fontSizeBody
+                        // Overpaid: the supplier owes us.
+                        trailingColor: modelData.overpaid ? Theme.danger : Theme.text
                         highlighted: modelData.supplierId === Terminal.cashSupplierId
                         onClicked: screen.choose(modelData.supplierId)
-
-                        contentItem: RowLayout {
-                            spacing: Theme.spacingS
-                            Label {
-                                text: debtor.modelData.name
-                                font.weight: Font.DemiBold
-                                elide: Text.ElideRight
-                                Layout.fillWidth: true
-                            }
-                            Label {
-                                text: debtor.modelData.balance
-                                // Overpaid: the supplier owes us.
-                                color: debtor.modelData.overpaid ? Theme.danger : Theme.text
-                            }
-                        }
                     }
                 }
             }
@@ -124,23 +110,9 @@ Page {
                 anchors.fill: parent
                 spacing: Theme.spacingM
 
-                ColumnLayout {
-                    spacing: 2
-                    Layout.fillWidth: true
-
-                    Label {
-                        text: Terminal.cashSupplierName
-                        font.pixelSize: Theme.fontSizeTitle
-                        font.weight: Font.Bold
-                        elide: Text.ElideRight
-                        Layout.fillWidth: true
-                    }
-                    Label {
-                        text: qsTr("Борги спільні для всіх сесій")
-                        font.pixelSize: Theme.fontSizeCaption
-                        color: Theme.textMuted
-                        Layout.fillWidth: true
-                    }
+                PanelHeader {
+                    title: Terminal.cashSupplierName
+                    subtitle: qsTr("Борги спільні для всіх сесій")
                 }
 
                 // The debt, read from across the counter.
@@ -232,18 +204,7 @@ Page {
                             confirmDialog.open()
                     }
                 }
-                Label {
-                    id: paymentError
-                    visible: text !== ""
-                    color: Theme.danger
-                    wrapMode: Text.WordWrap
-                    padding: Theme.spacingS
-                    Layout.fillWidth: true
-                    background: Rectangle {
-                        color: Theme.dangerSoft
-                        radius: Theme.radiusS
-                    }
-                }
+                ErrorLabel { id: paymentError }
                 Item { Layout.fillHeight: true }
             }
         }
@@ -274,34 +235,28 @@ Page {
                     // Column widths shared by the header and the rows; the record takes the rest.
                     readonly property int atWidth: 80
                     readonly property int effectWidth: 100
-                    readonly property int columnSpacing: Theme.spacingM
 
-                    Label {
-                        anchors.centerIn: parent
+                    ListPlaceholder {
                         visible: history.count === 0
                         text: qsTr("Записів немає")
-                        color: Theme.textMuted
                     }
 
+                    // Stays on top while the records scroll under it, so it needs a background.
                     header: Rectangle {
                         z: 2
                         width: ListView.view.width
-                        height: 28
+                        implicitHeight: historyHeader.implicitHeight
                         visible: history.count > 0
                         color: Theme.surface
 
-                        RowLayout {
-                            anchors.fill: parent
-                            spacing: history.columnSpacing
-                            ColumnHeader { text: qsTr("Коли"); horizontalAlignment: Text.AlignLeft; Layout.preferredWidth: history.atWidth }
-                            ColumnHeader { text: qsTr("Запис"); horizontalAlignment: Text.AlignLeft; Layout.fillWidth: true }
-                            ColumnHeader { text: qsTr("Сума, грн"); Layout.preferredWidth: history.effectWidth }
-                        }
-                        Rectangle {
-                            anchors.bottom: parent.bottom
+                        TableHeader {
+                            id: historyHeader
                             width: parent.width
-                            height: 1
-                            color: Theme.border
+                            columns: [
+                                { title: qsTr("Коли"), width: history.atWidth },
+                                { title: qsTr("Запис") },
+                                { title: qsTr("Сума, грн"), width: history.effectWidth, align: "right" }
+                            ]
                         }
                     }
 
@@ -317,7 +272,7 @@ Page {
                             anchors.left: parent.left
                             anchors.right: parent.right
                             anchors.verticalCenter: parent.verticalCenter
-                            spacing: history.columnSpacing
+                            spacing: Theme.spacingM
 
                             Label {
                                 text: record.modelData.at
@@ -337,13 +292,10 @@ Page {
                                     wrapMode: Text.WordWrap
                                     Layout.fillWidth: true
                                 }
-                                Label {
+                                CaptionLabel {
                                     visible: text !== ""
                                     text: record.modelData.detail
-                                    font.pixelSize: Theme.fontSizeCaption
-                                    color: Theme.textMuted
                                     wrapMode: Text.WordWrap
-                                    Layout.fillWidth: true
                                 }
                                 Button {
                                     visible: record.modelData.receiptId !== ""

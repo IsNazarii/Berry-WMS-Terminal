@@ -10,8 +10,9 @@ ItemDelegate {
     property string title
     property string detail
     property string trailing
-    // A zero count reads as "nothing here" when it is quieter than the rest.
-    property bool trailingMuted: false
+    // A count is small; a sum of money is read at body size.
+    property real trailingSize: Theme.fontSizeCaption
+    property color trailingColor: Theme.text
 
     width: ListView.view ? ListView.view.width : implicitWidth
 
@@ -36,8 +37,8 @@ ItemDelegate {
         Label {
             visible: text !== ""
             text: row.trailing
-            font.pixelSize: Theme.fontSizeCaption
-            color: row.trailingMuted ? Theme.textMuted : Theme.text
+            font.pixelSize: row.trailingSize
+            color: row.trailingColor
         }
     }
 }

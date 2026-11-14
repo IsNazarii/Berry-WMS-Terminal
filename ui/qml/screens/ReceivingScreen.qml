@@ -128,47 +128,18 @@ Page {
                     spacing: Theme.spacingXs
                     model: Terminal.openReceipts
 
-                    Label {
-                        anchors.centerIn: parent
+                    ListPlaceholder {
                         visible: receiptList.count === 0
                         text: qsTr("Відкритих чеків немає")
-                        color: Theme.textMuted
                     }
 
-                    delegate: ItemDelegate {
-                        id: receiptRow
+                    delegate: ReceiptListRow {
                         required property var modelData
-                        width: ListView.view.width
+                        title: modelData.supplierName
+                        detail: modelData.boxes > 0 ? modelData.openedAt + " · " + modelData.pallets : modelData.openedAt
+                        trailing: modelData.boxes > 0 ? qsTr("%1 ₴").arg(modelData.amount) : qsTr("порожній")
                         highlighted: modelData.receiptId === Terminal.activeReceiptId
                         onClicked: Terminal.activateReceipt(modelData.receiptId)
-
-                        contentItem: ColumnLayout {
-                            spacing: 2
-                            Label {
-                                text: receiptRow.modelData.supplierName
-                                font.weight: Font.DemiBold
-                                elide: Text.ElideRight
-                                Layout.fillWidth: true
-                            }
-                            RowLayout {
-                                Label {
-                                    text: receiptRow.modelData.boxes > 0
-                                          ? receiptRow.modelData.openedAt + " · " + receiptRow.modelData.pallets
-                                          : receiptRow.modelData.openedAt
-                                    font.pixelSize: Theme.fontSizeCaption
-                                    color: Theme.textMuted
-                                }
-                                Label {
-                                    text: receiptRow.modelData.boxes > 0 ? qsTr("%1 ₴").arg(receiptRow.modelData.amount)
-                                                                         : qsTr("порожній")
-                                    font.pixelSize: Theme.fontSizeCaption
-                                    color: Theme.textMuted
-                                    elide: Text.ElideRight
-                                    horizontalAlignment: Text.AlignRight
-                                    Layout.fillWidth: true
-                                }
-                            }
-                        }
                     }
                 }
             }
@@ -335,10 +306,9 @@ Page {
                                                     text: moreRow.modelData.name
                                                     Layout.fillWidth: true
                                                 }
-                                                Label {
+                                                CaptionLabel {
                                                     text: weighingForm.priceCaption(moreRow.modelData.cropCode)
-                                                    font.pixelSize: Theme.fontSizeCaption
-                                                    color: Theme.textMuted
+                                                    Layout.fillWidth: false
                                                 }
                                             }
                                         }
@@ -513,18 +483,7 @@ Page {
                         }
                     }
 
-                    Label {
-                        id: weighingError
-                        visible: text !== ""
-                        color: Theme.danger
-                        wrapMode: Text.WordWrap
-                        padding: Theme.spacingS
-                        Layout.fillWidth: true
-                        background: Rectangle {
-                            color: Theme.dangerSoft
-                            radius: Theme.radiusS
-                        }
-                    }
+                    ErrorLabel { id: weighingError }
                     Item { Layout.fillHeight: true }
 
                     // Only without real scales: put a pallet on and take it off.
@@ -537,13 +496,7 @@ Page {
                     RowLayout {
                         visible: Terminal.scaleSimulated
                         Layout.fillWidth: true
-                        Label {
-                            text: screen.scales.driverName
-                            font.pixelSize: Theme.fontSizeCaption
-                            color: Theme.textMuted
-                            elide: Text.ElideRight
-                            Layout.fillWidth: true
-                        }
+                        CaptionLabel { text: screen.scales.driverName }
                         Button {
                             text: qsTr("Поставити палету")
                             flat: true
@@ -580,25 +533,10 @@ Page {
                 visible: screen.hasReceipt
                 spacing: Theme.spacingM
 
-                ColumnLayout {
-                    spacing: 2
-                    Layout.fillWidth: true
-
-                    Label {
-                        text: Terminal.supplierName
-                        font.pixelSize: Theme.fontSizeTitle
-                        font.weight: Font.Bold
-                        elide: Text.ElideRight
-                        Layout.fillWidth: true
-                    }
-                    Label {
-                        text: qsTr("Відкрито %1 · борг до чека %2").arg(Terminal.activeSummary.openedAt)
+                PanelHeader {
+                    title: Terminal.supplierName
+                    subtitle: qsTr("Відкрито %1 · борг до чека %2").arg(Terminal.activeSummary.openedAt)
                                                                    .arg(Terminal.supplierBalance)
-                        font.pixelSize: Theme.fontSizeCaption
-                        color: Theme.textMuted
-                        elide: Text.ElideRight
-                        Layout.fillWidth: true
-                    }
                 }
 
                 ListView {
@@ -617,51 +555,44 @@ Page {
                     readonly property int priceWidth: 56
                     readonly property int amountWidth: 80
                     readonly property int actionWidth: 28
+                    // Seven columns in a narrow panel: tighter than other tables.
                     readonly property int columnSpacing: 6
 
-                    Label {
-                        anchors.centerIn: parent
+                    ListPlaceholder {
                         visible: screen.hasReceipt && lineList.count === 0
                         text: qsTr("Зважувань ще немає")
-                        color: Theme.textMuted
                     }
 
+                    // Stays on top while the lines scroll under it, so it needs a background.
                     header: Rectangle {
                         z: 2
                         width: ListView.view.width
-                        height: 28
+                        implicitHeight: lineHeader.implicitHeight
                         visible: lineList.count > 0
                         color: Theme.surface
 
-
-                        RowLayout {
-                            anchors.fill: parent
-                            spacing: lineList.columnSpacing
-                            ColumnHeader { text: qsTr("№"); horizontalAlignment: Text.AlignLeft; Layout.preferredWidth: lineList.indexWidth }
-                            ColumnHeader { text: qsTr("Культура"); horizontalAlignment: Text.AlignLeft; Layout.fillWidth: true }
-                            ColumnHeader { text: qsTr("Ящ."); Layout.preferredWidth: lineList.boxesWidth }
-                            ColumnHeader { text: qsTr("Нетто, кг"); Layout.preferredWidth: lineList.netWidth }
-                            ColumnHeader { text: qsTr("Ціна"); Layout.preferredWidth: lineList.priceWidth }
-                            ColumnHeader { text: qsTr("Сума, грн"); Layout.preferredWidth: lineList.amountWidth }
-                            Item { Layout.preferredWidth: lineList.actionWidth }
-                        }
-                        Rectangle {
-                            anchors.bottom: parent.bottom
+                        TableHeader {
+                            id: lineHeader
                             width: parent.width
-                            height: 1
-                            color: Theme.border
+                            columnSpacing: lineList.columnSpacing
+                            columns: [
+                                { title: qsTr("№"), width: lineList.indexWidth },
+                                { title: qsTr("Культура") },
+                                { title: qsTr("Ящ."), width: lineList.boxesWidth, align: "right" },
+                                { title: qsTr("Нетто, кг"), width: lineList.netWidth, align: "right" },
+                                { title: qsTr("Ціна"), width: lineList.priceWidth, align: "right" },
+                                { title: qsTr("Сума, грн"), width: lineList.amountWidth, align: "right" },
+                                { title: "", width: lineList.actionWidth }
+                            ]
                         }
                     }
 
-                    delegate: Rectangle {
+                    delegate: TableRow {
                         id: line
                         required property var modelData
                         readonly property bool cancelled: modelData.cancelled
                         width: ListView.view.width
-                        height: 44
-                        color: rowHover.hovered ? Theme.surfaceAlt : "transparent"
-
-                        HoverHandler { id: rowHover }
+                        implicitHeight: 44
 
                         // A cancelled line stays visible, struck through: the trace of the mistake is kept.
                         // A value typed by hand is marked in the warning color with an asterisk.
@@ -747,24 +678,15 @@ Page {
                                 }
                             }
                         }
-                        Rectangle {
-                            anchors.bottom: parent.bottom
-                            width: parent.width
-                            height: 1
-                            color: Theme.surfaceAlt
-                        }
                     }
                 }
 
-                Label {
+                CaptionLabel {
                     visible: lineList.count > 0
                     text: qsTr("<font color=\"%1\">123*</font> — введено вручну; наведіть на нетто, щоб побачити брутто і тару")
                           .arg(Theme.warn)
                     textFormat: Text.StyledText
-                    font.pixelSize: Theme.fontSizeCaption
-                    color: Theme.textMuted
                     wrapMode: Text.WordWrap
-                    Layout.fillWidth: true
                 }
 
                 Label {
@@ -963,17 +885,9 @@ Page {
             }
         }
 
-        footer: DialogButtonBox {
-            Button {
-                text: qsTr("Виплатити")
-                highlighted: true
-                enabled: (payDialog.check.blockers ?? []).length === 0
-                DialogButtonBox.buttonRole: DialogButtonBox.AcceptRole
-            }
-            Button {
-                text: qsTr("Скасувати")
-                DialogButtonBox.buttonRole: DialogButtonBox.RejectRole
-            }
+        footer: ConfirmButtons {
+            acceptText: qsTr("Виплатити")
+            acceptEnabled: (payDialog.check.blockers ?? []).length === 0
         }
 
         // Kept open on an error, so the typed prices stay.
@@ -1016,17 +930,9 @@ Page {
             }
         }
 
-        footer: DialogButtonBox {
-            Button {
-                text: qsTr("Видати чек")
-                highlighted: true
-                enabled: handOverDialog.blockers.length === 0
-                DialogButtonBox.buttonRole: DialogButtonBox.AcceptRole
-            }
-            Button {
-                text: qsTr("Скасувати")
-                DialogButtonBox.buttonRole: DialogButtonBox.RejectRole
-            }
+        footer: ConfirmButtons {
+            acceptText: qsTr("Видати чек")
+            acceptEnabled: handOverDialog.blockers.length === 0
         }
 
         onAccepted: {

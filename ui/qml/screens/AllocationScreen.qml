@@ -54,35 +54,15 @@ Page {
                     // Empty: the middle panel says so and why a receipt would turn up here.
                     model: Terminal.allocationSources
 
-                    delegate: ItemDelegate {
-                        id: sourceRow
+                    delegate: ReceiptListRow {
                         required property var modelData
-                        width: ListView.view.width
+                        title: modelData.supplierName
+                        detail: modelData.openedAt + " · " + (modelData.open ? qsTr("зважується") : qsTr("закритий"))
+                        trailing: qsTr("%1 ящ.").arg(modelData.leftBoxes)
                         highlighted: modelData.receiptId === Terminal.allocationReceiptId
                         onClicked: {
                             Terminal.selectAllocationReceipt(modelData.receiptId)
                             allocationError.text = ""
-                        }
-
-                        contentItem: ColumnLayout {
-                            spacing: 2
-                            Label {
-                                text: sourceRow.modelData.supplierName
-                                font.weight: Font.DemiBold
-                                elide: Text.ElideRight
-                                Layout.fillWidth: true
-                            }
-                            RowLayout {
-                                CaptionLabel {
-                                    text: sourceRow.modelData.openedAt + " · "
-                                          + (sourceRow.modelData.open ? qsTr("зважується") : qsTr("закритий"))
-                                    Layout.fillWidth: false
-                                }
-                                CaptionLabel {
-                                    text: qsTr("%1 ящ.").arg(sourceRow.modelData.leftBoxes)
-                                    horizontalAlignment: Text.AlignRight
-                                }
-                            }
                         }
                     }
                 }

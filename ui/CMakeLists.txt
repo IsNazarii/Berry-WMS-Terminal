@@ -42,6 +42,7 @@ qt_add_qml_module(wms_ui
         qml/screens/DestinationCard.qml
         qml/screens/ListPlaceholder.qml
         qml/screens/ConfirmButtons.qml
+        qml/screens/ReceiptListRow.qml
     # Screens use Theme; at run time the controls themselves come from the style.
     IMPORTS BerryWms.Style
 )

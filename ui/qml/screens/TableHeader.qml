@@ -13,6 +13,8 @@ ColumnLayout {
     // [{title, width, align, visible}]: width 0 or none takes the rest of the row,
     // align "right" for numbers, visible false hides the column.
     property var columns: []
+    // A table with many narrow columns sets it tighter; its rows use the same.
+    property int columnSpacing: Theme.spacingM
 
     function shown(column) { return column.visible === undefined || column.visible }
     function align(column) { return column.align === "right" ? Text.AlignRight : Text.AlignLeft }
@@ -21,7 +23,7 @@ ColumnLayout {
     Layout.fillWidth: true
 
     RowLayout {
-        spacing: Theme.spacingM
+        spacing: header.columnSpacing
         Layout.fillWidth: true
         Layout.preferredHeight: 28
 

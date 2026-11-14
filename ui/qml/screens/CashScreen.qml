@@ -368,17 +368,7 @@ Page {
             }
         }
 
-        footer: DialogButtonBox {
-            Button {
-                text: qsTr("Виплатити")
-                highlighted: true
-                DialogButtonBox.buttonRole: DialogButtonBox.AcceptRole
-            }
-            Button {
-                text: qsTr("Скасувати")
-                DialogButtonBox.buttonRole: DialogButtonBox.RejectRole
-            }
-        }
+        footer: ConfirmButtons { acceptText: qsTr("Виплатити") }
 
         onAccepted: {
             paymentError.text = Terminal.pay(amount.text, transfer.checked)

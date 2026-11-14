@@ -13,19 +13,6 @@ Page {
     id: screen
     title: qsTr("Сесія")
 
-    // An error under a form, on the same soft background as on the receiving screen.
-    component ErrorLabel: Label {
-        visible: text !== ""
-        color: Theme.danger
-        wrapMode: Text.WordWrap
-        padding: Theme.spacingS
-        Layout.fillWidth: true
-        background: Rectangle {
-            color: Theme.dangerSoft
-            radius: Theme.radiusS
-        }
-    }
-
     // Closed session: the only thing to do is to open a new one.
     EmptyState {
         anchors.centerIn: parent
@@ -60,11 +47,7 @@ Page {
             anchors.leftMargin: Theme.spacingL
             spacing: Theme.spacingXs
 
-            Label {
-                text: tile.caption
-                font.pixelSize: Theme.fontSizeCaption
-                color: Theme.textMuted
-            }
+            CaptionLabel { text: tile.caption }
             RowLayout {
                 spacing: Theme.spacingXs
                 Label {
@@ -80,12 +63,9 @@ Page {
                     Layout.alignment: Qt.AlignBaseline
                 }
             }
-            Label {
+            CaptionLabel {
                 text: tile.detail
-                font.pixelSize: Theme.fontSizeCaption
                 color: tile.detailColor
-                elide: Text.ElideRight
-                Layout.fillWidth: true
             }
         }
     }
@@ -256,12 +236,9 @@ Page {
                         Layout.fillWidth: true
                         onClicked: prices.applyAll()
                     }
-                    Label {
+                    CaptionLabel {
                         text: qsTr("Нова ціна діє для наступних зважувань; записані лишаються з попередньою.")
-                        font.pixelSize: Theme.fontSizeCaption
-                        color: Theme.textMuted
                         wrapMode: Text.WordWrap
-                        Layout.fillWidth: true
                     }
                     // Crops change during the season: a new berry comes in, so it is added here.
                     Button {
@@ -343,14 +320,10 @@ Page {
                                         Layout.minimumWidth: implicitWidth
                                         Layout.fillWidth: true
                                     }
-                                    Label {
+                                    CaptionLabel {
                                         visible: text !== ""
                                         text: [truckCard.modelData.make, truckCard.modelData.note]
                                               .filter(part => part !== "").join(" · ")
-                                        font.pixelSize: Theme.fontSizeCaption
-                                        color: Theme.textMuted
-                                        elide: Text.ElideRight
-                                        Layout.fillWidth: true
                                     }
                                 }
 
@@ -662,17 +635,9 @@ Page {
             ErrorLabel { id: removeCropError }
         }
 
-        footer: DialogButtonBox {
-            Button {
-                text: removeCropDialog.removal.keepsRecords ? qsTr("Приховати") : qsTr("Видалити")
-                enabled: removeCropDialog.removal.errors.length === 0
-                highlighted: true
-                DialogButtonBox.buttonRole: DialogButtonBox.AcceptRole
-            }
-            Button {
-                text: qsTr("Скасувати")
-                DialogButtonBox.buttonRole: DialogButtonBox.RejectRole
-            }
+        footer: ConfirmButtons {
+            acceptText: removeCropDialog.removal.keepsRecords ? qsTr("Приховати") : qsTr("Видалити")
+            acceptEnabled: removeCropDialog.removal.errors.length === 0
         }
         onAccepted: {
             const error = Terminal.removeCrop(removedCode)
@@ -693,17 +658,7 @@ Page {
             text: qsTr("Після закриття змінити сесію можна лише поправкою з поясненням.")
         }
 
-        footer: DialogButtonBox {
-            Button {
-                text: qsTr("Закрити сесію")
-                highlighted: true
-                DialogButtonBox.buttonRole: DialogButtonBox.AcceptRole
-            }
-            Button {
-                text: qsTr("Скасувати")
-                DialogButtonBox.buttonRole: DialogButtonBox.RejectRole
-            }
-        }
+        footer: ConfirmButtons { acceptText: qsTr("Закрити сесію") }
         onAccepted: Terminal.closeSession()
     }
 }

@@ -289,19 +289,7 @@ ToolBar {
             RowLayout {
                 spacing: Theme.spacingS
 
-                Rectangle {
-                    implicitWidth: Theme.avatarSize
-                    implicitHeight: Theme.avatarSize
-                    radius: width / 2
-                    color: Theme.accent
-
-                    Label {
-                        anchors.centerIn: parent
-                        text: Terminal.operatorName.charAt(0)
-                        font.weight: Font.DemiBold
-                        color: Theme.textOnAccent
-                    }
-                }
+                Avatar { name: Terminal.operatorName }
                 Label {
                     visible: !bar.compact
                     text: Terminal.operatorName

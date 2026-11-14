@@ -70,19 +70,10 @@ Page {
         contentItem: RowLayout {
             spacing: card.spacing
 
-            Rectangle {
-                implicitWidth: Theme.avatarSizeLarge
-                implicitHeight: Theme.avatarSizeLarge
-                radius: width / 2
-                color: card.checked ? Theme.accent : Theme.surfaceAlt
-
-                Label {
-                    anchors.centerIn: parent
-                    text: card.modelData.name.charAt(0)
-                    font.pixelSize: Theme.fontSizeLarge
-                    font.weight: Font.DemiBold
-                    color: card.checked ? Theme.textOnAccent : Theme.accent
-                }
+            Avatar {
+                name: card.modelData.name
+                size: Theme.avatarSizeLarge
+                filled: card.checked
             }
             ColumnLayout {
                 spacing: 0
@@ -95,11 +86,9 @@ Page {
                     elide: Text.ElideRight
                     Layout.fillWidth: true
                 }
-                Label {
+                CaptionLabel {
                     visible: card.opener
                     text: qsTr("відкрив(ла) сесію")
-                    font.pixelSize: Theme.fontSizeCaption
-                    color: Theme.textMuted
                 }
             }
         }

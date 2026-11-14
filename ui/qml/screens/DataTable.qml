@@ -10,8 +10,7 @@ import QtQuick.Layouts
 ColumnLayout {
     id: table
 
-    // [{title, width, align, visible}]: width 0 or none takes the rest of the row,
-    // align "right" for numbers, visible false hides the column.
+    // As in TableHeader: [{title, width, align, visible}].
     property var columns: []
     property alias model: list.model
     // One cell per column for a row: {text, muted, struck, bold, note}. `note` is a
@@ -23,35 +22,10 @@ ColumnLayout {
 
     spacing: 0
 
-    function shown(column) { return column.visible === undefined || column.visible }
-    function align(column) { return column.align === "right" ? Text.AlignRight : Text.AlignLeft }
-
-    RowLayout {
+    TableHeader {
+        id: header
         visible: list.count > 0
-        spacing: Theme.spacingM
-        Layout.fillWidth: true
-        Layout.preferredHeight: 28
-
-        Repeater {
-            model: table.columns
-
-            ColumnHeader {
-                required property var modelData
-                visible: table.shown(modelData)
-                text: modelData.title
-                horizontalAlignment: table.align(modelData)
-                // Fixed columns never stretch: a wide cell would push the row away from the header.
-                Layout.fillWidth: !modelData.width
-                Layout.preferredWidth: modelData.width || 0
-                Layout.maximumWidth: modelData.width || Number.POSITIVE_INFINITY
-            }
-        }
-    }
-    Rectangle {
-        visible: list.count > 0
-        Layout.fillWidth: true
-        implicitHeight: 1
-        color: Theme.border
+        columns: table.columns
     }
 
     Item {
@@ -66,15 +40,11 @@ ColumnLayout {
             clip: true
             ScrollBar.vertical: ScrollBar {}
 
-            delegate: Rectangle {
+            delegate: TableRow {
                 id: row
                 required property var modelData
                 readonly property var cells: table.cellsOf(modelData)
                 width: ListView.view.width
-                implicitHeight: 48
-                color: hover.hovered ? Theme.surfaceAlt : "transparent"
-
-                HoverHandler { id: hover }
 
                 RowLayout {
                     anchors.fill: parent
@@ -88,7 +58,7 @@ ColumnLayout {
                             required property var modelData
                             required property int index
                             readonly property var spec: row.cells[index] ?? {}
-                            visible: table.shown(modelData)
+                            visible: header.shown(modelData)
                             spacing: 0
                             Layout.fillWidth: !modelData.width
                             Layout.preferredWidth: modelData.width || 0
@@ -99,7 +69,7 @@ ColumnLayout {
                                 color: cell.spec.struck || cell.spec.muted ? Theme.textMuted : Theme.text
                                 font.strikeout: cell.spec.struck ?? false
                                 font.weight: cell.spec.bold ? Font.DemiBold : Font.Normal
-                                horizontalAlignment: table.align(cell.modelData)
+                                horizontalAlignment: header.align(cell.modelData)
                                 elide: Text.ElideRight
                                 Layout.fillWidth: true
                             }
@@ -113,12 +83,6 @@ ColumnLayout {
                             }
                         }
                     }
-                }
-                Rectangle {
-                    anchors.bottom: parent.bottom
-                    width: parent.width
-                    height: 1
-                    color: Theme.surfaceAlt
                 }
             }
         }

@@ -31,6 +31,10 @@ qt_add_qml_module(wms_ui
         qml/screens/WarehouseScreen.qml
         qml/screens/CashScreen.qml
         qml/screens/HistoryScreen.qml
+        qml/screens/CaptionLabel.qml
+        qml/screens/PanelHeader.qml
+        qml/screens/ListRow.qml
+        qml/screens/DataTable.qml
     # Screens use Theme; at run time the controls themselves come from the style.
     IMPORTS BerryWms.Style
 )

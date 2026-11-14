@@ -22,19 +22,6 @@ Page {
     readonly property bool hasDestination: destinationId !== ""
     readonly property var source: Terminal.allocationSources.find(r => r.receiptId === Terminal.allocationReceiptId)
 
-    // "40 / 400 ящ.": the load over the truck's limit.
-    function boxesText(load, limit) {
-        return load + " / " + limit + " " + qsTr("ящ.")
-    }
-
-    // A trace of the table rows, as on the receiving screen.
-    component RowDivider: Rectangle {
-        anchors.bottom: parent.bottom
-        width: parent.width
-        height: 1
-        color: Theme.surfaceAlt
-    }
-
     NoSessionNotice {
         visible: !Terminal.sessionOpen
         text: qsTr("Розподіл можливий лише у відкритій сесії.")
@@ -86,18 +73,14 @@ Page {
                                 Layout.fillWidth: true
                             }
                             RowLayout {
-                                Label {
+                                CaptionLabel {
                                     text: sourceRow.modelData.openedAt + " · "
                                           + (sourceRow.modelData.open ? qsTr("зважується") : qsTr("закритий"))
-                                    font.pixelSize: Theme.fontSizeCaption
-                                    color: Theme.textMuted
+                                    Layout.fillWidth: false
                                 }
-                                Label {
+                                CaptionLabel {
                                     text: qsTr("%1 ящ.").arg(sourceRow.modelData.leftBoxes)
-                                    font.pixelSize: Theme.fontSizeCaption
-                                    color: Theme.textMuted
                                     horizontalAlignment: Text.AlignRight
-                                    Layout.fillWidth: true
                                 }
                             }
                         }
@@ -127,44 +110,20 @@ Page {
                 visible: screen.hasReceipt
                 spacing: Theme.spacingM
 
-                ColumnLayout {
-                    spacing: 2
-                    Layout.fillWidth: true
-
-                    Label {
-                        text: screen.hasReceipt ? Terminal.allocationSupplierName : qsTr("Чек не обрано")
-                        font.pixelSize: Theme.fontSizeTitle
-                        font.weight: Font.Bold
-                        elide: Text.ElideRight
-                        Layout.fillWidth: true
-                    }
-                    Label {
-                        text: !screen.hasReceipt ? qsTr("Оберіть чек зліва")
-                              : screen.source ? qsTr("Відкрито %1 · %2 · лишилось %3 ящ., %4 кг")
-                                                .arg(screen.source.openedAt)
-                                                .arg(screen.source.open ? qsTr("зважується") : qsTr("закритий"))
-                                                .arg(screen.source.leftBoxes).arg(screen.source.leftKg)
-                              : qsTr("Усе розподілено")
-                        font.pixelSize: Theme.fontSizeCaption
-                        color: Theme.textMuted
-                        elide: Text.ElideRight
-                        Layout.fillWidth: true
-                    }
+                // Shown only with a receipt chosen; with nothing left it drops out of the sources.
+                PanelHeader {
+                    title: Terminal.allocationSupplierName
+                    subtitle: screen.source ? qsTr("Відкрито %1 · %2 · лишилось %3 ящ., %4 кг")
+                                              .arg(screen.source.openedAt)
+                                              .arg(screen.source.open ? qsTr("зважується") : qsTr("закритий"))
+                                              .arg(screen.source.leftBoxes).arg(screen.source.leftKg)
+                                            : qsTr("Усе розподілено")
                 }
 
-                // Where the next pallet goes: picked once on the right, shown here where the buttons are.
-                Label {
+                TargetBanner {
                     text: screen.hasDestination ? qsTr("Куди: %1").arg(screen.destinationTitle)
                                                 : qsTr("Оберіть фуру або склад праворуч")
-                    font.weight: screen.hasDestination ? Font.DemiBold : Font.Normal
-                    color: screen.hasDestination ? Theme.accent : Theme.textMuted
-                    elide: Text.ElideRight
-                    padding: Theme.spacingS
-                    Layout.fillWidth: true
-                    background: Rectangle {
-                        radius: Theme.radiusS
-                        color: screen.hasDestination ? Theme.accentSoft : Theme.surfaceAlt
-                    }
+                    active: screen.hasDestination
                 }
 
                 SectionCaption {
@@ -186,41 +145,34 @@ Page {
                     readonly property int boxesWidth: 40
                     readonly property int netWidth: 72
                     readonly property int placeWidth: 150
-                    readonly property int columnSpacing: Theme.spacingM
 
+                    // Stays on top while the lines scroll under it, so it needs a background.
                     header: Rectangle {
                         z: 2
                         width: ListView.view.width
-                        height: 28
+                        implicitHeight: lineHeader.implicitHeight
                         visible: lineList.count > 0
                         color: Theme.surface
 
-                        RowLayout {
-                            anchors.fill: parent
-                            spacing: lineList.columnSpacing
-                            ColumnHeader { text: qsTr("№"); horizontalAlignment: Text.AlignLeft; Layout.preferredWidth: lineList.indexWidth }
-                            ColumnHeader { text: qsTr("Культура"); horizontalAlignment: Text.AlignLeft; Layout.fillWidth: true }
-                            ColumnHeader { text: qsTr("Ящ."); Layout.preferredWidth: lineList.boxesWidth }
-                            ColumnHeader { text: qsTr("Нетто, кг"); Layout.preferredWidth: lineList.netWidth }
-                            ColumnHeader { text: qsTr("Де"); Layout.preferredWidth: lineList.placeWidth }
-                        }
-                        Rectangle {
-                            anchors.bottom: parent.bottom
+                        TableHeader {
+                            id: lineHeader
                             width: parent.width
-                            height: 1
-                            color: Theme.border
+                            columns: [
+                                { title: qsTr("№"), width: lineList.indexWidth },
+                                { title: qsTr("Культура") },
+                                { title: qsTr("Ящ."), width: lineList.boxesWidth, align: "right" },
+                                { title: qsTr("Нетто, кг"), width: lineList.netWidth, align: "right" },
+                                { title: qsTr("Де"), width: lineList.placeWidth, align: "right" }
+                            ]
                         }
                     }
 
-                    delegate: Rectangle {
+                    delegate: TableRow {
                         id: line
                         required property var modelData
                         readonly property bool free: modelData.placedIn === "" && !modelData.cancelled
                         width: ListView.view.width
-                        height: 44
-                        color: rowHover.hovered ? Theme.surfaceAlt : "transparent"
-
-                        HoverHandler { id: rowHover }
+                        implicitHeight: 44
 
                         // A cancelled line stays visible, struck through, as on the receiving screen.
                         component Cell: Label {
@@ -232,7 +184,7 @@ Page {
 
                         RowLayout {
                             anchors.fill: parent
-                            spacing: lineList.columnSpacing
+                            spacing: Theme.spacingM
 
                             Cell {
                                 text: line.modelData.index + 1
@@ -282,7 +234,6 @@ Page {
                                 }
                             }
                         }
-                        RowDivider {}
                     }
                 }
 
@@ -339,18 +290,7 @@ Page {
                     }
                 }
 
-                Label {
-                    id: allocationError
-                    visible: text !== ""
-                    color: Theme.danger
-                    wrapMode: Text.WordWrap
-                    padding: Theme.spacingS
-                    Layout.fillWidth: true
-                    background: Rectangle {
-                        color: Theme.dangerSoft
-                        radius: Theme.radiusS
-                    }
-                }
+                ErrorLabel { id: allocationError }
             }
         }
 
@@ -373,68 +313,14 @@ Page {
                     spacing: Theme.spacingXs
                     model: Terminal.destinations
 
-                    delegate: ItemDelegate {
-                        id: destination
+                    delegate: DestinationCard {
                         required property var modelData
-                        width: ListView.view.width
+                        place: modelData
                         highlighted: modelData.destinationId === screen.destinationId
                         onClicked: {
                             screen.destinationId = modelData.destinationId
                             screen.destinationTitle = modelData.title
                             allocationError.text = ""
-                        }
-
-                        contentItem: ColumnLayout {
-                            spacing: Theme.spacingXs
-                            Label {
-                                text: destination.modelData.title
-                                font.weight: Font.DemiBold
-                                elide: Text.ElideRight
-                                Layout.fillWidth: true
-                            }
-                            // The warehouse has no limit, so it lists what it holds instead.
-                            Label {
-                                visible: destination.modelData.warehouse
-                                text: destination.modelData.detail
-                                font.pixelSize: Theme.fontSizeCaption
-                                color: Theme.textMuted
-                                wrapMode: Text.WordWrap
-                                Layout.fillWidth: true
-                            }
-                            RowLayout {
-                                visible: !destination.modelData.warehouse
-                                Layout.fillWidth: true
-                                Label {
-                                    text: screen.boxesText(destination.modelData.loadBoxes, destination.modelData.limitBoxes)
-                                    font.pixelSize: Theme.fontSizeCaption
-                                    color: Theme.textMuted
-                                    elide: Text.ElideRight
-                                    Layout.fillWidth: true
-                                }
-                                Label {
-                                    text: destination.modelData.loadKg + " " + qsTr("кг")
-                                    font.pixelSize: Theme.fontSizeCaption
-                                    color: Theme.textMuted
-                                    elide: Text.ElideRight
-                                }
-                            }
-                            // Overload is only shown: facts from another terminal are never rejected.
-                            RowLayout {
-                                visible: !destination.modelData.warehouse
-                                Layout.fillWidth: true
-                                ProgressBar {
-                                    from: 0
-                                    to: 100
-                                    value: Math.min(destination.modelData.fillPercent, 100)
-                                    Layout.fillWidth: true
-                                }
-                                Label {
-                                    text: destination.modelData.overloaded ? qsTr("понад") : destination.modelData.fillPercent + "%"
-                                    font.pixelSize: Theme.fontSizeCaption
-                                    font.weight: destination.modelData.overloaded ? Font.DemiBold : Font.Normal
-                                    color: destination.modelData.overloaded ? Theme.danger : Theme.textMuted
-                                }
-                            }
                         }
                     }
                 }

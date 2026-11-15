@@ -54,7 +54,7 @@ Page {
     component OperatorCard: T.AbstractButton {
         id: card
         required property var modelData
-        readonly property bool opener: Terminal.sessionOpen && Terminal.sessionOpenedBy === modelData.name
+        readonly property bool opener: Terminal.sessionOpenerId === modelData.operatorId
 
         checkable: true
         checked: screen.picked === modelData.operatorId

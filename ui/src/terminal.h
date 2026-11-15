@@ -65,7 +65,10 @@ class Terminal : public QObject {
     Q_PROPERTY(bool sessionOpen READ sessionOpen NOTIFY sessionChanged)
     // "Сесія 26.09.2026", empty without an open session.
     Q_PROPERTY(QString sessionTitle READ sessionTitle NOTIFY sessionChanged)
+    // "Відкрито: Назарій, 19:43" — a line to read, not to compare with: for that, sessionOpenerId.
     Q_PROPERTY(QString sessionOpenedBy READ sessionOpenedBy NOTIFY sessionChanged)
+    // The operatorId (as in `operators`) of who opened the session; 0 without an open session.
+    Q_PROPERTY(qint64 sessionOpenerId READ sessionOpenerId NOTIFY sessionChanged)
     // [{cropCode, name}] in the order added. Kept apart from the prices: a Repeater
     // over a list that changes rebuilds its rows and would wipe what the operator
     // is typing. The list itself changes only when a crop is added.
@@ -180,6 +183,7 @@ public:
     [[nodiscard]] bool sessionOpen() const noexcept { return workDay_.has_value(); }
     [[nodiscard]] QString sessionTitle() const;
     [[nodiscard]] QString sessionOpenedBy() const;
+    [[nodiscard]] qint64 sessionOpenerId() const noexcept { return workDay_ ? workDay_->openedBy() : 0; }
     [[nodiscard]] QVariantList cropList() const;
     [[nodiscard]] QStringList cropKeyList() const;
     [[nodiscard]] QVariantMap priceMap() const;

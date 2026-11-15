@@ -51,7 +51,7 @@ Dialog {
 
     ColumnLayout {
         anchors.fill: parent
-        spacing: 8
+        spacing: Theme.spacingS
         visible: !picker.adding
 
         TextField {
@@ -70,6 +70,11 @@ Dialog {
             model: picker.suppliers
             ScrollBar.vertical: ScrollBar {}
 
+            // Column widths of the rows; the name takes the rest.
+            readonly property int idWidth: 48
+            readonly property int phoneWidth: 130
+            readonly property int balanceWidth: 110
+
             delegate: ItemDelegate {
                 id: row
                 required property var supplierId
@@ -81,11 +86,11 @@ Dialog {
                 onClicked: picker.pick(supplierId)
 
                 contentItem: RowLayout {
-                    spacing: 16
-                    Label { text: "#" + row.supplierId; Layout.preferredWidth: 48 }
+                    spacing: Theme.spacingL
+                    Label { text: "#" + row.supplierId; Layout.preferredWidth: list.idWidth }
                     Label { text: row.name; font.bold: true; Layout.fillWidth: true; elide: Text.ElideRight }
-                    Label { text: row.phone; Layout.preferredWidth: 130 }
-                    Label { text: row.balance; Layout.preferredWidth: 110; horizontalAlignment: Text.AlignRight }
+                    Label { text: row.phone; Layout.preferredWidth: list.phoneWidth }
+                    Label { text: row.balance; Layout.preferredWidth: list.balanceWidth; horizontalAlignment: Text.AlignRight }
                 }
             }
 

@@ -239,7 +239,8 @@ TEST(LoadingHistory, OldestFirstAcrossRecordKinds) {
     journal.add(StockShipment{Uuid::generateV7(), kMidnight + 15h, "raspberry",
                               {.boxes = 10, .weight = kilograms(20)}, truck});
 
-    const auto& all = LoadingHistory{day, journal}.entries();
+    const LoadingHistory history{day, journal};
+    const auto& all = history.entries();
     ASSERT_EQ(all.size(), 3U);
     EXPECT_TRUE(std::ranges::is_sorted(all, {}, &LoadingEntry::at));
 }

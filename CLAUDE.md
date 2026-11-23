@@ -202,7 +202,7 @@ $CM/cmake -S . -B build -G Ninja && $CM/cmake --build build && $CM/ctest --test-
 - Git: гілка `main`, remote `origin` = git@github.com:IsNazarii/Berry-WMS-Terminal.git (push можна робити з термінала).
 - GoogleTest у системі не встановлено — тягнеться FetchContent (потрібна мережа при першій конфігурації).
 
-## Стан і наступні кроки (оновлено 13.11.2026)
+## Стан і наступні кроки (оновлено 23.11.2026)
 **Історія вантаження, запит 4a (13.11):** ядро `LoadingHistory(day, journal, otherOpenReceipts)` → `LoadingEntry`
 (час, куди, культура, чек/постачальник або «зі складу», № палети, `by`, `reversedAt`/`reversedBy`); `intoTruck`/`intoTrucks`/
 `warehouse`. Фура — за весь рейс (перенесена показує й учорашнє); склад — за свій день: прихід за `sessionId` чека,
@@ -322,18 +322,18 @@ F2 → `SupplierPicker`; по центру обраний `cashSupplierId` (ок
 справа `cashHistory` з `Journal::historyOf` (чеки й виплати за часом; текст — віртуальний `describe()`,
 сума — `balanceEffect()`). Сигнал `cashChanged` ← `journalChanged`. Під виплатою в історії — «видав(ла): ім'я» (`Payment::paidBy`).
 
-**Наступна сесія — рефакторинг QML (рішення 13.11), до пунктів 4b/4c.** Мета — менше коду без жодної зміни дизайну й
-поведінки. Готові компоненти й нова «Історія» — у гілці `spike/history-ui` (коміт `b55def8`): `DataTable.qml`
-(`columns: [{title, width, align, visible}]`, `cellsOf: row => [{text, muted, struck, bold, note}]`, дочірній елемент —
-порожній стан; фіксовані колонки не розтягуються), `ListRow.qml` (title/detail/trailing на стилі `ItemDelegate`),
-`PanelHeader.qml` (заголовок + підпис), `CaptionLabel.qml` (дрібний приглушений текст з `elide`). Порядок:
-1) **Історія (F10)** — перша й уже готова: перенести в `main` компоненти й оптимізовану `HistoryScreen.qml` (274 → 107) +
-   рядки в `ui/CMakeLists.txt` (`git checkout spike/history-ui -- <файли>`; `spike/` у `main` не потрібен) — і перевірити
-   так само, як решту (пункт 3); 2) далі по екрану на коміт: Склад → Каса → Розподіл → Сесія → Прийом → Вхід →
-   `SupplierPicker` → `AppBar` і діалоги `Main.qml`; повтори, що знайдуться (картка фури на «Розподілі» й «Складі», рядок
-   чека), — у нові компоненти; 3) після кожного екрана — знімки до/після
-   в однакових станах (світла/темна, 1024 і 1536, порожні стани; тимчасовий патч `main.cpp` або раннер з гілки),
-   `wms_ui_qmllint`, прохід робочого циклу в терміналі. Підсумок рядків — у звіт (зараз UI: ≈ 4 400 QML + 2 400 C++).
+**Рефакторинг QML ✅ (рішення 13.11, зроблено 14–23.11)** — менше коду без зміни дизайну й поведінки. Усі екрани,
+`SupplierPicker`, `AppBar` і `Main.qml` — на спільних компонентах (`DataTable`, `TableHeader`/`TableRow`, `ListRow`,
+`ReceiptListRow`, `ListPlaceholder`, `PanelHeader`, `CaptionLabel`, `DestinationCard`, `TargetBanner`, `ErrorLabel`,
+`ConfirmButtons`, `Avatar`; перелік — `docs/ui.md` §1). `DataTable.model` — рядки вже як масиви клітинок
+`{text, muted, struck, bold, note}` (екран робить `rows.map(...)`; колбек-властивість `cellsOf` qmllint не пропускав).
+Вкладки `AppBar` — `Repeater` над одним списком, `Shortcut` F5–F10 — у кожній вкладці (не в `Main.qml`).
+Підсумок: QML екранів 3 480 → 2 858, увесь `ui/qml` 4 344 → 4 129 (+13 компонентів ≈ 430), C++ UI ≈ 2 400 без змін.
+Свідомо лишилось: ширини діалогів числами в кожному діалозі (свої для змісту); екранні діалоги центруються на екрані,
+а діалоги `AppBar` — на `Overlay.overlay` (панель — `header` вікна), тож спільні типові значення в стилі зсунули б їх.
+Знімки до/після — тимчасовий раннер (`WMS_SHOTS=<тека>`: вхід, демо-чек, F5–F10, діалоги ⋯, світла/темна × 1024/1536,
+`QT_SCALE_FACTOR=1`, `Qt6::Test` для `QTest::keyClick`), не комітиться; порівняння — PIL, різниця лише в годиннику.
+Гілка `spike/history-ui` перенесена й більше не потрібна (видалити — на розсуд автора).
 
 Наступні кроки (кожен — окремий коміт, ядро тест-першим):
 1. SQLite (`infra/`), обрано прямий C API `sqlite3` (не Qt Sql). Кроки:

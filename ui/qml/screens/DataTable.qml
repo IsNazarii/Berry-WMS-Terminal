@@ -12,10 +12,9 @@ ColumnLayout {
 
     // As in TableHeader: [{title, width, align, visible}].
     property var columns: []
+    // One array per row, one cell per column: {text, muted, struck, bold, note}. `note` is
+    // a small warning line under the text; `struck` crosses the text out and fades it.
     property alias model: list.model
-    // One cell per column for a row: {text, muted, struck, bold, note}. `note` is a
-    // small warning line under the text; `struck` crosses the text out and fades it.
-    property var cellsOf: row => []
     readonly property alias count: list.count
     // Shown instead of the rows while there are none (an EmptyState).
     default property alias placeholder: placeholderArea.data
@@ -42,8 +41,8 @@ ColumnLayout {
 
             delegate: TableRow {
                 id: row
+                // The row's cells.
                 required property var modelData
-                readonly property var cells: table.cellsOf(modelData)
                 width: ListView.view.width
 
                 RowLayout {
@@ -57,7 +56,7 @@ ColumnLayout {
                             id: cell
                             required property var modelData
                             required property int index
-                            readonly property var spec: row.cells[index] ?? {}
+                            readonly property var spec: row.modelData[index] ?? {}
                             visible: header.shown(modelData)
                             spacing: 0
                             Layout.fillWidth: !modelData.width

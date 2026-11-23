@@ -89,7 +89,6 @@ Page {
                 DataTable {
                     Layout.fillWidth: true
                     Layout.fillHeight: true
-                    model: Terminal.historyRows
                     columns: [
                         { title: qsTr("Час"), width: 92 },
                         // A plate on every truck, or where a warehouse row went; one truck needs none.
@@ -104,7 +103,7 @@ Page {
                     ]
                     // A pallet taken back stays as a trace of the mistake, crossed out; its number
                     // and who loaded it stay readable, they identify the mistake.
-                    cellsOf: row => [
+                    model: Terminal.historyRows.map(row => [
                         { text: row.time, struck: row.reversed },
                         { text: screen.warehouse ? (row.out ? "→ " + row.place : qsTr("на склад")) : row.place,
                           struck: row.reversed },
@@ -114,7 +113,7 @@ Page {
                         { text: row.boxes, struck: row.reversed },
                         { text: row.kg, struck: row.reversed },
                         { text: row.by, muted: true }
-                    ]
+                    ])
 
                     EmptyState {
                         anchors.centerIn: parent

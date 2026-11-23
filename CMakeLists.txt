@@ -20,6 +20,8 @@ set(QT_QML_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/qml)
 
 add_subdirectory(ui)
 add_subdirectory(app)
+# Developer tools (screenshots for UI before/after checks); not part of the terminal.
+add_subdirectory(tools/shots)
 
 if(WMS_BUILD_TESTS)
     enable_testing()

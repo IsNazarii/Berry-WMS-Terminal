@@ -195,6 +195,7 @@ infra/                    інфраструктура: wms_infra — обгор
                             wms_print — QR і друк чека
 app/main.cpp              точка входу (виконуваний файл wms_terminal)
 tests/*_test.cpp          unit-тести: wms_core_tests, wms_infra_tests, wms_serial_tests, wms_print_tests
+tools/shots/              wms_shots — знімки екранів без вікна для перевірки змін UI «до/після»
 docs/                     документація
   hardware/                 довідка з обладнання (ваги ІЕ-04)
   screenshots/              знімки екранів для README
@@ -211,6 +212,7 @@ docs/                     документація
 | [docs/development.md](docs/development.md) | збірка, тести, стиль коду, робочий процес |
 | [docs/course_mapping.md](docs/course_mapping.md) | як вимоги курсу ООП відображаються в коді |
 | [docs/lab3_report.md](docs/lab3_report.md) | лаба 3: друк чека з QR — бібліотека, перевірка, висновки |
+| [docs/ui_qml_vs_widgets.md](docs/ui_qml_vs_widgets.md) | експеримент 13.11: «Історія» на Qt Widgets проти QML — чому UI лишився на QML |
 | [docs/hardware/scale-ie04.md](docs/hardware/scale-ie04.md) | ваги ВН-2000-4 / ІЕ-04: кабель, налаштування, протокол RS-232, план драйвера |
 | [docs/source/](docs/source/) | первинні вимоги: бачення автора та вимоги лектора |
 

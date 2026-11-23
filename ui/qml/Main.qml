@@ -71,14 +71,6 @@ ApplicationWindow {
         onFullScreenToggled: uiSettings.fullScreen = !uiSettings.fullScreen
     }
 
-    // One key per screen, in the order of the tabs; F2 (new receipt / supplier) stays with the screens.
-    Shortcut { sequence: "F5"; enabled: Terminal.loggedIn; onActivated: appBar.currentIndex = 0 }
-    Shortcut { sequence: "F6"; enabled: Terminal.loggedIn; onActivated: appBar.currentIndex = 1 }
-    Shortcut { sequence: "F7"; enabled: Terminal.loggedIn; onActivated: appBar.currentIndex = 2 }
-    Shortcut { sequence: "F8"; enabled: Terminal.loggedIn; onActivated: appBar.currentIndex = 3 }
-    Shortcut { sequence: "F9"; enabled: Terminal.loggedIn; onActivated: appBar.currentIndex = 4 }
-    Shortcut { sequence: "F10"; enabled: Terminal.loggedIn; onActivated: appBar.currentIndex = 5 }
-
     // Nothing is recorded without knowing who did it, so the screens wait for a login.
     Connections {
         target: Terminal

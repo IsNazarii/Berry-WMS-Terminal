@@ -84,6 +84,13 @@ ToolBar {
         onTriggered: bar.scalePicked(factor)
     }
 
+    // A paper size for printed receipts; the item's text is the size.
+    component PaperItem: MenuItem {
+        checkable: true
+        checked: Terminal.receiptPaper === text
+        onTriggered: Terminal.setReceiptPaper(text)
+    }
+
     // What the box tare field on the receiving screen starts with.
     Dialog {
         id: tareDialog
@@ -222,48 +229,41 @@ ToolBar {
             }
         }
 
-        // Operator workflow goes left to right: open the day, receive, load, ship from stock, pay.
+        // Operator workflow goes left to right: open the day, receive, load, ship from stock, pay;
+        // then, not a step of the day, looking back at what was loaded where.
         TabBar {
             id: tabs
 
-            TabButton {
-                text: qsTr("Сесія")
-                icon.source: Theme.icon("calendar")
-                hint: "F5"
-                compact: bar.compact
-            }
-            TabButton {
-                text: qsTr("Прийом")
-                icon.source: Theme.icon("weight")
-                hint: "F6"
-                compact: bar.compact
-            }
-            TabButton {
-                text: qsTr("Розподіл")
-                icon.source: Theme.icon("truck")
-                hint: "F7"
-                compact: bar.compact
-                // Receipts with pallets nobody has placed yet.
-                badge: Terminal.allocationSources.length
-            }
-            TabButton {
-                text: qsTr("Склад")
-                icon.source: Theme.icon("warehouse")
-                hint: "F8"
-                compact: bar.compact
-            }
-            TabButton {
-                text: qsTr("Каса")
-                icon.source: Theme.icon("wallet")
-                hint: "F9"
-                compact: bar.compact
-            }
-            // Not a step of the day: looking back at what was loaded where.
-            TabButton {
-                text: qsTr("Історія")
-                icon.source: Theme.icon("history")
-                hint: "F10"
-                compact: bar.compact
+            Repeater {
+                model: [
+                    { text: qsTr("Сесія"), icon: "calendar" },
+                    { text: qsTr("Прийом"), icon: "weight" },
+                    // Receipts with pallets nobody has placed yet.
+                    { text: qsTr("Розподіл"), icon: "truck", counted: true },
+                    { text: qsTr("Склад"), icon: "warehouse" },
+                    { text: qsTr("Каса"), icon: "wallet" },
+                    { text: qsTr("Історія"), icon: "history" }
+                ]
+
+                TabButton {
+                    id: tab
+                    required property var modelData
+                    required property int index
+                    text: modelData.text
+                    icon.source: Theme.icon(modelData.icon)
+                    // One key per screen, in the order of the tabs; F2 (new receipt / supplier)
+                    // stays with the screens.
+                    hint: "F" + (5 + index)
+                    compact: bar.compact
+                    badge: modelData.counted ? Terminal.allocationSources.length : 0
+
+                    Shortcut {
+                        sequence: tab.hint
+                        // Nothing is shown before a login, so there is nowhere to go.
+                        enabled: Terminal.loggedIn
+                        onActivated: bar.currentIndex = tab.index
+                    }
+                }
             }
         }
 
@@ -329,18 +329,8 @@ ToolBar {
                     }
                     Menu {
                         title: qsTr("Папір чека: %1").arg(Terminal.receiptPaper)
-                        MenuItem {
-                            text: "A4"
-                            checkable: true
-                            checked: Terminal.receiptPaper === "A4"
-                            onTriggered: Terminal.setReceiptPaper("A4")
-                        }
-                        MenuItem {
-                            text: "A5"
-                            checkable: true
-                            checked: Terminal.receiptPaper === "A5"
-                            onTriggered: Terminal.setReceiptPaper("A5")
-                        }
+                        PaperItem { text: "A4" }
+                        PaperItem { text: "A5" }
                     }
                     // Crates differ between points, so the usual one is a setting of the terminal.
                     MenuItem {

@@ -188,8 +188,15 @@ $CM/cmake -S . -B build -G Ninja && $CM/cmake --build build && $CM/ctest --test-
 - Не комітити без прохання користувача.
 
 ## Оточення
-- Fedora, CLion (cmake у PATH відсутній — використовується вбудований у CLion).
-- Qt6 6.11: встановлені Gui/Quick/Qml/SerialPort/Sql/Test (+ драйвер QSQLITE). `sqlite-devel` не встановлено.
+Дві машини автора; на обох збірка без попереджень і всі тести зелені.
+- **Ноутбук (основний):** Fedora, CLion (cmake у PATH відсутній — використовується вбудований у CLion).
+  Qt6 6.11: встановлені Gui/Quick/Qml/SerialPort/Sql/Test (+ драйвер QSQLITE). `sqlite-devel` не встановлено.
+- **Друга машина (з 23.11):** Ubuntu 26.04, GCC 15, Qt 6.10.2 і cmake 4.2 з apt (проєкту досить Qt 6.8), без IDE.
+  Збірка — `cmake` з PATH (команда з розділу «Збірка» без `$CM/`). Пакети: `git cmake ninja-build build-essential
+  qt6-base-dev qt6-declarative-dev qt6-serialport-dev qt6-translations-l10n` + `qml6-module-qtquick*`/`qtqml*`.
+  CUPS-заголовків нема (повідомлення cmake «Could NOT find Cups» — не заважає). Ваг і принтера нема — симулятор.
+  Push — ключем `~/.ssh/id_ed25519` (fetch через HTTPS, push через SSH).
+  Урок: GCC 15 одразу ламає висячі посилання на тимчасові (`X{...}.entries()`), які на Fedora «працювали».
 - Порт ваг: права надаються **явно** (див. `docs/hardware/scale-ie04.md`, «Права на порт»). `pc` додано в групу `dialout` 01.11
   (діє після перезавантаження; `setfacl` — тимчасово, зникає при перепідключенні адаптера). sudo через `!` не працює — окремий термінал.
 - Git: гілка `main`, remote `origin` = git@github.com:IsNazarii/Berry-WMS-Terminal.git (push можна робити з термінала).

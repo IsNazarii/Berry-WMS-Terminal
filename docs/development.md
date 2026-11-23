@@ -4,7 +4,7 @@
 
 | Що | Версія / примітка |
 |---|---|
-| ОС | розробка на Fedora; будь-який Linux з Qt 6.8+ |
+| ОС | перевірено на Fedora (Qt 6.11, GCC 16) і Ubuntu 26.04 (Qt 6.10, GCC 15); будь-який Linux з Qt 6.8+ |
 | Компілятор | з повною підтримкою C++20 і `<format>`: GCC 13+ (перевірено на GCC 16), Clang 17+ |
 | CMake | ≥ 3.28 (у CLion — вбудований) |
 | Генератор | Ninja |
@@ -13,6 +13,15 @@
 | GoogleTest | 1.17, завантажується через `FetchContent` — потрібна мережа при першій конфігурації |
 | qrcodegen | nayuki QR-Code-generator 1.8.0 через `FetchContent` (архів з `URL_HASH`); власного CMake у бібліотеки нема — ціль `qrcodegen` з одного `.cpp`, з `-w` |
 | Порт ваг | оригінальний кабель «Промприлад» USB↔DB9 (FTDI) або USB↔RS-232 + 3-провідний null-modem DB9F–DB9F. **Права на порт надати явно**: `sudo usermod -aG dialout $USER` і перелогінитись — інакше порт не відкриється, а на табло буде «—». Деталі — [hardware/scale-ie04.md](hardware/scale-ie04.md#права-на-порт--надати-явно) |
+
+Ubuntu 26.04, усе потрібне одним рядком (`faketime` і `python3-pil` — лише для знімків екранів, §5):
+
+```bash
+sudo apt install git cmake ninja-build build-essential qt6-base-dev qt6-declarative-dev qt6-serialport-dev \
+  qt6-translations-l10n qml6-module-qtquick qml6-module-qtquick-controls qml6-module-qtquick-templates \
+  qml6-module-qtquick-layouts qml6-module-qtquick-window qml6-module-qtqml qml6-module-qtqml-workerscript \
+  qml6-module-qtcore faketime python3-pil
+```
 
 ## 2. Збірка
 
@@ -55,7 +64,7 @@ $CM/cmake -S . -B build -G Ninja && $CM/cmake --build build && $CM/ctest --test-
   (на справжній SQLite: `:memory:` або тимчасовий файл), `wms_serial_tests` (псевдотермінал) і
   `wms_print_tests` (власний `main()` з `QGuiApplication` — шрифтам він потрібен);
   `gtest_discover_tests` реєструє кожен тест у CTest окремо.
-- Покриваються ядро й infra (UI — тонкий шар без правил). Зараз 334 тести: 274 ядра, 39 infra, 7 порту ваг, 14 друку.
+- Покриваються ядро й infra (UI — тонкий шар без правил). Зараз 356 тестів: 293 ядра, 42 infra, 7 порту ваг, 14 друку.
 - Детермінованість: `Uuid::generateV7(time, randA, randB)` і явні `TimePoint` замість
   `Clock::now()` там, де час важливий.
 
@@ -133,7 +142,7 @@ WMS_SCALE_PORT=/dev/serial/by-id/usb-FTDI_FT232R_USB_UART_AN6UY90E-if00-port0 ./
 ## 5. Робочий процес
 
 1. **Тест-першим для ядра:** спершу тест, що падає, потім мінімальна реалізація.
-2. **Малі кроки:** кожен крок — окремий коміт зі змістовним повідомленням (вимога курсу).
+2. **Малі кроки:** кожен крок — окремий коміт зі змістовним повідомленням.
 3. Після змін у QML — `wms_ui_qmllint`; зміни, що не мають міняти вигляд (рефакторинг), — знімки до й після:
    ```bash
    tools/shots/shots.sh /tmp/before            # до змін (після збірки)
@@ -145,6 +154,9 @@ WMS_SCALE_PORT=/dev/serial/by-id/usb-FTDI_FT232R_USB_UART_AN6UY90E-if00-port0 ./
    Годинник процесу щоразу стартує з 13.11.2026 10:00 (libfaketime — пакет `faketime` на Ubuntu, `libfaketime` на Fedora),
    тож без змін UI знімки збігаються попіксельно; без faketime скрипт попереджає, і різниця в часі чека — норма.
    Для `compare.py` потрібен Pillow (`python3-pil`).
+   Знімки для README — `tools/shots/readme.sh`: населений робочий день (14.07.2026, кілька постачальників, фури, склад,
+   оплати, «підвішені» палети), 1280×800 з подвійною щільністю, обидві теми; `frame.py` додає кути, рамку й тінь і
+   кладе файли в `docs/screenshots/<екран>-light|dark.png`. Ваги дає симулятор, тож числа щоразу трохи інші.
 4. Перед комітом: збірка без попереджень, усі тести зелені.
 5. Нове рішення щодо предметної області фіксується в `CLAUDE.md` (розділ «Прийняті рішення»),
    а зміни API — у `docs/`.
@@ -159,4 +171,4 @@ WMS_SCALE_PORT=/dev/serial/by-id/usb-FTDI_FT232R_USB_UART_AN6UY90E-if00-port0 ./
 4. Оновити запити `Journal`, яких це стосується.
 5. Додати файли в `core/CMakeLists.txt` і `tests/CMakeLists.txt`.
 6. Лише потім — метод у `Terminal`, що повертає `QString` з помилкою, і кнопка в QML.
-7. Оновити [domain.md](domain.md) і [course_mapping.md](course_mapping.md).
+7. Оновити [domain.md](domain.md) (а якщо з'явився новий клас чи ієрархія — і [course/mapping.md](course/mapping.md)).

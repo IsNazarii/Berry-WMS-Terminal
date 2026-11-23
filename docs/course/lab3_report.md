@@ -112,6 +112,6 @@
 
 ## Як виглядає
 
-![Зразок чека (роздріб)](screenshots/receipt-sample.png)
+![Зразок чека (роздріб)](../screenshots/receipt-sample.png)
 
 Демодані, вивід у PDF через `WMS_PRINT_PDF`.

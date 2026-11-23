@@ -31,10 +31,11 @@ flowchart LR
 | Шар | Каталог | Ціль CMake | Залежить від | Що містить |
 |---|---|---|---|---|
 | Ядро | `core/` | `wms_core` (статична бібліотека) | лише стандартна бібліотека C++20 | доменні класи, правила, валідація, обчислення |
-| Інфраструктура | `infra/` | `wms_infra` + `sqlite3` (амальгамація) | core; Qt — лише для ваг і друку | обгортка SQLite (`sqlite::Database`/`Statement`/`ScopedTransaction`) ✅; схема з версіями (`migrateSchema`, 11 міграцій) + `SqliteJournalStore` + `SqliteSessionStore` + `SqliteRepository<T>` + `backupDatabase` ✅; ваги RS-232 (`wms_serial`) ✅; друк чека (`wms_print`) ✅; HTTP-sync — далі |
+| Інфраструктура | `infra/` | `wms_infra` + `sqlite3` (амальгамація) | core; Qt — лише для ваг і друку | обгортка SQLite (`sqlite::Database`/`Statement`/`ScopedTransaction`) ✅; схема з версіями (`migrateSchema`, 12 міграцій) + `SqliteJournalStore` + `SqliteSessionStore` + `SqliteRepository<T>` + `backupDatabase` ✅; ваги RS-232 (`wms_serial`) ✅; друк чека (`wms_print`) ✅; HTTP-sync — далі |
 | Інтерфейс | `ui/` | `wms_ui` + `wms_uiplugin` (QML-модуль `BerryWms.Ui`) | core, infra, Qt Quick | QML-екрани і тонкі адаптери |
 | Точка входу | `app/` | `wms_terminal` (виконуваний) | ui | `main()`: створює `QGuiApplication`, завантажує `Main.qml` |
-| Тести | `tests/` | `wms_core_tests`, `wms_infra_tests`, `wms_serial_tests`, `wms_print_tests` | core / infra, GoogleTest | 274 тести ядра, 39 infra на справжній SQLite, 7 порту ваг на псевдотерміналі, 14 друку (зображення й PDF) |
+| Тести | `tests/` | `wms_core_tests`, `wms_infra_tests`, `wms_serial_tests`, `wms_print_tests` | core / infra, GoogleTest | 293 тести ядра, 42 infra на справжній SQLite, 7 порту ваг на псевдотерміналі, 14 друку (зображення й PDF) |
+| Інструменти | `tools/shots/` | `wms_shots` (виконуваний, якщо є Qt Test) | ui | знімки всіх екранів без вікна: перевірка змін UI «до/після» і знімки для README |
 
 **Правило залежностей:** лише вниз (`app → ui → infra → core`). Ядро не підключає жодного
 заголовка Qt — це перевіряється тим, що `wms_core` лінкується без Qt і тестується окремо.
@@ -266,9 +267,9 @@ sequenceDiagram
   для справжніх ваг — біт індикатора (він сам фільтрує коливання), `StabilityDetector` — лише в симуляторі. `ScaleMonitor` знає драйвер лише через інтерфейс, тож заміна
   симулятора не зачепить екрани. Протокол перевірено на пристрої 01.11.2026 — результати, сирий запис і план у
   [hardware/scale-ie04.md](hardware/scale-ie04.md).
-- **Друк чека** (лаба 3) ✅: звичайний принтер, сторінка A4 (A5 — можливо, після спроб). Три частини:
+- **Друк чека** ✅: звичайний принтер, сторінка A4 (A5 — можливо, після спроб). Три частини:
   що на папері — чистий C++ у ядрі (`makeReceiptDocument` → `ReceiptDocument`, тести без принтера); QR — `QrMatrix`
-  (обгортка nayuki qrcodegen, зовнішня бібліотека лаби); верстка й друк — окрема Qt-ціль `wms_print`
+  (обгортка nayuki qrcodegen); верстка й друк — окрема Qt-ціль `wms_print`
   (`paintReceipt` малює на будь-якому `QPainter`, тому тести дивляться на зображення; `ReceiptPrinter` — `QPrinter`, CUPS).
   Друк іде **після** запису в базу: проблема з принтером не зачіпає чек, оператор бачить `printProblem` і може
   надрукувати копію з «Каси». Зупинена черга CUPS завдання не отримує, бо інакше чек вийшов би коли завгодно пізніше.

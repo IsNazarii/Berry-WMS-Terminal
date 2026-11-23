@@ -1,6 +1,6 @@
 # Відповідність вимогам курсу ООП
 
-Як вимоги лектора ([docs/source/course_requirements.md](source/course_requirements.md))
+Як вимоги лектора ([docs/source/course_requirements.md](../source/course_requirements.md))
 виконуються в коді. Документ оновлюється по ходу роботи.
 
 ## Загальні вимоги
@@ -10,8 +10,8 @@
 | Сучасна ООП-мова | C++20 (concepts, `std::variant`, `<=>`, `std::format`, designated initializers, ranges) |
 | Одна програма, одна точка входу `main()` | `app/main.cpp` → `wms_terminal` |
 | Git з регулярними змістовними комітами | малі кроки, кожен — окремий коміт; `git log` |
-| Unit-тести (для «відмінно») | 334 тести GoogleTest у `tests/` (274 ядра, 39 infra на справжній SQLite, 7 порту ваг на псевдотерміналі, 14 друку; розбір кадрів ваг — на справжньому записі з пристрою), ядро пишеться тест-першим |
-| Декларація використання ШІ | розділ у [README](../README.md#використання-ші), домовленості в `CLAUDE.md` |
+| Unit-тести (для «відмінно») | 356 тестів GoogleTest у `tests/` (293 ядра, 42 infra на справжній SQLite, 7 порту ваг на псевдотерміналі, 14 друку; розбір кадрів ваг — на справжньому записі з пристрою), ядро пишеться тест-першим |
+| Декларація використання ШІ | розділ у [README](../../README.md#використання-ші), домовленості в `CLAUDE.md` |
 | Аналіз конкурентів (для «відмінно») | ⏳ `docs/competitors.md` |
 
 ## Лабораторна 1 — базові ідеї ООП ✅
@@ -32,7 +32,7 @@
 `IScaleDriver`, `SimulatedScaleDriver`, `StabilityDetector`, `Ie04FrameReader`, `JournalStore`, `SessionStore`, `Repository<T>` + infra-класи
 `sqlite::Database`, `sqlite::Statement`, `sqlite::ScopedTransaction`, `sqlite::Error`, `SqliteJournalStore`, `SqliteSessionStore`, `SqliteRepository<T>`, `SerialScaleDriver`, `QrMatrix`, `ReceiptPrinter`
 (+ функції `backupDatabase`, `paintReceipt`) + UI-класи `Terminal`, `SupplierListModel`,
-`ScaleMonitor`. Детально — [domain.md](domain.md).
+`ScaleMonitor`. Детально — [domain.md](../domain.md).
 
 ### Ієрархії
 
@@ -88,7 +88,7 @@ classDiagram
 
 | Вимога | Мінімум | Стан |
 |---|---|---|
-| Логіка відділена від GUI | так | ядро без Qt; `Terminal` — тонкий міст, правила лише в `core/` ([ui.md](ui.md)) |
+| Логіка відділена від GUI | так | ядро без Qt; `Terminal` — тонкий міст, правила лише в `core/` ([ui.md](../ui.md)) |
 | Вікна / екрани | 4 | Вхід, Сесія, Прийом, Розподіл, Склад, Каса, Історія, пошук і додавання постачальника (+ діалоги «Додати фуру…», «Додати культуру…», прибрати культуру, закриття сесії, «Оплатити…», «Видати чек…», підтвердження виплати) |
 | Елементи керування | 20 | > 20: `Button`, `TextField`, `ComboBox`, `RadioButton`, `CheckBox`, `TabButton`, `ToolButton`, `Menu`, `Dialog`… |
 | Контейнер | 1 | `ListView` (постачальники, відкриті чеки, рядки чека, чеки до розподілу, фури/склад), `ListView` (борги, історія розрахунків), `ListView` (дні й місця, історія вантаження), `Repeater` (ціни, фури, культури із залишком, залишок складу) |
@@ -96,7 +96,7 @@ classDiagram
 
 Лабораторну закрито: шість екранів у власному стилі (`BerryWms.Style`), оболонка з вкладками й станом точки,
 порожні стани; стан термінала й довідники (постачальники, оператори, культури) зберігаються в SQLite.
-Як виглядає — знімки в [README](../README.md#як-це-виглядає). Подальші зміни інтерфейсу — точкові.
+Як виглядає — знімки в [README](../../README.md#як-це-виглядає). Подальші зміни інтерфейсу — точкові.
 
 ## Лабораторна 3 — зовнішня бібліотека ✅
 

@@ -7,6 +7,7 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 option(WMS_BUILD_TESTS "Build unit tests" ON)
+option(WMS_BUILD_TOOLS "Build developer tools (screenshots)" ON)
 
 # Qt is used by the UI layer, the entry point, the scale's serial port (wms_serial) and
 # printing (wms_print); core and the SQLite storage stay Qt-free.
@@ -21,9 +22,14 @@ set(QT_QML_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/qml)
 add_subdirectory(ui)
 add_subdirectory(app)
 # Developer tools (screenshots for UI before/after checks); not part of the terminal.
-add_subdirectory(tools/shots)
+if(WMS_BUILD_TOOLS)
+    add_subdirectory(tools/shots)
+endif()
 
 if(WMS_BUILD_TESTS)
     enable_testing()
     add_subdirectory(tests)
 endif()
+
+# Install rules and .deb/.rpm packages (cpack); last, so CPack sees every install rule.
+add_subdirectory(packaging)

@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Name=Berry WMS Terminal
+GenericName=Термінал приймальника ягід
+Comment=Прийом, зважування й розподіл ягід, розрахунок з постачальниками
+Exec=berry-wms
+Icon=io.github.isnazarii.BerryWms
+Terminal=false
+Categories=Office;
+Keywords=ягоди;прийом;ваги;чек;berry;wms;

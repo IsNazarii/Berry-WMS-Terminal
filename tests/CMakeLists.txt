@@ -4,6 +4,8 @@ FetchContent_Declare(
     URL https://github.com/google/googletest/archive/refs/tags/v1.17.0.tar.gz
     DOWNLOAD_EXTRACT_TIMESTAMP TRUE
 )
+# GoogleTest only builds the tests: it must not land in an install or a package.
+set(INSTALL_GTEST OFF CACHE BOOL "" FORCE)
 FetchContent_MakeAvailable(googletest)
 
 add_executable(wms_core_tests

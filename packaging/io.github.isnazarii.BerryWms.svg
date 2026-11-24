@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 36 36" width="256" height="256">
+  <!-- The app's mark (ui/qml/BrandMark.qml) in the colours of the login brand panel
+       (Theme.brandPanel, brandBerriesOnPanel, brandStemOnPanel), centred on a rounded tile. -->
+  <rect width="36" height="36" rx="8" fill="#2A2E70"/>
+  <g transform="translate(4 5)">
+    <path d="M14 3 C15 5 17 6 19 6" fill="none" stroke="#7CF0B0" stroke-width="2" stroke-linecap="round"/>
+    <circle cx="10" cy="11" r="5" fill="#8F95F2"/>
+    <circle cx="18" cy="11" r="5" fill="#B9BCF7"/>
+    <circle cx="14" cy="18" r="5" fill="#E2E3F6"/>
+  </g>
+</svg>

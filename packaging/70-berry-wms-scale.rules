@@ -1,0 +1,4 @@
+# Berry WMS Terminal: the scale's USB-serial cable (FTDI FT232R, as on the IE-04 indicator)
+# is handed to whoever is logged in at the terminal, so the operator needs no dialout group
+# and no reboot. "uaccess" must be tagged before 73-seat-late.rules applies it, hence 70.
+SUBSYSTEM=="tty", ATTRS{idVendor}=="0403", ATTRS{idProduct}=="6001", TAG+="uaccess"

@@ -37,6 +37,8 @@ int main(int argc, char* argv[]) {
     const double uiScale = applyUiScale();
 
     QGuiApplication app{argc, argv};
+    // Ties the window to the installed launcher (packaging/), so the dock shows its icon and name.
+    QGuiApplication::setDesktopFileName("io.github.isnazarii.BerryWms");
 
     // The terminal speaks Ukrainian whatever the system locale, and so must Qt's own
     // texts: standard dialog buttons ("Cancel"), text field context menus.

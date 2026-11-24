@@ -1,6 +1,6 @@
 # Packages for every supported system, from one tag:
 #   git tag v0.2.0 && git push origin v0.2.0
-# builds .deb (Ubuntu 26.04), .rpm (Fedora 44 and 45) and an AppImage (any recent Linux) and
+# builds .deb (Ubuntu 26.04+), .rpm (Fedora 44+) and an AppImage (any recent Linux) and
 # puts them on the Releases page. Each build runs every test first, through the same scripts as
 # a local build (packaging/). Run by hand (Actions → Release → Run workflow), it only builds:
 # the files are the run's artifacts and no release is made.
@@ -34,7 +34,8 @@ jobs:
   deb:
     needs: version
     runs-on: ubuntu-24.04
-    # The package depends on the system's own Qt, so it is built on the release it is for.
+    # The package takes the system's Qt as "this version or newer", so it is built on the oldest
+    # release we support and installs on every newer one.
     container: ubuntu:26.04
     steps:
       - name: Install build tools and Qt
@@ -49,25 +50,17 @@ jobs:
             qml6-module-qtqml-workerscript qml6-module-qtcore
       - uses: actions/checkout@v7
       - run: packaging/build-packages.sh build-release
-      - name: Name the package after its system
-        run: |
-          mkdir dist
-          mv build-release/berry-wms_${{ needs.version.outputs.version }}_amd64.deb \
-             dist/berry-wms_${{ needs.version.outputs.version }}_ubuntu26.04_amd64.deb
       - uses: actions/upload-artifact@v7
         with:
-          name: deb-ubuntu26.04
-          path: dist/*.deb
+          name: deb
+          path: build-release/*.deb
           if-no-files-found: error
 
   rpm:
     needs: version
     runs-on: ubuntu-24.04
-    strategy:
-      fail-fast: false
-      matrix:
-        fedora: ['44', '45']
-    container: fedora:${{ matrix.fedora }}
+    # The oldest supported Fedora, for the same reason as the .deb: the package installs on newer ones.
+    container: fedora:44
     steps:
       - name: Install build tools and Qt
         run: |
@@ -77,7 +70,7 @@ jobs:
       - run: packaging/build-packages.sh build-release
       - uses: actions/upload-artifact@v7
         with:
-          name: rpm-fedora${{ matrix.fedora }}
+          name: rpm
           path: build-release/*.rpm
           if-no-files-found: error
 
@@ -137,9 +130,9 @@ jobs:
 
           | Система | Файл | Встановлення |
           |---|---|---|
-          | Ubuntu 26.04 | \`berry-wms_${VERSION}_ubuntu26.04_amd64.deb\` | \`sudo apt install ./berry-wms_${VERSION}_ubuntu26.04_amd64.deb\` |
-          | Fedora 44 / 45 | \`berry-wms-${VERSION}-1.fc44.x86_64.rpm\` / \`…fc45…\` | \`sudo dnf install ./berry-wms-${VERSION}-1.fc45.x86_64.rpm\` |
-          | Будь-який інший свіжий Linux | \`Berry_WMS_Terminal-${VERSION}-x86_64.AppImage\` | \`chmod +x\` і запустити, без встановлення |
+          | Ubuntu 26.04 і новіші | \`berry-wms_${VERSION}_amd64.deb\` | \`sudo apt install ./berry-wms_${VERSION}_amd64.deb\` |
+          | Fedora 44 і новіші | \`berry-wms-${VERSION}-1.x86_64.rpm\` | \`sudo dnf install ./berry-wms-${VERSION}-1.x86_64.rpm\` |
+          | Будь-який інший Linux (glibc ≥ 2.38: Ubuntu 24.04, Fedora 39 і новіші) | \`Berry_WMS_Terminal-${VERSION}-x86_64.AppImage\` | \`chmod +x\` і запустити, без встановлення |
 
           Пакети додають ярлик у меню й правило udev для кабелю ваг; з AppImage для ваг потрібна група \`dialout\`.
           База лежить у \`~/.local/share/BerryWms/\`: оновлення її не чіпає.

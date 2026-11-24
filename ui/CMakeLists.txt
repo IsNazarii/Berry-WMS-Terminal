@@ -48,6 +48,11 @@ qt_add_qml_module(wms_ui
     IMPORTS BerryWms.Style
 )
 
+# QML is precompiled to bytecode only, not to C++: the C++ (AOT) code calls Qt's private API, which
+# would tie the packages to the exact Qt they were built with. Bytecode keeps them working on any
+# newer Qt; a UI this size gains nothing visible from AOT. The style module does the same.
+set_target_properties(wms_ui PROPERTIES QT_QMLCACHEGEN_ARGUMENTS "--only-bytecode")
+
 # The generated QML type registration includes headers by bare name.
 target_include_directories(wms_ui PUBLIC src)
 target_link_libraries(wms_ui PUBLIC Qt6::Quick Qt6::QuickControls2 wms_core wms_infra wms_serial wms_print wms_style)

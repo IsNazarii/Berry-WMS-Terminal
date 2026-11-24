@@ -44,3 +44,5 @@ qt_add_qml_module(wms_style
         icons/history.svg
 )
 target_link_libraries(wms_style PUBLIC Qt6::Quick Qt6::QuickControls2)
+# Bytecode only, as wms_ui (see there): no private Qt API in the program.
+set_target_properties(wms_style PROPERTIES QT_QMLCACHEGEN_ARGUMENTS "--only-bytecode")

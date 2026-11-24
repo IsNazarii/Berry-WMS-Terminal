@@ -48,6 +48,8 @@ set(CPACK_DEBIAN_PACKAGE_RECOMMENDS "qt6-translations-l10n, qt6-wayland")
 
 # Fedora: rpmbuild finds the Qt libraries; qtdeclarative holds every QML module we import.
 set(CPACK_RPM_FILE_NAME RPM-DEFAULT)
+# The .fc44/.fc45 tag: each package follows its own release's Qt, so names must differ.
+set(CPACK_RPM_PACKAGE_RELEASE_DIST ON)
 set(CPACK_RPM_PACKAGE_GROUP "Applications/Productivity")
 # SPDX name; commercial use needs a separate license from the author (README).
 set(CPACK_RPM_PACKAGE_LICENSE "PolyForm-Noncommercial-1.0.0")

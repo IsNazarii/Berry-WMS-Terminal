@@ -359,7 +359,9 @@ F2 → `SupplierPicker`; по центру обраний `cashSupplierId` (ок
          (`.deb` встановлено й перевірено на Ubuntu 26.04 24.11); лишилось: `.rpm` на Fedora, udev-правило на справжніх вагах;
       2) ✅ AppImage (24.11): `packaging/build-appimage.sh` (linuxdeploy + plugin-qt + appimagetool 1.9.1, закріплені SHA-256;
          клієнтські плагіни Wayland додає сам); локальний образ — лише перевірка (glibc 2.43), реліз — у CI на Ubuntu 24.04;
-      3) GitHub Actions: тег `vX.Y.Z` → Releases з `.rpm`, `.deb`, `.AppImage`; згодом COPR (Fedora) і PPA (Ubuntu) для автооновлень;
+      3) GitHub Actions (`.github/workflows/release.yml`, 24.11): тег `vX.Y.Z` (= версія в `CMakeLists.txt`) → Releases з `.deb`
+         (Ubuntu 26.04), `.rpm` (Fedora 44, 45), AppImage (Ubuntu 24.04 + Qt 6.11.3 з qt.io); ручний запуск — лише артефакти;
+         згодом COPR (Fedora) і PPA (Ubuntu) для автооновлень;
       4) Windows (пізніше, за запитом): прапорці MSVC/MinGW, тести вагів без `pty.h`, `windeployqt` + Inno Setup або zip,
          перевірка друку й COM-порту на справжньому ПК.
 5. **Sync** за рішеннями вище (`docs/sync.md` → факти сесії → id сесії з дати → push/pull → FastAPI-заглушка), звіти.

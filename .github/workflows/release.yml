@@ -1,0 +1,148 @@
+# Packages for every supported system, from one tag:
+#   git tag v0.2.0 && git push origin v0.2.0
+# builds .deb (Ubuntu 26.04), .rpm (Fedora 44 and 45) and an AppImage (any recent Linux) and
+# puts them on the Releases page. Each build runs every test first, through the same scripts as
+# a local build (packaging/). Run by hand (Actions → Release → Run workflow), it only builds:
+# the files are the run's artifacts and no release is made.
+name: Release
+
+on:
+  push:
+    tags: ['v*.*.*']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  version:
+    runs-on: ubuntu-24.04
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+    steps:
+      - uses: actions/checkout@v7
+      # The packages take their version from CMakeLists.txt; a tag that says otherwise is a mistake.
+      - id: version
+        run: |
+          version=$(sed -n 's/^project(BerryWms VERSION \([0-9.]*\).*/\1/p' CMakeLists.txt)
+          if [[ "$GITHUB_REF_TYPE" == tag && "$GITHUB_REF_NAME" != "v$version" ]]; then
+            echo "::error::Tag $GITHUB_REF_NAME does not match the project version $version in CMakeLists.txt"
+            exit 1
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
+  deb:
+    needs: version
+    runs-on: ubuntu-24.04
+    # The package depends on the system's own Qt, so it is built on the release it is for.
+    container: ubuntu:26.04
+    steps:
+      - name: Install build tools and Qt
+        env:
+          DEBIAN_FRONTEND: noninteractive
+        run: |
+          apt-get update
+          apt-get install -y --no-install-recommends ca-certificates git cmake ninja-build build-essential \
+            dpkg-dev file qt6-base-dev qt6-declarative-dev qt6-serialport-dev \
+            qml6-module-qtquick qml6-module-qtquick-controls qml6-module-qtquick-templates \
+            qml6-module-qtquick-layouts qml6-module-qtquick-shapes qml6-module-qtquick-window \
+            qml6-module-qtqml-workerscript qml6-module-qtcore
+      - uses: actions/checkout@v7
+      - run: packaging/build-packages.sh build-release
+      - name: Name the package after its system
+        run: |
+          mkdir dist
+          mv build-release/berry-wms_${{ needs.version.outputs.version }}_amd64.deb \
+             dist/berry-wms_${{ needs.version.outputs.version }}_ubuntu26.04_amd64.deb
+      - uses: actions/upload-artifact@v7
+        with:
+          name: deb-ubuntu26.04
+          path: dist/*.deb
+          if-no-files-found: error
+
+  rpm:
+    needs: version
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        fedora: ['44', '45']
+    container: fedora:${{ matrix.fedora }}
+    steps:
+      - name: Install build tools and Qt
+        run: |
+          dnf install -y git cmake ninja-build gcc-c++ rpm-build findutils \
+            qt6-qtbase-devel qt6-qtdeclarative-devel qt6-qtserialport-devel
+      - uses: actions/checkout@v7
+      - run: packaging/build-packages.sh build-release
+      - uses: actions/upload-artifact@v7
+        with:
+          name: rpm-fedora${{ matrix.fedora }}
+          path: build-release/*.rpm
+          if-no-files-found: error
+
+  appimage:
+    needs: version
+    # An AppImage runs on a glibc as new as the build machine's or newer: the oldest system we
+    # support builds it. Its Qt (>= 6.8) is too old there, so Qt comes from qt.io.
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+      - uses: jurplel/install-qt-action@v4
+        with:
+          version: '6.11.3'
+          host: linux
+          target: desktop
+          arch: linux_gcc_64
+          modules: qtserialport
+          cache: true
+      # GCC 14 for C++20 <format> and friends; the libraries are the ones the Qt plugins need
+      # to be copied into the image, plus the LGPL/GPL texts that travel with the bundled Qt.
+      - name: Install build tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends ninja-build g++-14 base-files \
+            libxcb-cursor0 libxkbcommon-x11-0 libxcb-icccm4 libxcb-image0 libxcb-keysyms1 \
+            libxcb-render-util0 libxcb-shape0 libegl1 libgl1 libcups2 \
+            libwayland-client0 libwayland-cursor0 libwayland-egl1
+      - run: packaging/build-appimage.sh build-appimage
+        env:
+          CC: gcc-14
+          CXX: g++-14
+          QMAKE: ${{ env.QT_ROOT_DIR }}/bin/qmake
+      - uses: actions/upload-artifact@v7
+        with:
+          name: appimage
+          path: build-appimage/*.AppImage
+          if-no-files-found: error
+
+  release:
+    if: github.ref_type == 'tag'
+    needs: [version, deb, rpm, appimage]
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v8
+        with:
+          path: dist
+          merge-multiple: true
+      - name: Publish the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ needs.version.outputs.version }}
+        run: |
+          cat > notes.md <<EOF
+          ## Який файл узяти
+
+          | Система | Файл | Встановлення |
+          |---|---|---|
+          | Ubuntu 26.04 | \`berry-wms_${VERSION}_ubuntu26.04_amd64.deb\` | \`sudo apt install ./berry-wms_${VERSION}_ubuntu26.04_amd64.deb\` |
+          | Fedora 44 / 45 | \`berry-wms-${VERSION}-1.fc44.x86_64.rpm\` / \`…fc45…\` | \`sudo dnf install ./berry-wms-${VERSION}-1.fc45.x86_64.rpm\` |
+          | Будь-який інший свіжий Linux | \`Berry_WMS_Terminal-${VERSION}-x86_64.AppImage\` | \`chmod +x\` і запустити, без встановлення |
+
+          Пакети додають ярлик у меню й правило udev для кабелю ваг; з AppImage для ваг потрібна група \`dialout\`.
+          База лежить у \`~/.local/share/BerryWms/\`: оновлення її не чіпає.
+          EOF
+          gh release create "$GITHUB_REF_NAME" dist/* --repo "$GITHUB_REPOSITORY" \
+            --title "Berry WMS Terminal $VERSION" --notes-file notes.md --generate-notes --verify-tag

@@ -100,6 +100,19 @@ AppImage працює лише там, де glibc не старіша, ніж н
 Qt з qt.io); локальна збірка — для перевірки. Запуск без вікна (`QT_QPA_PLATFORM=offscreen`) AppImage не
 вміє — у ньому лише плагіни Wayland і X11.
 
+**Релізи (GitHub Actions, `.github/workflows/release.yml`).** Версія — у `project(BerryWms VERSION …)` у
+`CMakeLists.txt`. Щоб випустити її:
+
+```bash
+git tag v0.2.0 && git push origin v0.2.0     # тег має збігатися з версією в CMakeLists.txt, інакше збірка зупиниться
+```
+
+CI тими самими скриптами (`packaging/`) і лише після зелених тестів збирає `.deb` для Ubuntu 26.04 (у контейнері
+`ubuntu:26.04`), `.rpm` для Fedora 44 і 45 (контейнери `fedora:44`/`fedora:45`, назви з `.fc44`/`.fc45`) і AppImage
+(Ubuntu 24.04, Qt 6.11.3 з qt.io, GCC 14) і викладає їх на сторінку Releases з таблицею «який файл узяти».
+Ручний запуск (Actions → Release → Run workflow) лише збирає: файли лишаються артефактами запуску, релізу нема.
+Новий випуск Fedora чи Ubuntu — дописати в матрицю/контейнер.
+
 Без пакета, у домашню теку (правило udev там нічого б не дало, тому його вимкнено):
 
 ```bash

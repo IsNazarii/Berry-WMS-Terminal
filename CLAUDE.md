@@ -120,6 +120,8 @@
   Flatpak (пісочниця заважає вагам/друку, база переїхала б) і Snap — ні. Windows — можливо пізніше (код переносний).
   Id застосунку — `io.github.isnazarii.BerryWms` (ярлик, іконка, `setDesktopFileName`); команда — `berry-wms`.
   База лишається в `~/.local/share/BerryWms/` — оновлення програми дані не чіпає.
+  Правило udev (`uaccess`) лишається (рішення 24.11), але це зручність, а не єдиний шлях: на ПК пункту оператора
+  все одно додають у `dialout` (інший кабель, не FTDI, чи запуск не з локального сеансу правило не покриває).
 - **Ліцензія (рішення 24.11):** PolyForm Noncommercial 1.0.0 (`LICENSE.md`, рядок `Required Notice:` — автор). Код доступний
   для читання (source-available, **не** «open source» — так і не називати); комерційне використання, зокрема робота
   пункту, що належить не авторові, — окремою ліцензією автора. Ліцензії сторонніх частин — `THIRD_PARTY_NOTICES.md`
@@ -355,7 +357,8 @@ F2 → `SupplierPicker`; по центру обраний `cashSupplierId` (ок
       1) основа + `.rpm`/`.deb`: Release, правила `install()` (`berry-wms`, ярлик, іконка зі знаком `BrandMark`,
          правило udev для FTDI з `TAG+="uaccess"`), CPack, `packaging/build-packages.sh` — пакет тієї системи, де збирається
          (`.deb` встановлено й перевірено на Ubuntu 26.04 24.11); лишилось: `.rpm` на Fedora, udev-правило на справжніх вагах;
-      2) AppImage (Qt усередині, новий статичний runtime без `libfuse2`; збирати на найстарішій підтримуваній системі);
+      2) ✅ AppImage (24.11): `packaging/build-appimage.sh` (linuxdeploy + plugin-qt + appimagetool 1.9.1, закріплені SHA-256;
+         клієнтські плагіни Wayland додає сам); локальний образ — лише перевірка (glibc 2.43), реліз — у CI на Ubuntu 24.04;
       3) GitHub Actions: тег `vX.Y.Z` → Releases з `.rpm`, `.deb`, `.AppImage`; згодом COPR (Fedora) і PPA (Ubuntu) для автооновлень;
       4) Windows (пізніше, за запитом): прапорці MSVC/MinGW, тести вагів без `pty.h`, `windeployqt` + Inno Setup або zip,
          перевірка друку й COM-порту на справжньому ПК.

@@ -82,6 +82,24 @@ QML-модулі й плагін SVG програма завантажує пі�
 (`packaging/CMakeLists.txt`); новий `import` у QML — додати й туди. База (`~/.local/share/BerryWms/`) лежить
 окремо від програми: встановлення, оновлення й видалення пакета її не чіпають.
 
+**AppImage** — один файл з Qt усередині, для будь-якого свіжого Linux (без встановлення й без `sudo`):
+
+```bash
+packaging/build-appimage.sh          # Release + усі тести → build-appimage/Berry_WMS_Terminal-<версія>-x86_64.AppImage
+chmod +x Berry_WMS_Terminal-*.AppImage && ./Berry_WMS_Terminal-*.AppImage
+```
+
+Скрипт сам завантажує закріплені версії `linuxdeploy`, `linuxdeploy-plugin-qt` і `appimagetool` (перевірка
+SHA-256, кеш — `~/.cache/berry-wms/appimage-tools`). `appimagetool` 1.9 кладе новий статичний runtime, тож
+машині користувача `libfuse2` не потрібна. Плагін Qt не бере клієнтських плагінів Wayland (без
+`wayland-shell-integration` вікно на Wayland не відкривається), тому скрипт додає їх сам. Разом з Qt (LGPL) в
+образ ідуть тексти LGPL-3 і GPL-3. Правила udev в AppImage нема — для ваг потрібна група `dialout`.
+
+AppImage працює лише там, де glibc не старіша, ніж на машині збирання: зібраний на Ubuntu 26.04 (glibc 2.43)
+не запуститься на 24.04. Тому образ для релізу збирає CI на найстарішій підтримуваній системі (Ubuntu 24.04,
+Qt з qt.io); локальна збірка — для перевірки. Запуск без вікна (`QT_QPA_PLATFORM=offscreen`) AppImage не
+вміє — у ньому лише плагіни Wayland і X11.
+
 Без пакета, у домашню теку (правило udev там нічого б не дало, тому його вимкнено):
 
 ```bash

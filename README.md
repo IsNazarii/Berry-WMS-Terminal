@@ -202,7 +202,7 @@ ctest --test-dir build --output-on-failure   # 356 тестів
 
 **Встановлення:** `packaging/build-packages.sh` збирає `.deb` (Ubuntu 26.04+) або `.rpm` (Fedora 42+) з ярликом, іконкою
 і правилом udev для кабелю ваг; далі `sudo apt install ./build-release/berry-wms_*.deb` чи `sudo dnf install ./build-release/berry-wms-*.rpm`,
-запуск — `berry-wms` або з меню. Деталі — [docs/development.md](docs/development.md#встановлення-й-пакети).
+запуск — `berry-wms` або з меню. Для будь-якого іншого Linux — один файл AppImage з Qt усередині: `packaging/build-appimage.sh`. Деталі — [docs/development.md](docs/development.md#встановлення-й-пакети).
 
 ## Архітектура
 
@@ -249,7 +249,7 @@ flowchart TD
 - [x] Друк чека з QR-кодом на звичайному принтері
 - [x] Історія вантаження: по кожній фурі, по всіх фурах і по складу
 - [x] Рефакторинг UI на спільні QML-компоненти
-- [ ] Розгортання: `.deb`/`.rpm` (у роботі), AppImage, готові пакети на сторінці релізів
+- [ ] Розгортання: `.deb`/`.rpm` і AppImage ✅, готові пакети на сторінці релізів (CI)
 - [ ] Гнучкіше перевантаження й довантаження фур
 - [ ] Доплата постачальникам, якщо ціна сильно піднялася (окремим записом журналу, чеки незмінні)
 - [ ] Синхронізація терміналів точки через мінімальний сервер: outbox, батчі, retry з backoff
@@ -282,7 +282,7 @@ ui/                   QML-модуль BerryWms.Ui (wms_ui)
   qml/                  Main.qml, AppBar.qml, screens/ — екрани й спільні компоненти
   style/                модуль BerryWms.Style: власний стиль контролів, Theme.qml, шрифт Onest, іконки
 app/main.cpp          точка входу (wms_terminal)
-packaging/            встановлення й пакети: ярлик, іконка, правило udev, CPack, build-packages.sh
+packaging/            встановлення й пакети: ярлик, іконка, правило udev, CPack, build-packages.sh, build-appimage.sh
 tests/                unit-тести: wms_core_tests, wms_infra_tests, wms_serial_tests, wms_print_tests
 tools/shots/          wms_shots — знімки екранів без вікна
 docs/                 документація; screenshots/ — знімки для README

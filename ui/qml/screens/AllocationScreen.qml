@@ -13,7 +13,7 @@ Page {
 
     // No session: the main window switches to the session screen.
     signal sessionRequested()
-    title: qsTr("Розподіл по фурах")
+    title: qsTr("Розподіл палет")
 
     // A truck id or "warehouse"; kept in QML, the core checks it on every allocation.
     property string destinationId: ""
@@ -81,8 +81,8 @@ Page {
                 icon: sourceList.count === 0 ? "circle-check" : "truck"
                 title: sourceList.count === 0 ? qsTr("Усе розподілено") : qsTr("Оберіть чек зліва")
                 text: sourceList.count === 0
-                      ? qsTr("Чек з'явиться зліва, коли палеті забракне місця у фурі або на «Прийомі» не обрано ціль.")
-                      : qsTr("Там чеки з палетами, що ще чекають на фуру або склад.")
+                      ? qsTr("Чек з'явиться зліва, коли палеті забракне місця у вантажівці або на «Прийомі» не обрано ціль.")
+                      : qsTr("Там чеки з палетами, що ще чекають на вантажівку або склад.")
             }
 
             ColumnLayout {
@@ -102,7 +102,7 @@ Page {
 
                 TargetBanner {
                     text: screen.hasDestination ? qsTr("Куди: %1").arg(screen.destinationTitle)
-                                                : qsTr("Оберіть фуру або склад праворуч")
+                                                : qsTr("Оберіть вантажівку або склад праворуч")
                     active: screen.hasDestination
                 }
 

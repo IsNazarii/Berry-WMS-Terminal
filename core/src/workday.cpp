@@ -103,7 +103,7 @@ std::vector<std::string> WorkDay::validateCancel(const Uuid& receiptId, std::siz
     const auto destination = journal.destinationOf(receiptId, index);
     if (errors.empty() && destination && !accepts(*destination)) {
         const Truck* gone = findTruck(std::get<TruckId>(*destination));
-        errors.push_back(std::format("Палета вже у фурі {}, яка не завантажується", gone ? gone->plate() : "?"));
+        errors.push_back(std::format("Палета вже у вантажівці {}, яка не завантажується", gone ? gone->plate() : "?"));
     }
     return errors;
 }
@@ -184,7 +184,7 @@ std::vector<std::string> WorkDay::validateClose() const {
     }
     for (const Truck& t : trucks_) {
         if (t.status() == TruckStatus::Loading) {
-            errors.push_back(std::format("Фура {} ще завантажується: закрийте її або перенесіть у наступну сесію",
+            errors.push_back(std::format("Вантажівка {} ще завантажується: закрийте її або перенесіть у наступну сесію",
                                          t.plate()));
         }
     }
@@ -214,7 +214,7 @@ void WorkDay::setPrice(std::string cropCode, Money pricePerKg, TimePoint at, con
 }
 
 const Truck& WorkDay::addTruck(std::string plate, int boxLimit, const Amendment& amendment, TruckDetails details) {
-    auto description = std::format("Додано фуру {}", plate);
+    auto description = std::format("Додано вантажівку {}", plate);
     const Truck* added = nullptr;
     amend(amendment, std::move(description),
           [&] { added = &trucks_.emplace_back(Truck::create(std::move(plate), boxLimit, std::move(details))); });
@@ -223,12 +223,12 @@ const Truck& WorkDay::addTruck(std::string plate, int boxLimit, const Amendment&
 
 void WorkDay::departTruck(const TruckId& id, const Amendment& amendment) {
     Truck& t = truck(id);
-    amend(amendment, std::format("Фуру {} відправлено", t.plate()), [&] { t.depart(); });
+    amend(amendment, std::format("Вантажівку {} відправлено", t.plate()), [&] { t.depart(); });
 }
 
 void WorkDay::carryOverTruck(const TruckId& id, const Amendment& amendment) {
     Truck& t = truck(id);
-    amend(amendment, std::format("Фуру {} перенесено в наступну сесію", t.plate()), [&] { t.carryOver(); });
+    amend(amendment, std::format("Вантажівку {} перенесено в наступну сесію", t.plate()), [&] { t.carryOver(); });
 }
 
 std::vector<Truck> WorkDay::trucksForNextSession() const {

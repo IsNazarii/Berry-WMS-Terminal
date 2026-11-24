@@ -142,7 +142,7 @@ Page {
                     Layout.fillWidth: true
                 }
                 Label {
-                    text: qsTr("Прийом, зважування, розподіл по фурах і розрахунок з постачальниками")
+                    text: qsTr("Прийом, зважування, відвантаження й розрахунки з постачальниками")
                     font.pixelSize: Theme.fontSizeField
                     color: Theme.brandPanelMuted
                     wrapMode: Text.WordWrap

@@ -43,14 +43,14 @@ Page {
 
                 PanelHeader {
                     title: qsTr("Залишок на складі")
-                    subtitle: qsTr("Надходить з «Прийому» і «Розподілу»; відвантажується лише у фуру поточної сесії")
+                    subtitle: qsTr("Надходить з «Прийому» і «Розподілу»; відвантажується лише у вантажівку поточної сесії")
                 }
 
                 TargetBanner {
                     visible: !screen.empty
                     text: !Terminal.sessionOpen ? qsTr("Відвантаження можливе лише у відкритій сесії")
                           : screen.hasTruck ? qsTr("Куди: %1").arg(screen.truckTitle)
-                                            : qsTr("Оберіть фуру праворуч")
+                                            : qsTr("Оберіть вантажівку праворуч")
                     active: screen.hasTruck && Terminal.sessionOpen
                     warning: !Terminal.sessionOpen
                 }
@@ -128,7 +128,7 @@ Page {
                                     }
                                     Button {
                                         visible: cropRow.modelData.boxes > 0
-                                        text: qsTr("У фуру →")
+                                        text: qsTr("У вантажівку →")
                                         enabled: screen.hasTruck && boxes.text !== ""
                                         onClicked: cropRow.ship()
                                     }
@@ -149,7 +149,7 @@ Page {
                         icon: "warehouse"
                         title: qsTr("Склад порожній")
                         text: qsTr("Палети потрапляють сюди з «Прийому» (ціль «Склад») і з «Розподілу». "
-                                   + "Звідси ящики йдуть лише у фуру поточної сесії.")
+                                   + "Звідси ящики йдуть лише у вантажівку поточної сесії.")
                     }
                 }
             }
@@ -165,7 +165,7 @@ Page {
                 anchors.fill: parent
                 spacing: Theme.spacingM
 
-                SectionCaption { text: qsTr("Фури сесії") }
+                SectionCaption { text: qsTr("Вантажівки сесії") }
 
                 ListView {
                     id: truckList
@@ -177,7 +177,7 @@ Page {
 
                     ListPlaceholder {
                         visible: truckList.count === 0
-                        text: qsTr("Немає фур, що завантажуються")
+                        text: qsTr("Немає вантажівок, що завантажуються")
                     }
 
                     delegate: DestinationCard {

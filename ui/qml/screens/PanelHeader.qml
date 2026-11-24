@@ -2,7 +2,7 @@ import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
 
-// A panel's title with a muted line under it ("Усі фури" / "2 палети · 65 ящ.").
+// A panel's title with a muted line under it ("Усі вантажівки" / "2 палети · 65 ящ.").
 ColumnLayout {
     property alias title: titleLabel.text
     property alias subtitle: subtitleLabel.text

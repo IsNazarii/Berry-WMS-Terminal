@@ -19,7 +19,7 @@ Page {
         visible: !Terminal.sessionOpen
         icon: "calendar"
         title: qsTr("Сесію не відкрито")
-        text: qsTr("Перенесені фури з попередньої сесії додадуться автоматично.")
+        text: qsTr("Перенесені вантажівки з попередньої сесії додадуться автоматично.")
         actionText: qsTr("Відкрити сесію")
         onActionTriggered: Terminal.openSession()
     }
@@ -127,7 +127,7 @@ Page {
             StatTile {
                 caption: qsTr("Ящиків")
                 value: parent.summary.receivedBoxes ?? ""
-                detail: qsTr("у фурах %1 · на складі %2 · чекає %3")
+                detail: qsTr("вантажівки %1 · склад %2 · чекає %3")
                         .arg(parent.summary.inTrucks).arg(parent.summary.inWarehouse).arg(parent.summary.waiting)
                 detailColor: parent.summary.waiting > 0 ? Theme.warn : Theme.textMuted
             }
@@ -263,11 +263,11 @@ Page {
                     RowLayout {
                         Layout.fillWidth: true
                         SectionCaption {
-                            text: truckList.count > 0 ? qsTr("Фури сесії · %1").arg(truckList.count) : qsTr("Фури сесії")
+                            text: truckList.count > 0 ? qsTr("Вантажівки сесії · %1").arg(truckList.count) : qsTr("Вантажівки сесії")
                             Layout.fillWidth: true
                         }
                         Button {
-                            text: qsTr("Додати фуру…")
+                            text: qsTr("Додати вантажівку…")
                             onClicked: truckDialog.open()
                         }
                     }
@@ -288,8 +288,8 @@ Page {
                             anchors.centerIn: parent
                             visible: truckList.count === 0
                             icon: "truck"
-                            title: qsTr("Фур ще немає")
-                            text: qsTr("Додайте фуру або повторіть учорашню — тоді палети з «Прийому» підуть одразу в неї.")
+                            title: qsTr("Вантажівок ще немає")
+                            text: qsTr("Додайте вантажівку або повторіть учорашню — тоді палети з «Прийому» підуть одразу в неї.")
                         }
 
                         // A card per truck: who it is, how full, and what to do with it.
@@ -443,7 +443,7 @@ Page {
         anchors.centerIn: parent
         width: 420
         modal: true
-        title: qsTr("Нова фура")
+        title: qsTr("Нова вантажівка")
         standardButtons: Dialog.Cancel
 
         function add() {
@@ -505,7 +505,7 @@ Page {
                 }
             }
             Button {
-                text: qsTr("Додати фуру")
+                text: qsTr("Додати вантажівку")
                 highlighted: true
                 Layout.fillWidth: true
                 onClicked: truckDialog.add()

@@ -431,10 +431,10 @@ Page {
                                 text: {
                                     const p = placementBar.placement
                                     if (weighingForm.wontFit)
-                                        return qsTr("Не влізе у фуру %1 — палета чекатиме на «Розподілі»").arg(p.plate)
+                                        return qsTr("Не влізе у вантажівку %1 — палета чекатиме на «Розподілі»").arg(p.plate)
                                     if (p.hangs)
                                         return qsTr("Палета піде %1").arg(p.text)
-                                    return (placementBar.toTruck ? qsTr("Палета піде у фуру <b>%1</b>").arg(p.plate)
+                                    return (placementBar.toTruck ? qsTr("Палета піде у вантажівку <b>%1</b>").arg(p.plate)
                                                                  : qsTr("Палета піде <b>на склад</b>"))
                                            + (p.follows ? qsTr(" — як попередня цієї культури в чеку") : "")
                                 }

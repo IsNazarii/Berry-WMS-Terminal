@@ -213,7 +213,7 @@ TEST(Journal, KeepsAllocationOwnErrors) {
     journal.add(receipt);
 
     const auto errors = journal.validateAllocation(Allocation::boxesOf(receipt, "raspberry", 10, TruckId{}));
-    EXPECT_TRUE(mentions(errors, "Не обрано фуру"));
+    EXPECT_TRUE(mentions(errors, "Не обрано вантажівку"));
 }
 
 TEST(Journal, LastBoxesTakeExactlyTheRemainingWeight) {

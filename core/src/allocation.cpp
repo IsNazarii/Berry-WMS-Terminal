@@ -33,7 +33,7 @@ std::vector<std::string> Allocation::validate() const {
     std::vector<std::string> errors;
     if (receiptId_.isNil()) errors.emplace_back("Не обрано чек");
     if (const auto* truckId = std::get_if<TruckId>(&destination_); truckId && truckId->isNil()) {
-        errors.emplace_back("Не обрано фуру");
+        errors.emplace_back("Не обрано вантажівку");
     }
     if (cropCode_.empty()) errors.emplace_back("Не обрано культуру");
     if (cargo_.boxes <= 0) errors.emplace_back("Кількість ящиків має бути більшою за нуль");
@@ -43,7 +43,7 @@ std::vector<std::string> Allocation::validate() const {
 
 std::string Allocation::describe() const {
     const Overloaded where{
-        [](const TruckId& truckId) { return "фура " + truckId.toString(); },
+        [](const TruckId& truckId) { return "вантажівка " + truckId.toString(); },
         [](ToWarehouse) { return std::string{"склад"}; },
     };
     return std::format("Розподіл {}: {} ящ., {} → {}{}", cropCode_, cargo_.boxes, formatWeight(cargo_.weight),

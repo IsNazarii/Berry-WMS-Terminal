@@ -95,7 +95,7 @@ TEST(Allocation, DescribeMentionsTruckAndCargo) {
     const auto text = Allocation::wholeWeighing(sampleReceipt(), 2, kTruck).describe();
     EXPECT_NE(text.find("blueberry"), std::string::npos);
     EXPECT_NE(text.find("40 ящ."), std::string::npos);
-    EXPECT_NE(text.find("фура " + kTruck.toString()), std::string::npos);
+    EXPECT_NE(text.find("вантажівка " + kTruck.toString()), std::string::npos);
 }
 
 TEST(Allocation, CanGoToTheWarehouse) {

@@ -22,14 +22,14 @@ StockShipment StockShipment::create(std::string cropCode, Cargo cargo, TruckId t
 std::vector<std::string> StockShipment::validate() const {
     std::vector<std::string> errors;
     if (cropCode_.empty()) errors.emplace_back("Не обрано культуру");
-    if (truckId_.isNil()) errors.emplace_back("Не обрано фуру");
+    if (truckId_.isNil()) errors.emplace_back("Не обрано вантажівку");
     if (cargo_.boxes <= 0) errors.emplace_back("Кількість ящиків має бути більшою за нуль");
     if (!cargo_.weight.isPositive()) errors.emplace_back("Вага має бути більшою за нуль");
     return errors;
 }
 
 std::string StockShipment::describe() const {
-    return std::format("Відвантаження зі складу {}: {} ящ., {} → фура {}", cropCode_, cargo_.boxes,
+    return std::format("Відвантаження зі складу {}: {} ящ., {} → вантажівка {}", cropCode_, cargo_.boxes,
                        formatWeight(cargo_.weight), truckId_.toString());
 }
 

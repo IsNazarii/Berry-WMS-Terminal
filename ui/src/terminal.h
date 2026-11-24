@@ -111,7 +111,7 @@ class Terminal : public QObject {
     // (destinationId as in `destinations`); empty: none, they hang. Remembered per terminal.
     Q_PROPERTY(QString receivingTarget READ receivingTarget NOTIFY receivingTargetChanged)
     // Where the next pallet of each crop goes, said before it is weighed: {cropCode: {text, plate, follows,
-    // hangs, boxesLeft}}. text: "у фуру BI1111AA" / "на склад"; plate is empty for the warehouse;
+    // hangs, boxesLeft}}. text: "у вантажівку BI1111AA" / "на склад"; plate is empty for the warehouse;
     // follows: after the last pallet of the crop rather than the target; boxesLeft is -1 for the
     // warehouse. Empty without an active receipt.
     Q_PROPERTY(QVariantMap nextPlacements READ nextPlacements NOTIFY placementsChanged)

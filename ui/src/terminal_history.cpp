@@ -97,8 +97,8 @@ QVariantList Terminal::historyPlaces() const {
     QVariantList list;
     list.append(QVariantMap{
         {"placeId", QString(kAllTrucks)},
-        {"title", tr("Усі фури")},
-        {"detail", tr("фур: %1").arg(day->trucks().size())},
+        {"title", tr("Усі вантажівки")},
+        {"detail", tr("вантажівок: %1").arg(day->trucks().size())},
         {"rows", static_cast<int>(history.intoTrucks().size())},
     });
     for (const Truck& truck : day->trucks()) {

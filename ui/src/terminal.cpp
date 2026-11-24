@@ -539,7 +539,7 @@ QVariantList Terminal::allocationLines() const {
                 QString placedIn;
                 if (const auto destination = journal_.destinationOf(receipt->id(), i)) {
                     const auto* truckId = std::get_if<TruckId>(&*destination);
-                    placedIn = truckId ? tr("у фурі %1").arg(plateOf(*truckId)) : tr("на складі");
+                    placedIn = truckId ? tr("у вантажівці %1").arg(plateOf(*truckId)) : tr("на складі");
                 }
                 list.append(QVariantMap{
                     {"index", static_cast<int>(i)},
@@ -762,9 +762,9 @@ QString Terminal::setPrice(const QString& cropCode, const QString& price) {
 
 QString Terminal::addTruck(const QString& plate, const QString& make, const QString& note, const QString& boxes) {
     if (!workDay_) return tr("Сесію не відкрито");
-    if (plate.trimmed().isEmpty()) return tr("Вкажіть номер фури");
+    if (plate.trimmed().isEmpty()) return tr("Вкажіть номер вантажівки");
     const auto boxLimit = parseBoxLimit(boxes);
-    if (!boxLimit) return tr("Ліміт фури — ціле додатне число ящиків");
+    if (!boxLimit) return tr("Ліміт вантажівки — ціле додатне число ящиків");
     workDay_->addTruck(plate.trimmed().toUpper().toStdString(), *boxLimit,
                        {.make = make.trimmed().toStdString(), .note = note.trimmed().toStdString()});
     saveSession();
@@ -774,7 +774,7 @@ QString Terminal::addTruck(const QString& plate, const QString& make, const QStr
 
 QString Terminal::repeatTruck(int previousIndex) {
     if (!workDay_) return tr("Сесію не відкрито");
-    if (previousIndex < 0 || previousIndex >= static_cast<int>(previousTrucks_.size())) return tr("Оберіть фуру");
+    if (previousIndex < 0 || previousIndex >= static_cast<int>(previousTrucks_.size())) return tr("Оберіть вантажівку");
     workDay_->repeatTruck(previousTrucks_[static_cast<std::size_t>(previousIndex)]);
     saveSession();
     emit trucksChanged();
@@ -1068,7 +1068,7 @@ QVariantMap Terminal::nextPlacement(std::string_view cropCode) const {
         boxesLeft = std::max(truck->boxesLeft(journal_.loadOf(*truckId)), 0);
         plate = QString::fromStdString(truck->plate());
     }
-    const QString text = plate.isEmpty() ? tr("на склад") : tr("у фуру %1").arg(plate);
+    const QString text = plate.isEmpty() ? tr("на склад") : tr("у вантажівку %1").arg(plate);
     return {{"text", text}, {"plate", plate}, {"follows", next != target}, {"hangs", false}, {"boxesLeft", boxesLeft}};
 }
 
@@ -1235,7 +1235,7 @@ QString Terminal::shipFromStock(const QString& cropCode, const QString& boxesTex
     const int boxes = boxesText.trimmed().toInt(&ok);
     if (!ok || boxes <= 0) return tr("Кількість ящиків — ціле додатне число");
     // From the warehouse only into a truck: "warehouse to warehouse" makes no sense.
-    if (truckId == kWarehouseId) return tr("Оберіть фуру");
+    if (truckId == kWarehouseId) return tr("Оберіть вантажівку");
     const auto destination = destinationFor(truckId);
     if (const auto* error = std::get_if<QString>(&destination)) return *error;
 
@@ -1370,8 +1370,8 @@ std::variant<Destination, QString> Terminal::destinationFor(const QString& desti
     if (destinationId == kWarehouseId) return Destination{ToWarehouse{}};
     const auto id = Uuid::parse(destinationId.toStdString());
     const Truck* truck = id ? workDay_->findTruck(*id) : nullptr;
-    if (!truck) return tr("Оберіть фуру або склад");
-    if (!truck->acceptsCargo()) return tr("Фура %1 вже не завантажується").arg(QString::fromStdString(truck->plate()));
+    if (!truck) return tr("Оберіть вантажівку або склад");
+    if (!truck->acceptsCargo()) return tr("Вантажівка %1 вже не завантажується").arg(QString::fromStdString(truck->plate()));
     return Destination{truck->id()};
 }
 

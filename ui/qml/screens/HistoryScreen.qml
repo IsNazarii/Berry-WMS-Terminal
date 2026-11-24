@@ -92,7 +92,7 @@ Page {
                     columns: [
                         { title: qsTr("Час"), width: 92 },
                         // A plate on every truck, or where a warehouse row went; one truck needs none.
-                        { title: screen.warehouse ? qsTr("Куди") : qsTr("Фура"), width: screen.narrow ? 90 : 110,
+                        { title: screen.warehouse ? qsTr("Куди") : qsTr("Вантажівка"), width: screen.narrow ? 90 : 110,
                           visible: screen.warehouse || Terminal.historyPlace === "all" },
                         { title: qsTr("Від кого") },
                         { title: qsTr("Культура"), width: screen.narrow ? 84 : 110 },
@@ -122,7 +122,7 @@ Page {
                                : screen.warehouse ? qsTr("Склад цього дня не змінювався")
                                                   : qsTr("Ще нічого не завантажено")
                         text: !screen.hasDay ? qsTr("Історія з'явиться, щойно відкриють першу сесію й запишуть палету.")
-                              : qsTr("Тут з'являється кожна палета, щойно вона потрапляє у фуру чи на склад — "
+                              : qsTr("Тут з'являється кожна палета, щойно вона потрапляє у вантажівку чи на склад — "
                                      + "з «Прийому» чи з «Розподілу».")
                     }
                 }

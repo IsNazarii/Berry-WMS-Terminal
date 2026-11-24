@@ -31,6 +31,8 @@ Page {
         property string value
         property string unit
         property string detail
+        // Longest first; the tile shows the first that fits its width (or `detail` when empty).
+        property list<string> detailChoices
         property color detailColor: Theme.textMuted
 
         Layout.fillWidth: true
@@ -64,8 +66,19 @@ Page {
                 }
             }
             CaptionLabel {
-                text: tile.detail
+                id: detailLabel
+                text: {
+                    for (const choice of tile.detailChoices) {
+                        if (detailMetrics.advanceWidth(choice) <= width) return choice
+                    }
+                    return tile.detailChoices.length > 0 ? tile.detailChoices[tile.detailChoices.length - 1] : tile.detail
+                }
                 color: tile.detailColor
+
+                FontMetrics {
+                    id: detailMetrics
+                    font: detailLabel.font
+                }
             }
         }
     }
@@ -122,7 +135,8 @@ Page {
                 caption: qsTr("Прийнято")
                 value: parent.summary.receivedKg ?? ""
                 unit: qsTr("кг")
-                detail: parent.summary.crops || qsTr("ще нічого")
+                detail: qsTr("ще нічого")
+                detailChoices: parent.summary.crops ? parent.summary.cropChoices : []
             }
             StatTile {
                 caption: qsTr("Ящиків")

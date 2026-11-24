@@ -359,10 +359,16 @@ QVariantMap Terminal::sessionSummary() const {
     QStringList crops;
     for (const CropTotal& crop : summary.byCrop())
         crops << QString("%1 %2").arg(cropName(crop.cropCode).toLower(), kilogramsText(crop.cargo.weight));
+    // The whole list, then shorter and shorter: the heaviest crops and how many more there are.
+    // The tile shows the longest that fits, so a narrow window loses crops, not half a name.
+    QStringList cropChoices{crops.join(" · ")};
+    for (qsizetype shown = crops.size() - 1; shown >= 1; --shown)
+        cropChoices << (crops.mid(0, shown) << tr("ще %1").arg(crops.size() - shown)).join(" · ");
     return {
         {"receivedKg", kilogramsText(summary.received().weight)},
         {"receivedBoxes", summary.received().boxes},
         {"crops", crops.join(" · ")},
+        {"cropChoices", cropChoices},
         {"closedReceipts", summary.closedReceipts()},
         {"openReceipts", summary.openReceipts()},
         {"inTrucks", summary.inTrucks().boxes},

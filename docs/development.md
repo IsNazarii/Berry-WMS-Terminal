@@ -53,7 +53,40 @@ $CM/cmake -S . -B build -G Ninja && $CM/cmake --build build && $CM/ctest --test-
 | `wms_ui_qmllint` | перевірка QML-файлів `qmllint` |
 | `wms_shots` | знімки всіх екранів без вікна для перевірки змін UI «до/після» (`tools/shots/`; збирається, якщо є Qt Test) |
 
-Опції CMake: `WMS_BUILD_TESTS` (за замовчуванням `ON`).
+Опції CMake: `WMS_BUILD_TESTS`, `WMS_BUILD_TOOLS` (`wms_shots`), `WMS_INSTALL_UDEV_RULE` (усі за замовчуванням `ON`).
+
+### Встановлення й пакети
+
+Пакет системи, на якій запущено скрипт (`.deb` на Ubuntu, `.rpm` на Fedora), — однією командою:
+
+```bash
+packaging/build-packages.sh          # Release + усі тести → build-release/berry-wms_<версія>_amd64.deb або .rpm
+sudo apt install ./build-release/berry-wms_0.1.0_amd64.deb      # Ubuntu
+sudo dnf install ./build-release/berry-wms-0.1.0-1.x86_64.rpm   # Fedora
+```
+
+Потрібні `dpkg-dev` (Ubuntu) або `rpm-build` (Fedora). Пакет ставить:
+
+| Файл | Навіщо |
+|---|---|
+| `/usr/bin/berry-wms` | програма (у збірці — `wms_terminal`) |
+| `/usr/share/applications/io.github.isnazarii.BerryWms.desktop` | ярлик у меню; `main.cpp` ставить ту саму назву (`setDesktopFileName`), щоб вікно мало іконку |
+| `/usr/share/icons/hicolor/scalable/apps/io.github.isnazarii.BerryWms.svg` | іконка — знак `BrandMark` у кольорах екрана входу |
+| `/usr/lib/udev/rules.d/70-berry-wms-scale.rules` | кабель ваг (FTDI `0403:6001`) належить тому, хто увійшов у систему: без групи `dialout` і перезавантаження; діє після перепідключення кабелю |
+
+Qt береться з системи, тому пакет — для того самого випуску дистрибутива (чи новішого), де зібраний: потрібен
+Qt ≥ 6.8 (Fedora 42+, Ubuntu 26.04+). QML, скомпільований заздалегідь, прив'язаний до точної версії Qt
+(`qt6-declarative-private-abi (= 6.10.2)` у `.deb`), тож після оновлення Qt у системі пакет перезбирають.
+QML-модулі й плагін SVG програма завантажує під час роботи — їх перелічено в залежностях пакета вручну
+(`packaging/CMakeLists.txt`); новий `import` у QML — додати й туди. База (`~/.local/share/BerryWms/`) лежить
+окремо від програми: встановлення, оновлення й видалення пакета її не чіпають.
+
+Без пакета, у домашню теку (правило udev там нічого б не дало, тому його вимкнено):
+
+```bash
+cmake -S . -B build-release -G Ninja -DCMAKE_BUILD_TYPE=Release -DWMS_INSTALL_UDEV_RULE=OFF
+cmake --build build-release && cmake --install build-release --prefix ~/.local
+```
 
 Прапорці `-Wall -Wextra -Wpedantic -Wshadow` на всіх наших цілях — **збірка має бути без
 попереджень**.

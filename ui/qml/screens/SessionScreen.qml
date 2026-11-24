@@ -141,8 +141,17 @@ Page {
             StatTile {
                 caption: qsTr("Ящиків")
                 value: parent.summary.receivedBoxes ?? ""
-                detail: qsTr("вантажівки %1 · склад %2 · чекає %3")
-                        .arg(parent.summary.inTrucks).arg(parent.summary.inWarehouse).arg(parent.summary.waiting)
+                // Shorter variants drop the warehouse, then the trucks; what waits for a place
+                // matters most, so it moves to the front once the full line does not fit.
+                detailChoices: {
+                    const s = parent.summary
+                    const trucks = qsTr("вантажівки %1").arg(s.inTrucks)
+                    const stock = qsTr("склад %1").arg(s.inWarehouse)
+                    const waiting = qsTr("чекає %1").arg(s.waiting)
+                    const full = [trucks, stock, waiting].join(" · ")
+                    return s.waiting > 0 ? [full, [waiting, trucks].join(" · "), waiting]
+                                         : [full, [trucks, stock].join(" · "), trucks]
+                }
                 detailColor: parent.summary.waiting > 0 ? Theme.warn : Theme.textMuted
             }
             StatTile {
@@ -156,7 +165,9 @@ Page {
                 caption: qsTr("Виплачено")
                 value: parent.summary.paid ?? ""
                 unit: qsTr("грн")
-                detail: qsTr("готівка %1 · переказ %2").arg(parent.summary.paidCash).arg(parent.summary.paidTransfer)
+                // Amounts stay whole to the kopeck; only the words get shorter.
+                detailChoices: [qsTr("готівка %1 · переказ %2").arg(parent.summary.paidCash).arg(parent.summary.paidTransfer),
+                                qsTr("гот. %1 · пер. %2").arg(parent.summary.paidCash).arg(parent.summary.paidTransfer)]
             }
         }
 

@@ -12,6 +12,9 @@ install(FILES ${WMS_APP_ID}.svg DESTINATION ${CMAKE_INSTALL_DATADIR}/icons/hicol
 # udev reads only /usr/lib/udev/rules.d (also on 64-bit Fedora, so not LIBDIR). Off for
 # an install into the home folder, where the rule would do nothing.
 option(WMS_INSTALL_UDEV_RULE "Install the udev rule that gives the scale port to the logged-in user" ON)
+# The license and the notices of the third-party parts must travel with every copy.
+install(FILES ${PROJECT_SOURCE_DIR}/LICENSE.md ${PROJECT_SOURCE_DIR}/THIRD_PARTY_NOTICES.md
+        DESTINATION ${CMAKE_INSTALL_DATADIR}/doc/berry-wms)
 if(WMS_INSTALL_UDEV_RULE)
     install(FILES 70-berry-wms-scale.rules DESTINATION lib/udev/rules.d)
 endif()
@@ -24,6 +27,7 @@ set(CPACK_PACKAGE_DESCRIPTION_SUMMARY "Berry receiving terminal: weighing, truck
 set(CPACK_PACKAGE_DESCRIPTION
     "Offline-first terminal of a berry receiving point: receiving and weighing pallets on \
 industrial scales, loading trucks and the warehouse, printing receipts and paying suppliers.")
+set(CPACK_RESOURCE_FILE_LICENSE ${PROJECT_SOURCE_DIR}/LICENSE.md)
 set(CPACK_PACKAGING_INSTALL_PREFIX /usr)
 set(CPACK_STRIP_FILES ON)
 # Folders as every package has them, whatever the umask of the machine that builds.
@@ -45,13 +49,14 @@ set(CPACK_DEBIAN_PACKAGE_RECOMMENDS "qt6-translations-l10n, qt6-wayland")
 # Fedora: rpmbuild finds the Qt libraries; qtdeclarative holds every QML module we import.
 set(CPACK_RPM_FILE_NAME RPM-DEFAULT)
 set(CPACK_RPM_PACKAGE_GROUP "Applications/Productivity")
-# No license chosen for the project yet: all rights reserved.
-set(CPACK_RPM_PACKAGE_LICENSE "Proprietary")
+# SPDX name; commercial use needs a separate license from the author (README).
+set(CPACK_RPM_PACKAGE_LICENSE "PolyForm-Noncommercial-1.0.0")
 set(CPACK_RPM_PACKAGE_REQUIRES "qt6-qtdeclarative >= 6.8, qt6-qtsvg")
 set(CPACK_RPM_PACKAGE_SUGGESTS "qt6-qttranslations, qt6-qtwayland")
 # These folders belong to the system's own packages; owning them too makes rpm complain.
 list(APPEND CPACK_RPM_EXCLUDE_FROM_AUTO_FILELIST_ADDITION
     /usr/share/applications
+    /usr/share/doc
     /usr/share/icons
     /usr/share/icons/hicolor
     /usr/share/icons/hicolor/scalable

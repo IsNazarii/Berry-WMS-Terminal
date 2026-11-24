@@ -72,6 +72,7 @@ sudo dnf install ./build-release/berry-wms-0.1.0-1.x86_64.rpm   # Fedora
 | `/usr/bin/berry-wms` | програма (у збірці — `wms_terminal`) |
 | `/usr/share/applications/io.github.isnazarii.BerryWms.desktop` | ярлик у меню; `main.cpp` ставить ту саму назву (`setDesktopFileName`), щоб вікно мало іконку |
 | `/usr/share/icons/hicolor/scalable/apps/io.github.isnazarii.BerryWms.svg` | іконка — знак `BrandMark` у кольорах екрана входу |
+| `/usr/share/doc/berry-wms/` | `LICENSE.md` і `THIRD_PARTY_NOTICES.md`: ліцензії сторонніх частин мають іти з кожною копією |
 | `/usr/lib/udev/rules.d/70-berry-wms-scale.rules` | кабель ваг (FTDI `0403:6001`) належить тому, хто увійшов у систему: без групи `dialout` і перезавантаження; діє після перепідключення кабелю |
 
 Qt береться з системи, тому пакет — для того самого випуску дистрибутива (чи новішого), де зібраний: потрібен

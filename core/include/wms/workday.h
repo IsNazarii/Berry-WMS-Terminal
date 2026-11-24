@@ -8,6 +8,7 @@
 #include "wms/truck.h"
 
 #include <chrono>
+#include <functional>
 #include <optional>
 #include <string>
 #include <string_view>
@@ -156,7 +157,10 @@ public:
                                          PaymentMethod method, OperatorId paidBy, TimePoint at);
 
     // Operator-facing: why the session cannot be closed yet; empty when it can.
-    [[nodiscard]] std::vector<std::string> validateClose() const;
+    // The core knows suppliers only by number: `supplierName` lets the caller name the
+    // supplier of an open receipt; without it, or for an empty name, the number is shown.
+    [[nodiscard]] std::vector<std::string> validateClose(
+        const std::function<std::string(SupplierId)>& supplierName = {}) const;
     // Throws std::logic_error when validateClose() is not empty or already closed.
     void close(TimePoint at, OperatorId by);
 

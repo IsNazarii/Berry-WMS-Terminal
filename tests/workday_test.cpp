@@ -381,6 +381,17 @@ TEST(WorkDay, CannotCloseWithOpenReceipts) {
     EXPECT_NE(errors[0].find("#42"), std::string::npos);
 }
 
+// The core knows suppliers by number; the operator knows them by name.
+TEST(WorkDay, OpenReceiptBlockerNamesTheSupplierWhenTheCallerKnowsTheName) {
+    WorkDay day = dayWithRaspberryPrice();
+    (void)day.openReceipt(42);
+    const auto errors =
+        day.validateClose([](SupplierId id) { return id == 42 ? std::string{"Шевченко Тарас"} : std::string{}; });
+    ASSERT_EQ(errors.size(), 1U);
+    EXPECT_NE(errors[0].find("Шевченко Тарас"), std::string::npos);
+    EXPECT_EQ(errors[0].find("#42"), std::string::npos);
+}
+
 TEST(WorkDay, ClosedSessionOpensNoReceipts) {
     WorkDay day = openAtNoon();
     day.close(kMidnight + 20h, kOksana);

@@ -431,7 +431,11 @@ QVariantList Terminal::previousTruckList() const {
 QStringList Terminal::closeBlockers() const {
     QStringList list;
     if (workDay_) {
-        for (const std::string& error : workDay_->validateClose()) list << QString::fromStdString(error);
+        const auto nameOf = [this](SupplierId id) {
+            const auto found = std::ranges::find(suppliers_, id, &Supplier::id);
+            return found != suppliers_.end() ? found->fullName() : std::string{};
+        };
+        for (const std::string& error : workDay_->validateClose(nameOf)) list << QString::fromStdString(error);
     }
     return list;
 }

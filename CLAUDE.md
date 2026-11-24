@@ -415,7 +415,7 @@ F2 → `SupplierPicker`; по центру обраний `cashSupplierId` (ок
 - Лаба 3: `QrMatrix` (обгортка qrcodegen), `ReceiptPrinter`, `ReceiptDocument` ✅
 - Інші класи: `Uuid`, `Supplier`, `Crop`, `CropKeys`, `StabilityDetector`, `ScaleReading`, `Ie04FrameReader`, `Weighing`, `Truck`, `Cargo`, `Journal`, `DayPrices`,
   `WorkDay`, `Operator`, `OpenReceipt`, `SessionSummary`, `LoadingHistory` ✅
-- Стан на 26.09: 19 класів ядра, 2 ієрархії (A — 5 класів), 6+ поліморфізмів, 158 тестів (зараз 356: 293 ядра + 42 infra + 7 серійного порту + 14 друку) — лаба 1 закрита із запасом.
+- Стан на 26.09: 19 класів ядра, 2 ієрархії (A — 5 класів), 6+ поліморфізмів, 158 тестів (зараз 357: 294 ядра + 42 infra + 7 серійного порту + 14 друку) — лаба 1 закрита із запасом.
 
 Лаба 2: ≥4 екрани (Вхід, Прийом, Сесія, Розподіл, Склад, Каса, Історія, + Sync/Довідники),
 ≥20 контролів, ≥1 контейнер (ListView), ≥10 обробників, логіка відділена.

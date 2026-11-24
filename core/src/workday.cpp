@@ -177,10 +177,13 @@ PaidReceipt WorkDay::payReceipt(const Uuid& receiptId, const std::vector<CropPri
     return {.receipt = std::move(closed), .payment = std::move(payment)};
 }
 
-std::vector<std::string> WorkDay::validateClose() const {
+std::vector<std::string> WorkDay::validateClose(const std::function<std::string(SupplierId)>& supplierName) const {
     std::vector<std::string> errors;
     for (const OpenReceipt& r : openReceipts_) {
-        errors.push_back(std::format("Відкритий чек постачальника #{}: закрийте його", r.supplierId()));
+        const std::string name = supplierName ? supplierName(r.supplierId()) : std::string{};
+        errors.push_back(name.empty()
+                             ? std::format("Чек постачальника #{} ще відкритий: закрийте його", r.supplierId())
+                             : std::format("Чек {} ще відкритий: закрийте його", name));
     }
     for (const Truck& t : trucks_) {
         if (t.status() == TruckStatus::Loading) {

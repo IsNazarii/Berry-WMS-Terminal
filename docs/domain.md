@@ -163,7 +163,7 @@ classDiagram
         +addWeighing(id, w, at)
         +closeReceipt(id, settlement) Receipt
         +payReceipt(id, prices, method, by, at) PaidReceipt
-        +validateClose()
+        +validateClose(supplierName)
         +close(at, by)
     }
     class Truck {
@@ -674,8 +674,9 @@ Append-only сховище фактів. Для кожного типу — ок
 
 **Закриття сесії:**
 
-- `validateClose()` — список причин: кожен відкритий чек і кожна вантажівка у стані `Loading`
-  («закрийте її або перенесіть у наступну сесію»).
+- `validateClose(supplierName = {})` — список причин: кожен відкритий чек («Чек Шевченко Тарас ще відкритий: закрийте
+  його»; ядро знає постачальників лише за номером, тож ім'я дає функція `supplierName`, без неї — «#42») і кожна
+  вантажівка у стані `Loading` («закрийте її або перенесіть у наступну сесію»).
 - `close(at, by)` — лише коли причин немає.
 - `trucksForNextSession()` — вантажівки, перенесені в наступну сесію.
 

@@ -8,7 +8,7 @@
 ![C++20](https://img.shields.io/badge/C%2B%2B-20-00599C?logo=cplusplus&logoColor=white)
 ![Qt 6](https://img.shields.io/badge/Qt-6.8%2B%20%2F%20QML-41CD52?logo=qt&logoColor=white)
 ![SQLite](https://img.shields.io/badge/SQLite-offline--first-003B57?logo=sqlite&logoColor=white)
-![Tests](https://img.shields.io/badge/tests-356%20passing-2ea44f)
+![Tests](https://img.shields.io/badge/tests-357%20passing-2ea44f)
 ![Status](https://img.shields.io/badge/status-beta-3A3F94)
 
 <picture>
@@ -183,7 +183,7 @@ qrcodegen завантажуються автоматично, тож під ч�
 ```bash
 cmake -S . -B build -G Ninja
 cmake --build build
-ctest --test-dir build --output-on-failure   # 356 тестів
+ctest --test-dir build --output-on-failure   # 357 тестів
 ./build/app/wms_terminal
 ```
 
